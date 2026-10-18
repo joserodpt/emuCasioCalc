@@ -61,23 +61,26 @@ SC(sc_bdisp_setpoint_vram)
     return 0;
 }
 
-/* SaveVRAM_1() / LoadVRAM_1(): keep a copy of VRAM, put it back. */
+/* SaveVRAM_1() / LoadVRAM_1(): copy VRAM to the secondary VRAM and back
+ * (GetSecondaryVRAMAddress gives add-ins its address). */
 SC(sc_save_vram_1)
 {
     (void)a;
-    if (!emu->saved_vram)
-        emu->saved_vram = malloc(VRAM_SIZE);
-    if (emu->saved_vram)
-        memcpy(emu->saved_vram, emu->vram, VRAM_SIZE);
+    memcpy(emu->vram2, emu->vram, VRAM_SIZE);
     return 0;
 }
 
 SC(sc_load_vram_1)
 {
     (void)a;
-    if (emu->saved_vram)
-        memcpy(emu->vram, emu->saved_vram, VRAM_SIZE);
+    memcpy(emu->vram, emu->vram2, VRAM_SIZE);
     return 0;
+}
+
+SC(sc_get_secondary_vram_address)
+{
+    (void)a;
+    return emu->layout->vram2;
 }
 
 /* PrintXY(int x, int y, const char *string, int mode, int color).

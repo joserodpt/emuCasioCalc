@@ -8,7 +8,7 @@
  * Syscall numbers and signatures: WikiPrizm (prizm.cemetech.net) and the
  * syscall stubs in libfxcg (github.com/Jonimoose/libfxcg). This file has
  * the table and the system calls; drawing, keyboard and storage are in
- * syscalls_text.c, syscalls_keys.c, syscalls_bfile.c and syscalls_mcs.c.
+ * syscalls_draw.c, syscalls_text.c, syscalls_keys.c, syscalls_bfile.c and syscalls_mcs.c.
  */
 #include "syscalls.h"
 
@@ -224,6 +224,107 @@ static SC(sc_strlen)
     return n;
 }
 
+/* memcmp(p1, p2, n): like C's, the difference of the first differing bytes. */
+static SC(sc_memcmp)
+{
+    for (uint32_t i = 0; i < a[2]; i++) {
+        int d = mem_read8(&emu->mem, a[0] + i) - mem_read8(&emu->mem, a[1] + i);
+        if (d)
+            return (uint32_t)d;
+    }
+    return 0;
+}
+
+/* Hex conversions. The *ToHex calls write uppercase digits without a NUL;
+ * HexTo* accept either case and return 0, or 1 on a non-hex character
+ * (then *result is left alone). */
+static int hex_value(uint8_t c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    return -1;
+}
+
+static bool hex_read(Emu *emu, uint32_t addr, int digits, uint32_t *out)
+{
+    uint32_t v = 0;
+    for (int i = 0; i < digits; i++) {
+        int n = hex_value(mem_read8(&emu->mem, addr + (uint32_t)i));
+        if (n < 0)
+            return false;
+        v = v << 4 | (uint32_t)n;
+    }
+    *out = v;
+    return true;
+}
+
+static void hex_write(Emu *emu, uint32_t addr, uint32_t value, int digits)
+{
+    for (int i = 0; i < digits; i++)
+        mem_write8(&emu->mem, addr + (uint32_t)i,
+                   (uint8_t)"0123456789ABCDEF"[value >> 4 * (digits - 1 - i) & 15]);
+}
+
+/* HexToNibble(char, unsigned char *result) */
+static SC(sc_hex_to_nibble)
+{
+    int n = hex_value((uint8_t)a[0]);
+    if (n < 0)
+        return 1;
+    mem_write8(&emu->mem, a[1], (uint8_t)n);
+    return 0;
+}
+
+/* HexToByte(const char *two_digits, unsigned char *result) */
+static SC(sc_hex_to_byte)
+{
+    uint32_t v;
+    if (!hex_read(emu, a[0], 2, &v))
+        return 1;
+    mem_write8(&emu->mem, a[1], (uint8_t)v);
+    return 0;
+}
+
+/* HexToWord(const char *four_digits, unsigned short *result) */
+static SC(sc_hex_to_word)
+{
+    uint32_t v;
+    if (!hex_read(emu, a[0], 4, &v))
+        return 1;
+    mem_write16(&emu->mem, a[1], (uint16_t)v);
+    return 0;
+}
+
+/* NibbleToHex / ByteToHex / WordToHex(value, char *result) */
+static SC(sc_nibble_to_hex)
+{
+    hex_write(emu, a[1], a[0], 1);
+    return 0;
+}
+
+static SC(sc_byte_to_hex)
+{
+    hex_write(emu, a[1], a[0], 2);
+    return 0;
+}
+
+static SC(sc_word_to_hex)
+{
+    hex_write(emu, a[1], a[0], 4);
+    return 0;
+}
+
+/* LongToAscHex(value, char *result, digits): the low digits of value. */
+static SC(sc_long_to_asc_hex)
+{
+    int digits = (int32_t)a[2];
+    if (digits > 8) digits = 8;
+    if (digits > 0)
+        hex_write(emu, a[1], a[0], digits);
+    return 0;
+}
+
 /* itoa(value, unsigned char *result): decimal; returns result. */
 static SC(sc_itoa)
 {
@@ -342,9 +443,21 @@ static const Syscall SYSCALLS[] = {
     {0x023B, "PrintMiniGlyph", sc_print_mini_glyph},
     {0x023C, "PrintMini", sc_print_mini},
     {0x025F, "Bdisp_PutDisp_DD", sc_bdisp_putdisp_dd},
+    {0x0260, "Bdisp_PutDisp_DD_stripe", sc_putdisp_stripe},
+    {0x0262, "Bdisp_SetPointWB_VRAM", sc_bdisp_setpoint_vram},
     {0x0263, "Bdisp_SetPoint_VRAM", sc_bdisp_setpoint_vram},
+    {0x0267, "Bdisp_GetPoint_VRAM", sc_get_point_vram},
+    {0x026B, "Bdisp_SetPoint_DD", sc_set_point_dd},
+    {0x026F, "Bdisp_GetPoint_DD", sc_get_point_dd},
     {0x0272, "Bdisp_AllClr_VRAM", sc_bdisp_allclr_vram},
+    {0x0275, "Bdisp_Fill_VRAM", sc_fill_vram},
+    {0x028F, "Bdisp_WriteGraphVRAM_WB", sc_write_graph_vram},
+    {0x0290, "Bdisp_WriteGraphVRAM", sc_write_graph_vram},
+    {0x0291, "Bdisp_WriteGraphDD_WB", sc_write_graph_dd},
+    {0x02A3, "FrameColor", sc_frame_color},
     {0x02A8, "DrawFrame", sc_draw_frame},
+    {0x02AA, "DirectDrawRectangle", sc_direct_draw_rectangle},
+    {0x02B2, "Bdisp_AreaClr", sc_area_clr},
     {0x02B7, "EnableStatusArea", sc_nothing},
     {0x02B8, "DefineStatusAreaFlags", sc_nothing},
     {0x02C0, "RTC_GetTime", sc_rtc_get_time},
@@ -354,6 +467,9 @@ static const Syscall SYSCALLS[] = {
     {0x08C8, "Cursor_SetFlashOff", sc_nothing},
     {0x08D9, "Timer_Install", sc_timer_install},
     {0x0921, "Bdisp_EnableColor", sc_nothing},
+    {0x0924, "Bdisp_Rectangle", sc_rectangle},
+    {0x0925, "Bdisp_FilledRectangle", sc_filled_rectangle},
+    {0x0926, "Bdisp_FilledRectangleFullColor", sc_filled_rectangle_full},
     {0x0D39, "PRGM_GetKey_OS", sc_prgm_get_key_os},
     {0x0EAB, "GetKey", sc_get_key},
     {0x1170, "itoa", sc_itoa},
@@ -368,6 +484,12 @@ static const Syscall SYSCALLS[] = {
     {0x12D8, "SetBacklightDuration", sc_set_backlight},
     {0x12D9, "GetBacklightDuration", sc_get_backlight},
     {0x12F3, "GetFKeyPtr", sc_get_fkey_ptr},
+    {0x1343, "HexToNibble", sc_hex_to_nibble},
+    {0x1344, "HexToByte", sc_hex_to_byte},
+    {0x1345, "HexToWord", sc_hex_to_word},
+    {0x1346, "NibbleToHex", sc_nibble_to_hex},
+    {0x1347, "ByteToHex", sc_byte_to_hex},
+    {0x1348, "WordToHex", sc_word_to_hex},
     {0x1349, "strlen", sc_strlen},
     {0x1511, "memset", sc_memset},
     {0x154B, "MCS_CreateDirectory", sc_mcs_create_dir},
@@ -386,6 +508,7 @@ static const Syscall SYSCALLS[] = {
     {0x180E, "ProgressBar", sc_progress_bar},
     {0x1815, "ColorIndexDialog1", sc_color_index_dialog},
     {0x1839, "PowerOff", sc_nothing},         /* off and on again at once */
+    {0x1841, "LongToAscHex", sc_long_to_asc_hex},
     {0x1863, "locate_OS", sc_locate},
     {0x1883, "PrintLine", sc_print_line},
     {0x18EC, "PrintXY_2", sc_print_xy_2},
@@ -412,9 +535,11 @@ static const Syscall SYSCALLS[] = {
     {0x1DB3, "Bfile_RenameEntry", sc_bfile_rename},
     {0x1DB4, "Bfile_DeleteEntry", sc_bfile_delete},
     {0x1DD0, "memcpy", sc_memcpy},
+    {0x1DD1, "memcmp", sc_memcmp},
     {0x1DDC, "Bfile_StrToName_ncpy", sc_bfile_str_to_name},
     {0x1E23, "ResetAllDialog", sc_nothing},   /* nothing to reset */
     {0x1E4B, "DisplayMessageBox", sc_display_message_box},
+    {0x1E50, "GetSecondaryVRAMAddress", sc_get_secondary_vram_address},
     {0x1E62, "SaveVRAM_1", sc_save_vram_1},
     {0x1E63, "LoadVRAM_1", sc_load_vram_1},
     {0x1E6A, "DisplayMainMenu", sc_nothing},  /* no OS main menu */

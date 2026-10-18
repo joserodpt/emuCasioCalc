@@ -15,6 +15,9 @@
  */
 #define PANEL_WIDTH  396
 #define PANEL_HEIGHT 224
+/* Where the OS's 384x216 VRAM area sits on the panel. */
+#define VRAM_ORIGIN_X 6
+#define VRAM_ORIGIN_Y 4
 
 typedef struct {
     uint16_t fb[PANEL_WIDTH * PANEL_HEIGHT]; /* host-endian RGB565 */
@@ -33,6 +36,8 @@ uint16_t r61524_read(R61524 *lcd);
 /* What Bdisp_PutDisp_DD does: shows the OS's 384x216 VRAM (big-endian
  * RGB565), centred on the panel. */
 void r61524_blit_vram(R61524 *lcd, const uint8_t *vram);
+/* Only VRAM rows y1..y2 (Bdisp_PutDisp_DD_stripe). */
+void r61524_blit_vram_rows(R61524 *lcd, const uint8_t *vram, int y1, int y2);
 /* The inverse: the panel's VRAM-sized centre area as big-endian RGB565. */
 void r61524_read_vram(const R61524 *lcd, uint8_t *vram);
 

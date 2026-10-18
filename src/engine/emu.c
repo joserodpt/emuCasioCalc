@@ -21,6 +21,8 @@
  * fx-CG10/20: 2 MB of RAM at 0x08000000, VRAM at its start (0xA8000000);
  * gint borrows 0x880F0000, the add-in's static RAM is the last 512 kB.
  *
+ * On both, the secondary VRAM (SaveVRAM_1) follows VRAM, then the heap.
+ *
  * Clocks: the fx-CG50 runs the CPU at 117.96 MHz (Pphi 29.49 MHz); the
  * fx-CG10/20 at half that, 58.98 MHz (Pphi 14.75 MHz), from the same PLL
  * with bigger dividers.
@@ -37,6 +39,7 @@ static const Layout LAYOUTS[] = {
         .ram_phys = 0x0C000000u, .ram_size = 0x00800000u,
         .uram_phys = 0x0C200000u,
         .vram = P2(0x0C000000u),
+        .vram2 = P2(0x0C030000u),
         .stack_top = P1(0x0C180000u),
         .heap_base = P1(0x0C400000u), .heap_size = 0x00400000u,
         .frqcr = 0x0F011112u,
@@ -45,8 +48,9 @@ static const Layout LAYOUTS[] = {
         .ram_phys = 0x08000000u, .ram_size = 0x00200000u,
         .uram_phys = 0x08180000u,
         .vram = P2(0x08000000u),
+        .vram2 = P2(0x08030000u),
         .stack_top = P1(0x08170000u),
-        .heap_base = P1(0x08030000u), .heap_size = 0x000C0000u,
+        .heap_base = P1(0x08060000u), .heap_size = 0x00090000u,
         .frqcr = 0x0F102203u,
     },
 };
@@ -105,6 +109,7 @@ bool emu_init(Emu *emu, Model model)
     sh7305_add_mapping(&emu->hw, URAM_BASE, l->uram_phys, URAM_SIZE);
 
     emu->vram = emu->ram + ((l->vram & 0x1FFFFFFFu) - l->ram_phys);
+    emu->vram2 = emu->ram + ((l->vram2 & 0x1FFFFFFFu) - l->ram_phys);
     /* Add-ins written for the fx-CG10/20 hard-code VRAM at 0xA8000000; on
      * the fx-CG50, show those writes too by aliasing that address. */
     if (model == MODEL_CG50)
@@ -136,7 +141,6 @@ void emu_free(Emu *emu)
     for (size_t i = 0; i < sizeof emu->files / sizeof emu->files[0]; i++)
         if (emu->files[i])
             fclose(emu->files[i]);
-    free(emu->saved_vram);
     mem_free(&emu->mem);
 }
 

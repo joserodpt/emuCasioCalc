@@ -83,8 +83,10 @@ GiteaPC puts it), the CMake build compiles them and CTest runs them.
 | `r61524.c` | Display controller (396x224 panel) |
 | `emu.c` | Builds the machine (memory map, devices), key script |
 | **`src/engine/os/`** | **High-level emulation of the Casio OS** |
-| `syscalls.c` | Syscall table and system calls (memory, time, settings) |
-| `syscalls_text.c` | Drawing and text: PrintXY/PrintMini/PrintCXY, message boxes |
+| `syscalls.c` | Syscall table and system calls (memory, strings, time, settings) |
+| `syscalls_draw.c` | Drawing: fills, rectangles, points, bitmaps (`Bdisp_WriteGraph*`), the display (`_DD`) |
+| `syscalls_text.c` | Text: PrintXY/PrintMini/PrintCXY, message boxes, VRAM save/load |
+| `syscalls_dialogs.c` | OS dialogs: message box, colour picker, progress bars, scrollbar |
 | `syscalls_keys.c` | Keyboard: GetKey, GetKeyWait_OS, PRGM_GetKey_OS, line editing |
 | `syscalls_bfile.c` | Storage memory files (`Bfile_*`), stored in `./storage/fls0` |
 | `syscalls_mcs.c` | Main memory (MCS) items, stored in `./storage/mcs` |
@@ -136,7 +138,8 @@ Addresses on the fx-CG50 (fx-CG10/20 in brackets):
 | `0x8C000000` [`0x88000000`] | RAM through P1; gint borrows `0x8C0F0000` [`0x880F0000`] for its VRAMs |
 | `0xAC000000` [`0xA8000000`] | OS VRAM (384x216, `GetVRAMAddress`); on the fx-CG50 `0xA8000000` is aliased to it for old add-ins |
 | `0x8C180000` [`0x88170000`] | initial stack pointer (gint tells the model from it) |
-| `0x8C400000` [`0x88030000`] | heap for `sys_malloc` (HLE) |
+| `0xAC030000` [`0xA8030000`] | secondary VRAM (`SaveVRAM_1`, `GetSecondaryVRAMAddress`) |
+| `0x8C400000` [`0x88060000`] | heap for `sys_malloc` (HLE) |
 | `0xE5200000`, `0xE5000000` | on-chip IL and X/Y memory |
 | `0xA4xxxxxx`, `0xFxxxxxxx` | peripheral registers; unknown ones read back what was written |
 
@@ -184,7 +187,7 @@ Next steps:
 1. **More `Bfile_*` syscalls**: open/read/write/create/delete work (also from
    gint through its world switch); seeking, sizes, renaming and directory
    listing (`Bfile_FindFirst`...) are next.
-2. **More HLE syscalls**: `Bdisp_Fill_VRAM`, drawing the status bar, OS
+2. **More HLE syscalls** (see `TODO.md`): drawing the status bar, OS
    timers, the OS's localised messages (`PrintXY_2` shows message numbers).
 3. **Real font** for PrintXY (18x24) and PrintMini.
 4. **Proper `free`/`realloc`** in the HLE heap (it is a bump allocator).

@@ -49,10 +49,26 @@ SC(sc_msgbox_pop);
 SC(sc_display_mbstring2);
 SC(sc_save_vram_1);
 SC(sc_load_vram_1);
+SC(sc_get_secondary_vram_address);
 SC(sc_print_mini_mini);
 SC(sc_locate);
 SC(sc_print_line);
 SC(sc_print_os);
+
+/* syscalls_draw.c: shapes, points, bitmaps, the display (_DD) */
+SC(sc_fill_vram);
+SC(sc_area_clr);
+SC(sc_rectangle);
+SC(sc_filled_rectangle);
+SC(sc_filled_rectangle_full);
+SC(sc_get_point_vram);
+SC(sc_set_point_dd);
+SC(sc_get_point_dd);
+SC(sc_direct_draw_rectangle);
+SC(sc_frame_color);
+SC(sc_putdisp_stripe);
+SC(sc_write_graph_vram);
+SC(sc_write_graph_dd);
 
 /* syscalls_dialogs.c: OS dialogs */
 SC(sc_display_message_box);

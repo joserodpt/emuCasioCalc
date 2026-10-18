@@ -24,6 +24,7 @@ typedef struct {
     uint32_t ram_phys, ram_size;   /* physical RAM */
     uint32_t uram_phys;            /* add-in static RAM behind URAM_BASE */
     uint32_t vram;                 /* GetVRAMAddress, at the start of RAM */
+    uint32_t vram2;                /* GetSecondaryVRAMAddress (SaveVRAM_1), after it */
     uint32_t stack_top;            /* r15 when the add-in starts */
     uint32_t heap_base, heap_size; /* our sys_malloc arena */
     uint32_t frqcr;                /* clock setup the OS leaves (CPG FRQCR) */
@@ -42,6 +43,7 @@ typedef struct {
     R61524 lcd;
     uint8_t *rom, *ram;
     uint8_t *vram;        /* OS VRAM (GetVRAMAddress), in RAM */
+    uint8_t *vram2;       /* secondary VRAM (SaveVRAM_1 / LoadVRAM_1), in RAM */
     bool heap_ready;      /* the sys_malloc heap has its first header */
     bool trace;           /* log every syscall to stdout */
     /* Realistic timing: syscalls, uncached memory and DMA transfers take the
@@ -66,7 +68,6 @@ typedef struct {
     char mcs_path[600];   /* item selected by MCSGetDlen2, for MCSGetData1 */
     const char *data_dir; /* host folder for saved data: ./storage (mcs/, fls0/) */
     FILE *files[16];      /* open Bfile handles */
-    uint8_t *saved_vram;  /* SaveVRAM_1 / LoadVRAM_1 */
     bool serial_open;     /* Serial_Open was called (no cable: nothing arrives) */
     int cursor_x, cursor_y; /* locate_OS: PrintLine's position, in PrintXY cells */
     char app_name[12];      /* GetAppName: the add-in's internal name (@NAME) */

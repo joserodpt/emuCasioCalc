@@ -13,8 +13,8 @@
 #define REG_VSTART      0x212
 #define REG_VEND        0x213
 
-#define X_ORIGIN 6  /* where the OS's 384x216 VRAM sits on the panel */
-#define Y_ORIGIN 4
+#define X_ORIGIN VRAM_ORIGIN_X
+#define Y_ORIGIN VRAM_ORIGIN_Y
 
 /* Window edges in panel coordinates (the horizontal axis is mirrored). */
 static int win_left(const R61524 *lcd)   { return PANEL_WIDTH - 1 - lcd->regs[REG_HEND]; }
@@ -81,15 +81,22 @@ uint16_t r61524_read(R61524 *lcd)
     return lcd->regs[lcd->index];
 }
 
-void r61524_blit_vram(R61524 *lcd, const uint8_t *vram)
+void r61524_blit_vram_rows(R61524 *lcd, const uint8_t *vram, int y1, int y2)
 {
-    for (int y = 0; y < LCD_HEIGHT; y++) {
+    if (y1 < 0) y1 = 0;
+    if (y2 > LCD_HEIGHT - 1) y2 = LCD_HEIGHT - 1;
+    for (int y = y1; y <= y2; y++) {
         uint16_t *dst = lcd->fb + (y + Y_ORIGIN) * PANEL_WIDTH + X_ORIGIN;
         const uint8_t *src = vram + y * LCD_WIDTH * 2;
         for (int x = 0; x < LCD_WIDTH; x++)
             dst[x] = (uint16_t)(src[2 * x] << 8 | src[2 * x + 1]);
     }
     lcd->dirty = true;
+}
+
+void r61524_blit_vram(R61524 *lcd, const uint8_t *vram)
+{
+    r61524_blit_vram_rows(lcd, vram, 0, LCD_HEIGHT - 1);
 }
 
 void r61524_read_vram(const R61524 *lcd, uint8_t *vram)

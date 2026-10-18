@@ -1,28 +1,28 @@
 # TODO
 
 What emuCasioFxCG still lacks. The syscall list is measured against
-[libfxcg](https://github.com/Jonimoose/libfxcg)'s stubs: 94 of its 273 syscalls
-are implemented, 179 are left. Add-ins only use a small part of them, so the
+[libfxcg](https://github.com/Jonimoose/libfxcg)'s stubs: 118 of its 273 syscalls
+are implemented, 155 are left. Add-ins only use a small part of them, so the
 groups are ordered by how likely real add-ins are to need them.
 
 Approach that has worked so far: run an add-in, implement what it stops at,
 check it on screen. For calls no add-in at hand uses, write a test app in
 `~/VSCode/casioPrizmApps` (see `apps/os-syscalls`, which tests the system-info
-and dialog calls). Semantics come from WikiPrizm (prizm.cemetech.net),
+and dialog calls, and `apps/draw-syscalls`, the drawing and memory/string
+calls). Semantics come from WikiPrizm (prizm.cemetech.net),
 libfxcg's headers, and the add-in's source when it has one.
 
 ## Syscalls, likely to be needed
 
 ### Drawing
-`Bdisp_Fill_VRAM` (0275), `Bdisp_AreaClr` (02B2), `Bdisp_Rectangle` (0924),
-`Bdisp_FilledRectangle` (0925), `Bdisp_FilledRectangleFullColor` (0926),
-`Bdisp_GetPoint_VRAM` (0267), `Bdisp_SetPointWB_VRAM` (0262),
-`Bdisp_SetPoint_DD` (026B), `Bdisp_GetPoint_DD` (026F),
-`Bdisp_WriteGraphVRAM` (0290), `Bdisp_WriteGraphVRAM_WB` (028F),
-`Bdisp_WriteGraphDD_WB` (0291), `Bdisp_PutDisp_DD_stripe` (0260),
-`Bdisp_AreaClr_DD_x3` (01B6), `DirectDrawRectangle` (02AA), `FrameColor`
-(02A3), `DrawFrameWorkbench` (0923), `GetSecondaryVRAMAddress` (1E50),
-`WriteBackground` (1EF7).
+`Bdisp_AreaClr_DD_x3` (01B6), `DrawFrameWorkbench` (0923) and
+`WriteBackground` (1EF7): parameters not documented.
+
+Implemented, but guessed where WikiPrizm is silent: `Bdisp_WriteGraph*` with
+4-bit bitmaps use the 8 PrintXY colours (the real palette is unknown), and
+"halftone" draws every other pixel; the `_WB` variants act like the plain
+ones; `Bdisp_AreaClr` and `Bdisp_WriteGraph*` take VRAM coordinates (no
+status bar offset).
 
 ### Text and fonts
 `Bdisp_MMPrint` (0D09), `Bdisp_MMPrintRef` (0D08), `PrintGlyph` (0238),
@@ -60,10 +60,12 @@ missing. Doing them properly means calling the add-in's handler
 periodically, like an interrupt.
 
 ### Memory and strings
-`memcmp` (1DD1), `memcmp3` (115E), `strcmp_ignore_case` (1635), `ItoA_10digit`
-(1633), `HexToNibble` / `HexToByte` / `HexToWord` (1343-1345), `NibbleToHex` /
-`ByteToHex` / `WordToHex` (1346-1348), `LongToAscHex` (1841), `BCDtoInternal`
-(0160).
+`memcmp3` (115E), `strcmp_ignore_case` (1635), `ItoA_10digit` (1633): their
+exact results are not documented. `BCDtoInternal` (0160): needs the OS's
+BCD number format.
+
+Guessed: the `*ToHex` calls write uppercase digits without a NUL; `HexTo*`
+return 1 on a non-hex character.
 
 ## Syscalls, less likely
 
