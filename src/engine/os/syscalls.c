@@ -72,14 +72,100 @@ static SC(sc_wait_ms)
     return 0;
 }
 
-/* Bump allocator in RAM: good enough to start; free() does nothing yet. */
+/*
+ * The OS heap (sys_malloc, sys_free, sys_realloc): first fit over blocks
+ * laid out back to back in the model's heap area. Each block starts with
+ * an 8-byte header in emulated memory: its total size, and 1 if in use.
+ * Free neighbours are merged when the heap is walked.
+ */
+#define BLOCK_HEADER 8
+#define BLOCK_MIN    16
+
+static uint32_t heap_end(Emu *emu)
+{
+    return emu->layout->heap_base + emu->layout->heap_size;
+}
+
+static void heap_init(Emu *emu)
+{
+    if (emu->heap_ready)
+        return;
+    mem_write32(&emu->mem, emu->layout->heap_base, emu->layout->heap_size);
+    mem_write32(&emu->mem, emu->layout->heap_base + 4, 0);
+    emu->heap_ready = true;
+}
+
+static uint32_t heap_alloc(Emu *emu, uint32_t request)
+{
+    Memory *mem = &emu->mem;
+    heap_init(emu);
+    uint32_t need = ((request + 7) & ~7u) + BLOCK_HEADER;
+    for (uint32_t b = emu->layout->heap_base; b < heap_end(emu);) {
+        uint32_t size = mem_read32(mem, b), used = mem_read32(mem, b + 4);
+        if (size < BLOCK_HEADER || b + size > heap_end(emu))
+            return 0; /* the add-in overwrote a header */
+        if (!used) {
+            /* merge the free blocks that follow */
+            uint32_t next = b + size;
+            while (next < heap_end(emu) && !mem_read32(mem, next + 4)) {
+                size += mem_read32(mem, next);
+                next = b + size;
+            }
+            mem_write32(mem, b, size);
+            if (size >= need) {
+                if (size - need >= BLOCK_MIN) { /* split */
+                    mem_write32(mem, b + need, size - need);
+                    mem_write32(mem, b + need + 4, 0);
+                    size = need;
+                }
+                mem_write32(mem, b, size);
+                mem_write32(mem, b + 4, 1);
+                return b + BLOCK_HEADER;
+            }
+        }
+        b += size;
+    }
+    return 0;
+}
+
+/* The block of a pointer we returned, or 0. */
+static uint32_t heap_block(Emu *emu, uint32_t p)
+{
+    if (p < emu->layout->heap_base + BLOCK_HEADER || p >= heap_end(emu))
+        return 0;
+    return p - BLOCK_HEADER;
+}
+
 static SC(sc_malloc)
 {
-    uint32_t size = (a[0] + 7) & ~7u;
-    if (emu->heap_next + size > emu->layout->heap_base + emu->layout->heap_size)
+    return heap_alloc(emu, a[0]);
+}
+
+static SC(sc_free)
+{
+    uint32_t b = heap_block(emu, a[0]);
+    if (b)
+        mem_write32(&emu->mem, b + 4, 0);
+    return 0;
+}
+
+/* sys_realloc(p, size): a new block with the old contents. */
+static SC(sc_realloc)
+{
+    uint32_t old = heap_block(emu, a[0]);
+    if (!a[0])
+        return heap_alloc(emu, a[1]);
+    if (!old)
         return 0;
-    uint32_t p = emu->heap_next;
-    emu->heap_next += size;
+    uint32_t p = heap_alloc(emu, a[1]);
+    if (!p)
+        return 0; /* the old block stays valid */
+    uint32_t old_size = mem_read32(&emu->mem, old) - BLOCK_HEADER;
+    uint32_t n = old_size < a[1] ? old_size : a[1];
+    uint8_t *d = mem_ptr(&emu->mem, p, n), *s = mem_ptr(&emu->mem, a[0], n);
+    if (d && s)
+        memmove(d, s, n);
+    mem_write32(&emu->mem, old + 4, 0);
     return p;
 }
 
@@ -138,14 +224,14 @@ static SC(sc_strlen)
     return n;
 }
 
-/* itoa(value, unsigned char *result): decimal. */
+/* itoa(value, unsigned char *result): decimal; returns result. */
 static SC(sc_itoa)
 {
     char buf[16];
     int len = snprintf(buf, sizeof buf, "%d", (int32_t)a[0]);
     for (int i = 0; i <= len; i++)
         mem_write8(&emu->mem, a[1] + (uint32_t)i, (uint8_t)buf[i]);
-    return 0;
+    return a[1]; /* add-ins use the result as the string */
 }
 
 /* Calls that only change OS state we don't show (status bar contents,
@@ -208,8 +294,9 @@ static const Syscall SYSCALLS[] = {
     {0x1DD0, "memcpy", sc_memcpy},
     {0x1E62, "SaveVRAM_1", sc_save_vram_1},
     {0x1E63, "LoadVRAM_1", sc_load_vram_1},
-    {0x1F42, "sys_free", sc_nothing},
+    {0x1F42, "sys_free", sc_free},
     {0x1F44, "sys_malloc", sc_malloc},
+    {0x1F46, "sys_realloc", sc_realloc},
 };
 
 /* Stack arguments; near the top of the stack they may not exist. */

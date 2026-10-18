@@ -42,7 +42,7 @@ typedef struct {
     R61524 lcd;
     uint8_t *rom, *ram;
     uint8_t *vram;        /* OS VRAM (GetVRAMAddress), in RAM */
-    uint32_t heap_next;
+    bool heap_ready;      /* the sys_malloc heap has its first header */
     bool trace;           /* log every syscall to stdout */
     /* Realistic timing: syscalls, uncached memory and DMA transfers take the
      * time they would on the calculator. Off ("fast"): they take none. */

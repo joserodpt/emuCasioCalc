@@ -97,7 +97,6 @@ bool emu_init(Emu *emu, Model model)
     if (model == MODEL_CG50)
         mem_map_phys(mem, model_layout(MODEL_CG20)->ram_phys, (VRAM_SIZE + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1),
                      emu->vram, true);
-    emu->heap_next = l->heap_base;
     emu->data_dir = "storage"; /* main memory files, next to where we run */
     emu_set_realistic(emu, true);
     emu->cpu.event = sh7305_event;
