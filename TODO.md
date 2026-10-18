@@ -175,6 +175,41 @@ Casio's own apps are not emulated: `APP_RUNMAT` (1A03), `APP_Program` (1945),
   drops MENU (unless the add-in turned the return to the menu off); gint
   add-ins' `gint_osmenu()` returns at once.
 
+## From the OS dump (next)
+
+What the user's OS dump (FirmDump, see `casio_font.c`) can still give.
+Facts from OS 03.80.0010: header `CASIOWIN` at 0x80020000, version at
+0x80020020; the dispatcher at 0x80020070 loads the syscall table from
+0x806A1FEC (8040 entries); the OS ends at 0x807E6000 (erased flash up to
+0x80B00000, then the user's storage). Disassemble with
+`sh-elf-objdump -D -b binary -m sh4a-nofpu -EB --adjust-vma=0x80000000`.
+
+- **Messages** (`LocalizeMessage1`, 12FC): every message in every
+  language, instead of WikiPrizm's ~40 and our translations. The syscall
+  can't simply run on the private CPU like the glyph lookups: it goes
+  through a resource lookup shared with `GetFKeyPtr` (around 0x801E84F0)
+  that reads an index at 0xFD80141C (on-chip RAM) and a pointer the OS
+  sets up at boot (null in the sandbox: read at 0x0000000A from
+  0x801E8542). Plan: read the tables instead. The strings are in the OS
+  part: English around 0x8013C000 ("Memory ERROR", "Syntax ERROR",
+  "Press:[EXIT]" x8), German / French around 0x80785000-0x807BD000
+  ("Speicher", "Erreur": 27 each). Find the per-language tables from
+  message number to string (pointers or offsets near those strings, or
+  the boot code that fills the pointer), then load them like the fonts.
+- **F-key labels** (`GetFKeyPtr` 12F3, `FKey_Display` 0131): same
+  resource lookup; the bitmaps are probably beside the messages. Format to
+  find (the fonts suggest 1-bit rows, MSB first).
+- **Chinese glyphs**: the tiny bold lookup (01EB) handles GB 18030
+  (compares with 0x8140), so some CJK glyphs are in the OS; where the big
+  and mini fonts get theirs (01E7, which takes a font size, is a
+  candidate) is unknown.
+- **Character table for the open fonts**: read each glyph of the dump to
+  map Casio codes to Unicode, so Classic / Spleen / Unifont draw the right
+  symbols without a dump.
+- **Add-ins' own glyphs**: `PrintMiniGlyph` (023B) and `PrintGlyph` (0238)
+  can draw any glyph pointer now that the format is known: mini 18 rows,
+  big 24 rows of 3 bytes, rows of (width + 7) / 8 bytes, MSB first.
+
 ## Not planned
 
 - **FPU**: the SH7305 has none; add-ins are built with soft-float
