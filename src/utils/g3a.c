@@ -149,7 +149,10 @@ bool g3a_map(Emu *emu, const G3aFile *file)
     /* Map whole 64 kB pages, like the OS's TLB entries. */
     uint32_t mapped = (code_size + 0xFFFF) & ~0xFFFFu;
     memcpy(emu->rom + ADDIN_PHYS - ROM_PHYS, file->data + G3A_HEADER_SIZE, code_size);
-    mem_map(&emu->mem, ADDIN_BASE, mapped, emu->rom + ADDIN_PHYS - ROM_PHYS, false);
+    /* Writable: some add-ins patch their own constant data (Tetrizm writes
+     * a digit into a string before drawing it) and run on the calculator.
+     * Writes only change this in-memory copy, not the file. */
+    mem_map(&emu->mem, ADDIN_BASE, mapped, emu->rom + ADDIN_PHYS - ROM_PHYS, true);
     sh7305_add_mapping(&emu->hw, ADDIN_BASE, ADDIN_PHYS, mapped);
     return true;
 }

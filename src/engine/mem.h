@@ -26,7 +26,7 @@
 #define P1(phys)      ((phys) | 0x80000000u)
 #define P2(phys)      ((phys) | 0xA0000000u)
 
-#define ADDIN_BASE    0x00300000u  /* g3a code (from file offset 0x7000), read-only */
+#define ADDIN_BASE    0x00300000u  /* g3a code (from file offset 0x7000), in ROM */
 #define ADDIN_MAX     0x00400000u  /* largest add-in we map */
 #define ADDIN_PHYS    0x01000000u  /* where we put it in ROM */
 #define OS_ROM_SIZE   0x00400000u  /* where the OS would be: reads as zeros */

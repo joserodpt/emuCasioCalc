@@ -46,8 +46,8 @@ typedef struct {
 bool g3a_read(const char *path, G3aFile *file);
 void g3a_close(G3aFile *file);
 
-/* Puts the code after the 0x7000-byte header into ROM, mapped read-only at
- * ADDIN_BASE. */
+/* Puts the code after the 0x7000-byte header into ROM, mapped at
+ * ADDIN_BASE (writable: see g3a.c). */
 bool g3a_map(Emu *emu, const G3aFile *file);
 
 #endif

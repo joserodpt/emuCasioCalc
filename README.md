@@ -131,7 +131,7 @@ Addresses on the fx-CG50 (fx-CG10/20 in brackets):
 
 | Address | What |
 |---|---|
-| `0x00300000` | add-in code (read-only, ROM) |
+| `0x00300000` | add-in code (in ROM; writable, some add-ins patch their own data) |
 | `0x08100000` | add-in static RAM, 512 kB (= physical `0x0C200000` [`0x08180000`]) |
 | `0x8C000000` [`0x88000000`] | RAM through P1; gint borrows `0x8C0F0000` [`0x880F0000`] for its VRAMs |
 | `0xAC000000` [`0xA8000000`] | OS VRAM (384x216, `GetVRAMAddress`); on the fx-CG50 `0xA8000000` is aliased to it for old add-ins |
