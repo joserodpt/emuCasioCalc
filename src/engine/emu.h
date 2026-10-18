@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "cpu.h"
 #include "mem.h"
@@ -60,7 +61,9 @@ typedef struct {
     uint8_t *msgbox[8];   /* VRAM saved by MsgBoxPush */
     int msgbox_depth;
     char mcs_path[600];   /* item selected by MCSGetDlen2, for MCSGetData1 */
-    const char *data_dir; /* host folder for main memory (MCS) files: ./storage */
+    const char *data_dir; /* host folder for saved data: ./storage (mcs/, fls0/) */
+    FILE *files[16];      /* open Bfile handles */
+    uint8_t *saved_vram;  /* SaveVRAM_1 / LoadVRAM_1 */
 } Emu;
 
 /* Builds the memory map and peripherals of a model. */

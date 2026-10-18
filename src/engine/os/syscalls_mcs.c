@@ -1,6 +1,6 @@
 /*
  * HLE syscalls: main memory (MCS), where add-ins keep settings and saves.
- * Each item is a host file emu->data_dir/<dir>/<item>. Return values are 0
+ * Each item is a host file emu->data_dir/mcs/<dir>/<item>. Return values are 0
  * for success and nonzero for failure (WikiPrizm documents no codes).
  */
 #include <errno.h>
@@ -41,10 +41,12 @@ static bool item_path(Emu *emu, uint32_t dir, uint32_t item, char *out, size_t c
     char d[64], i[64];
     safe_name(emu, dir, d, sizeof d);
     safe_name(emu, item, i, sizeof i);
+    char root[512];
+    snprintf(root, sizeof root, "%s/mcs", emu->data_dir);
     if (create) {
-        /* data_dir itself may be nested (a/b/c) */
+        /* the root itself may be nested (storage/mcs) */
         char path[512];
-        snprintf(path, sizeof path, "%s", emu->data_dir);
+        snprintf(path, sizeof path, "%s", root);
         for (char *p = path + 1; *p; p++) {
             if (*p == '/') {
                 *p = '\0';
@@ -53,11 +55,11 @@ static bool item_path(Emu *emu, uint32_t dir, uint32_t item, char *out, size_t c
             }
         }
         make_dir(path);
-        snprintf(out, cap, "%s/%s", emu->data_dir, d);
+        snprintf(out, cap, "%s/%s", root, d);
         if (!make_dir(out))
             return false;
     }
-    return snprintf(out, cap, "%s/%s/%s", emu->data_dir, d, i) < (int)cap;
+    return snprintf(out, cap, "%s/%s/%s", root, d, i) < (int)cap;
 }
 
 /* Copies len bytes of emulated memory to a host buffer. */

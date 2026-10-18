@@ -27,7 +27,7 @@ add_executable(emucasiofxcg
   src/main.c
   src/engine/emu.c
   src/engine/os/syscalls.c src/engine/os/syscalls_text.c src/engine/os/syscalls_keys.c
-  src/engine/os/syscalls_mcs.c src/engine/os/display.c
+  src/engine/os/syscalls_mcs.c src/engine/os/syscalls_bfile.c src/engine/os/display.c
   src/views/window.c src/views/menubar.c src/views/info_window.c src/views/font.c
   src/views/app_icon.c
   src/utils/g3a.c src/utils/keys.c)
@@ -82,6 +82,7 @@ if(FXSDK)
   endfunction()
   gint_addin(gint-hello GintHello.g3a)
   gint_addin(gint-stress GintStress.g3a)
+  gint_addin(gint-files GintFiles.g3a)
 
   add_test(NAME gint_hello
     COMMAND emucasiofxcg --headless --keys EXE,MENU,7,EXIT --screenshot gint-hello.bmp gint-hello/GintHello.g3a
@@ -100,6 +101,10 @@ if(FXSDK)
   add_test(NAME gint_panic
     COMMAND emucasiofxcg --headless --keys F1 --screenshot gint-panic.bmp gint-stress/GintStress.g3a
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+  # Bfile_* syscalls through gint's world switch; leaves storage/fls0/EMUFILES.txt.
+  add_test(NAME gint_files
+    COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_BINARY_DIR}/gint-files
+            sh -c "rm -rf storage && $<TARGET_FILE:emucasiofxcg> --headless --keys EXE GintFiles.g3a && grep -q ok storage/fls0/EMUFILES.txt")
   set_tests_properties(gint_panic PROPERTIES PASS_REGULAR_EXPRESSION "misaligned write at 0x08100001.*key script finished")
 else()
   message(STATUS "fxSDK not found: gint test add-ins will not be built")

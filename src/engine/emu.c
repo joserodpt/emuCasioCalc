@@ -101,6 +101,10 @@ void emu_free(Emu *emu)
 {
     while (emu->msgbox_depth > 0)
         free(emu->msgbox[--emu->msgbox_depth]);
+    for (size_t i = 0; i < sizeof emu->files / sizeof emu->files[0]; i++)
+        if (emu->files[i])
+            fclose(emu->files[i]);
+    free(emu->saved_vram);
     mem_free(&emu->mem);
 }
 

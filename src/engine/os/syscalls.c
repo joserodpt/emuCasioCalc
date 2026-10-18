@@ -8,7 +8,7 @@
  * Syscall numbers and signatures: WikiPrizm (prizm.cemetech.net) and the
  * syscall stubs in libfxcg (github.com/Jonimoose/libfxcg). This file has
  * the table and the system calls; drawing, keyboard and storage are in
- * syscalls_text.c, syscalls_keys.c and syscalls_mcs.c.
+ * syscalls_text.c, syscalls_keys.c, syscalls_bfile.c and syscalls_mcs.c.
  */
 #include "syscalls.h"
 
@@ -187,8 +187,16 @@ static const Syscall SYSCALLS[] = {
     {0x18F9, "PrintXY", sc_print_xy},
     {0x1BB4, "OS_InnerWait_ms", sc_wait_ms},
     {0x1D77, "DefineStatusMessage", sc_nothing},
+    {0x1DA3, "Bfile_OpenFile_OS", sc_bfile_open},
+    {0x1DA4, "Bfile_CloseFile_OS", sc_bfile_close},
+    {0x1DAC, "Bfile_ReadFile_OS", sc_bfile_read},
+    {0x1DAE, "Bfile_CreateEntry_OS", sc_bfile_create},
+    {0x1DAF, "Bfile_WriteFile_OS", sc_bfile_write},
+    {0x1DB4, "Bfile_DeleteEntry", sc_bfile_delete},
     {0x1D81, "DisplayStatusArea", sc_nothing},
     {0x1DD0, "memcpy", sc_memcpy},
+    {0x1E62, "SaveVRAM_1", sc_save_vram_1},
+    {0x1E63, "LoadVRAM_1", sc_load_vram_1},
     {0x1F42, "sys_free", sc_nothing},
     {0x1F44, "sys_malloc", sc_malloc},
 };
@@ -212,8 +220,9 @@ static void dispatch(Cpu *cpu, void *user)
         if (SYSCALLS[i].number != number)
             continue;
         if (emu->trace)
-            printf("syscall %04X %-24s (%08X, %08X, %08X, %08X)\n",
-                   number, SYSCALLS[i].name, args[0], args[1], args[2], args[3]);
+            printf("%9.3f ms  syscall %04X %-24s (%08X, %08X, %08X, %08X)\n",
+                   (double)cpu->instructions * 1000 / sh7305_iphi_hz(&emu->hw), number, SYSCALLS[i].name,
+                   args[0], args[1], args[2], args[3]);
         cpu->r[0] = SYSCALLS[i].fn(emu, args);
         cpu->pc = cpu->pr;
         if (emu->mem.fault) {

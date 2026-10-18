@@ -42,8 +42,10 @@ add-in's name, header fields and icon (hover the icon to see its selected
 version). Shortcuts: Ctrl+O, Ctrl+I, Ctrl+S, Ctrl+P, Ctrl+R, Ctrl+1..4, Ctrl+Q.
 When the add-in exits, the window stays open so you can reset or open another.
 
-Saved data (main memory, `MCS*` syscalls) goes to a `storage` folder in the
-directory you run the emulator from.
+Saved data goes to a `storage` folder in the directory you run the emulator
+from: files in the storage memory (`Bfile_*` syscalls, paths like
+`\\fls0\GAME.sav`) under `storage/fls0/`, main memory items (`MCS*`
+syscalls) under `storage/mcs/<folder>/<item>`.
 
 Keyboard: arrows, Enter = EXE, Esc = EXIT, Backspace = DEL, Delete = AC,
 Home = MENU, Tab = SHIFT, F1–F6, digits, `. + - * / ( )`.
@@ -54,10 +56,10 @@ Headless gint runs stop 0.5 s (emulated) after the last scripted key.
 
 ### gint test add-ins
 
-`tests/gint-hello` (display, keyboard, timers, RTC) and `tests/gint-stress`
+`tests/gint-hello` (display, keyboard, timers, RTC), `tests/gint-stress`
 (rendering through gint's DSP-loop blitters, heap, frame timing, and F1 for a
-deliberate address error that gint's panic screen must catch) are fxSDK
-projects. When `fxsdk` is installed (on the PATH, or in `~/.local/bin` as
+deliberate address error that gint's panic screen must catch) and
+`tests/gint-files` (`Bfile_*` file operations) are fxSDK projects. When `fxsdk` is installed (on the PATH, or in `~/.local/bin` as
 GiteaPC puts it), the CMake build compiles them and CTest runs them.
 
 ## Layout
@@ -75,7 +77,8 @@ GiteaPC puts it), the CMake build compiles them and CTest runs them.
 | `syscalls.c` | Syscall table and system calls (memory, time, settings) |
 | `syscalls_text.c` | Drawing and text: PrintXY/PrintMini/PrintCXY, message boxes |
 | `syscalls_keys.c` | Keyboard: GetKey, GetKeyWait_OS, PRGM_GetKey_OS, line editing |
-| `syscalls_mcs.c` | Main memory (MCS) items, stored as files in `./storage` |
+| `syscalls_bfile.c` | Storage memory files (`Bfile_*`), stored in `./storage/fls0` |
+| `syscalls_mcs.c` | Main memory (MCS) items, stored in `./storage/mcs` |
 | `display.c` | VRAM drawing used by the syscalls |
 | **`src/views/`** | **Windows (SDL3)** |
 | `window.c` | Main window, keyboard, the `platform.h` interface |
@@ -151,8 +154,9 @@ transfers and the first access to every peripheral page we don't model. The
 gint sources (`include/gint/mpu/*.h`, `src/*/`) document each register.
 
 Next steps:
-1. **`Bfile_*` syscalls** (map them to a folder on the host). gint add-ins
-   reach them too, through a world switch back to the OS.
+1. **More `Bfile_*` syscalls**: open/read/write/create/delete work (also from
+   gint through its world switch); seeking, sizes, renaming and directory
+   listing (`Bfile_FindFirst`...) are next.
 2. **More HLE syscalls**: `Bdisp_Fill_VRAM`, drawing the status bar, OS
    timers, the OS's localised messages (`PrintXY_2` shows message numbers).
 3. **Real font** for PrintXY (18x24) and PrintMini.

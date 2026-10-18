@@ -57,6 +57,25 @@ SC(sc_bdisp_setpoint_vram)
     return 0;
 }
 
+/* SaveVRAM_1() / LoadVRAM_1(): keep a copy of VRAM, put it back. */
+SC(sc_save_vram_1)
+{
+    (void)a;
+    if (!emu->saved_vram)
+        emu->saved_vram = malloc(VRAM_SIZE);
+    if (emu->saved_vram)
+        memcpy(emu->saved_vram, emu->vram, VRAM_SIZE);
+    return 0;
+}
+
+SC(sc_load_vram_1)
+{
+    (void)a;
+    if (emu->saved_vram)
+        memcpy(emu->vram, emu->saved_vram, VRAM_SIZE);
+    return 0;
+}
+
 /* PrintXY(int x, int y, const char *string, int mode, int color).
  * The OS skips the first two bytes of the string whatever they are (they
  * select a font page), which is why add-ins write PrintXY(1, 1, "  Hello",

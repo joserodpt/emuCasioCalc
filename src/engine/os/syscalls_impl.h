@@ -31,6 +31,8 @@ SC(sc_get_fkey_ptr);
 SC(sc_msgbox_push);
 SC(sc_msgbox_pop);
 SC(sc_display_mbstring2);
+SC(sc_save_vram_1);
+SC(sc_load_vram_1);
 
 /* syscalls_keys.c: keyboard and text input */
 SC(sc_get_key);
@@ -38,6 +40,14 @@ SC(sc_get_key_wait_os);
 SC(sc_prgm_get_key_os);
 SC(sc_edit_mbstring_char);
 SC(sc_edit_mbstring_ctrl2);
+
+/* syscalls_bfile.c: storage memory files (Bfile_*) */
+SC(sc_bfile_open);
+SC(sc_bfile_close);
+SC(sc_bfile_read);
+SC(sc_bfile_write);
+SC(sc_bfile_create);
+SC(sc_bfile_delete);
 
 /* syscalls_mcs.c: main memory (MCS) files */
 SC(sc_mcs_put_var2);
