@@ -100,6 +100,18 @@ SC(sc_locate)
     return 0;
 }
 
+/* Print_OS(msg, mode, 0): the whole string at the cursor (no 2-byte skip,
+ * unlike PrintXY), inverted if mode is nonzero; the cursor moves past it. */
+SC(sc_print_os)
+{
+    char text[128];
+    read_text(emu, a[0], text, sizeof text);
+    display_print_xy(emu->vram, emu->cursor_x, emu->cursor_y, text,
+                     a[1] ? TEXT_MODE_INVERT : TEXT_MODE_NORMAL, 0);
+    emu->cursor_x += (int)strlen(text);
+    return 0;
+}
+
 /* PrintLine(msg, imax): the message at the cursor, at most imax characters,
  * the rest of the line up to imax cleared; black on white. */
 SC(sc_print_line)

@@ -39,6 +39,7 @@ SC(sc_load_vram_1);
 SC(sc_print_mini_mini);
 SC(sc_locate);
 SC(sc_print_line);
+SC(sc_print_os);
 
 /* syscalls_keys.c: keyboard and text input */
 SC(sc_get_key);

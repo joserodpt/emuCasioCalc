@@ -291,6 +291,7 @@ static const Syscall SYSCALLS[] = {
     {0x0032, "SetSetupSetting", sc_set_setup_setting},
     {0x01E6, "GetVRAMAddress", sc_get_vram_address},
     {0x01E9, "GetMiniGlyphPtr", sc_get_mini_glyph_ptr},
+    {0x01F9, "Print_OS", sc_print_os},
     {0x021B, "PrintMiniMini", sc_print_mini_mini},
     {0x0239, "PrintCXY", sc_print_cxy},
     {0x023B, "PrintMiniGlyph", sc_print_mini_glyph},
@@ -303,6 +304,7 @@ static const Syscall SYSCALLS[] = {
     {0x02B8, "DefineStatusAreaFlags", sc_nothing},
     {0x02C0, "RTC_GetTime", sc_rtc_get_time},
     {0x02C1, "RTC_GetTicks", sc_rtc_get_ticks},
+    {0x08C7, "Cursor_SetFlashOn", sc_nothing}, /* we don't draw the text cursor */
     {0x08C8, "Cursor_SetFlashOff", sc_nothing},
     {0x08D9, "Timer_Install", sc_timer_install},
     {0x0921, "Bdisp_EnableColor", sc_nothing},
