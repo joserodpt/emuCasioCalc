@@ -2,6 +2,7 @@
  * input, and the platform interface the emulator uses. */
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "app_icon.h"
 #include "keys.h"
@@ -31,6 +32,8 @@ int view_key_alpha;
 int view_battery_cv = BATTERY_CENTIVOLTS;
 char view_os_status[64];
 int view_language = LANG_EN;
+bool view_auto_reload = true;
+bool view_show_keypad = true;
 
 static SDL_Texture *screen;    /* the panel, 396 x 224 */
 static SDL_Texture *upscaled;  /* the panel at a whole scale, see draw_screen() */
@@ -82,15 +85,50 @@ static void update_layout(void)
     window_w = w;
     view_text_scale = text_scale_for(w);
     float area_h = (float)(h - BAR_H);
-    float k = (float)w / PANEL_WIDTH;
+    /* the keypad on the right, the screen centred in the rest */
+    float kw = view_show_keypad ? area_h * KEYPAD_RATIO : 0;
+    if (kw > w * 0.6f)
+        kw = w * 0.6f;
+    float sw = (float)w - kw;
+    float k = sw / PANEL_WIDTH;
     if (area_h / PANEL_HEIGHT < k)
         k = area_h / PANEL_HEIGHT;
     if (k < 0.25f)
         k = 0.25f;
     view_screen.w = PANEL_WIDTH * k;
     view_screen.h = PANEL_HEIGHT * k;
-    view_screen.x = ((float)w - view_screen.w) / 2;
+    view_screen.x = (sw - view_screen.w) / 2;
     view_screen.y = BAR_H + (area_h - view_screen.h) / 2;
+    float pad = area_h * 0.02f;
+    keypad_set_area((SDL_FRect){sw + pad, BAR_H + pad, kw - 2 * pad, area_h - 2 * pad});
+}
+
+/* The keypad's width for a screen of height screen_h at an exact zoom. */
+static int keypad_width(int screen_h)
+{
+    return view_show_keypad ? (int)(screen_h * KEYPAD_RATIO + 0.5f) : 0;
+}
+
+void view_show_keypad_panel(bool show)
+{
+    if (show == view_show_keypad)
+        return;
+    int w, h;
+    SDL_GetWindowSize(view_window, &w, &h);
+    int kw = (int)((float)(h - BAR_H) * KEYPAD_RATIO + 0.5f);
+    view_show_keypad = show;
+    SDL_SetWindowSize(view_window, show ? w + kw : (w - kw > 200 ? w - kw : 200), h);
+    SDL_SyncWindow(view_window);
+    update_layout();
+    view_redraw();
+}
+
+bool view_key_held(int k)
+{
+    for (int sc = 0; sc < SDL_SCANCODE_COUNT; sc++)
+        if (held[sc] == k + 1)
+            return true;
+    return false;
 }
 
 int view_zoom(void)
@@ -142,13 +180,14 @@ void view_redraw(void)
     SDL_RenderClear(view_renderer);
     SDL_UpdateTexture(screen, NULL, frame, PANEL_WIDTH * 2);
     draw_screen();
+    keypad_draw();
     menubar_draw(window_w, status);
     SDL_RenderPresent(view_renderer);
 }
 
 void view_set_scale(int scale)
 {
-    int w = PANEL_WIDTH * scale;
+    int w = PANEL_WIDTH * scale + keypad_width(PANEL_HEIGHT * scale);
     int ts = text_scale_for(w);
     int bar = (8 * ts + 16) + (view_show_speed ? 8 * ts + 14 : 0) + (8 * ts + 14); /* BAR_H at that width */
     SDL_SetWindowSize(view_window, w, bar + PANEL_HEIGHT * scale);
@@ -172,6 +211,12 @@ void view_flash_status(const char *msg)
 {
     snprintf(status, sizeof status, "%s", msg);
     status_until = SDL_GetTicks() + STATUS_MS;
+}
+
+void platform_show_keys(const bool *down)
+{
+    if (!view_headless)
+        keypad_show_down(down);
 }
 
 void platform_flash(const char *msg)
@@ -254,6 +299,13 @@ static int handle_event(const SDL_Event *e)
 {
     if (info_window_event(e) || menubar_event(e))
         return -1;
+    int pk = keypad_event(e);
+    if (pk >= 0) {
+        track_modifiers(pk);
+        return pk;
+    }
+    if (pk == -2)
+        return -1;
     switch (e->type) {
     case SDL_EVENT_QUIT:
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED: /* the main window: with two windows open, no QUIT comes */
@@ -261,6 +313,8 @@ static int handle_event(const SDL_Event *e)
         break;
     case SDL_EVENT_KEY_UP:
         held[e->key.scancode] = 0;
+        if (view_show_keypad)
+            view_redraw();
         break;
     case SDL_EVENT_KEY_DOWN:
         if (!e->key.repeat) {
@@ -268,6 +322,8 @@ static int handle_event(const SDL_Event *e)
             held[e->key.scancode] = (uint8_t)(k + 1);
             if (k >= 0)
                 track_modifiers(k);
+            if (view_show_keypad)
+                view_redraw();
             return k;
         }
         break;
@@ -284,9 +340,57 @@ static int handle_event(const SDL_Event *e)
 }
 
 /* Work that doesn't come as an event: the Open dialog, expiring status. */
+/* File > Reload when the file changes: the running .g3a is checked every
+ * 500 ms; once it has changed and then stayed the same for one check (a
+ * build has finished writing it), the add-in is loaded again. */
+#define WATCH_MS 500
+
+static void watch_app(void)
+{
+    static uint64_t next_check;
+    static char path[1024];
+    static int64_t mtime_ns, size;
+    static bool changed;
+    if (!view_auto_reload || !view_have_app || !view_app_path[0] || view_pending != CMD_NONE)
+        return;
+    uint64_t now = SDL_GetTicks();
+    if (now < next_check)
+        return;
+    next_check = now + WATCH_MS;
+    struct stat st;
+    if (stat(view_app_path, &st) != 0)
+        return; /* being replaced: look again later */
+#ifdef __APPLE__
+    int64_t m = (int64_t)st.st_mtimespec.tv_sec * 1000000000 + st.st_mtimespec.tv_nsec;
+#else
+    int64_t m = (int64_t)st.st_mtim.tv_sec * 1000000000 + st.st_mtim.tv_nsec;
+#endif
+    if (strcmp(path, view_app_path)) { /* a newly loaded add-in */
+        snprintf(path, sizeof path, "%s", view_app_path);
+        mtime_ns = m;
+        size = (int64_t)st.st_size;
+        changed = false;
+        return;
+    }
+    if (m != mtime_ns || (int64_t)st.st_size != size) {
+        mtime_ns = m;
+        size = (int64_t)st.st_size;
+        changed = true; /* reload once it stops changing */
+        return;
+    }
+    if (changed) {
+        changed = false;
+        printf("%s changed: reloading\n", view_app_path);
+        view_flash_status("The add-in changed: reloaded");
+        view_paused = false;
+        view_pending = CMD_RESET;
+    }
+}
+
 static void housekeeping(void)
 {
     menubar_poll();
+    watch_app();
     if (status_until && SDL_GetTicks() >= status_until)
         view_redraw();
 }
@@ -306,7 +410,7 @@ bool platform_init(int scale, bool headless)
     }
     if (headless)
         return true;
-    int w = PANEL_WIDTH * scale;
+    int w = PANEL_WIDTH * scale + keypad_width(PANEL_HEIGHT * scale);
     view_text_scale = text_scale_for(w);
     if (!SDL_CreateWindowAndRenderer("emuCasioFxCG", w, BAR_H + PANEL_HEIGHT * scale, SDL_WINDOW_RESIZABLE,
                                      &view_window, &view_renderer)) {
@@ -350,6 +454,24 @@ bool platform_save_bmp(const char *path, const uint16_t *pixels, int w, int h)
     if (!ok)
         fprintf(stderr, "%s: %s\n", path, SDL_GetError());
     SDL_DestroySurface(s);
+    return ok;
+}
+
+bool platform_save_window(const char *path)
+{
+    if (view_headless)
+        return false;
+    view_redraw();
+    /* read back what was just drawn (the frame is presented after) */
+    SDL_SetRenderDrawColor(view_renderer, 32, 32, 32, 255);
+    SDL_RenderClear(view_renderer);
+    draw_screen();
+    keypad_draw();
+    menubar_draw(window_w, status);
+    SDL_Surface *s = SDL_RenderReadPixels(view_renderer, NULL);
+    bool ok = s && SDL_SaveBMP(s, path);
+    SDL_DestroySurface(s);
+    SDL_RenderPresent(view_renderer);
     return ok;
 }
 
@@ -464,6 +586,8 @@ bool platform_poll(bool *down)
     for (int sc = 0; sc < SDL_SCANCODE_COUNT; sc++)
         if (held[sc])
             down[held[sc] - 1] = true;
+    if (keypad_mouse_key() >= 0)
+        down[keypad_mouse_key()] = true;
     return view_pending == CMD_NONE;
 }
 

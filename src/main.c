@@ -30,6 +30,7 @@ static void usage(const char *argv0)
             "  --keys K1,K2,...   keys to press first (EXE, EXIT, UP, F1, 0-9...)\n"
             "  --headless         no window; input only comes from --keys\n"
             "  --screenshot F     save the last frame to F (.bmp) on exit\n"
+            "  --window-shot F    save the whole window (menus, keyboard) to F (.bmp) on exit\n"
             "  --icon F           save the add-in's menu icon to F (.bmp)\n"
             "  --info             open the add-in information window at start\n"
             "  --model M          calculator to emulate: auto (default, detected from the\n"
@@ -182,6 +183,7 @@ static bool run(Emu *emu, bool headless)
         if (!platform_poll(down))
             return true;
         emu_update_keys(emu, down);
+        platform_show_keys(emu->key_down);
         emu_present(emu);
 
         if (cpu->state == CPU_RUNNING && cpu->sleeping && cpu->next_event == UINT64_MAX &&
@@ -220,7 +222,7 @@ int main(int argc, char **argv)
 {
     int scale = 4;
     Options opt = {0};
-    const char *path = NULL, *screenshot = NULL, *icon = NULL;
+    const char *path = NULL, *screenshot = NULL, *window_shot = NULL, *icon = NULL;
     bool show_info = false;
     const char *model = "auto", *timing = "realistic", *speed = NULL, *battery = NULL, *language = NULL;
     static Emu emu;
@@ -233,6 +235,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--keys") && i + 1 < argc) opt.keys = argv[++i];
         else if (!strcmp(argv[i], "--headless")) opt.headless = true;
         else if (!strcmp(argv[i], "--screenshot") && i + 1 < argc) screenshot = argv[++i];
+        else if (!strcmp(argv[i], "--window-shot") && i + 1 < argc) window_shot = argv[++i];
         else if (!strcmp(argv[i], "--icon") && i + 1 < argc) icon = argv[++i];
         else if (!strcmp(argv[i], "--info")) show_info = true;
         else if (!strcmp(argv[i], "--model") && i + 1 < argc) model = argv[++i];
@@ -341,6 +344,8 @@ int main(int argc, char **argv)
             platform_status("Could not load that file");
     }
 
+    if (window_shot && !platform_save_window(window_shot))
+        fprintf(stderr, "could not save %s\n", window_shot);
     if (screenshot && !platform_save_screenshot(screenshot))
         status = 1;
     platform_shutdown();

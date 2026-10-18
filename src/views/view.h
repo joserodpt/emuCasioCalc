@@ -28,6 +28,8 @@ extern int view_key_alpha;      /* ALPHA: 0 off, 1 for the next key, 2 locked */
 extern int view_battery_cv;     /* battery voltage, 1/100 V */
 extern char view_os_status[64]; /* the add-in's status message */
 extern int view_language;       /* LANG_* */
+extern bool view_auto_reload;   /* File > Reload when the file changes */
+extern bool view_show_keypad;   /* View > Keyboard: the on-screen keys */
 
 void view_redraw(void);
 /* View > Zoom: sizes the window for the screen at exactly scale x. */
@@ -86,6 +88,23 @@ bool info_window_event(const SDL_Event *e);
 void send_addin_start(void);
 /* Finishes the copy once the folder dialog has answered. */
 void send_addin_poll(void);
+
+/* keypad.c: the on-screen keyboard, right of the screen, KEYPAD_RATIO of
+ * its height wide */
+#define KEYPAD_RATIO 0.56f
+void keypad_set_area(SDL_FRect r);
+void keypad_draw(void);
+/* Mouse events: a KEYS index pressed, -2 if used otherwise, -1 if not its. */
+int keypad_event(const SDL_Event *e);
+/* The key held with the mouse, or -1. */
+int keypad_mouse_key(void);
+/* Keys held as the emulator sees them, to light them up. */
+void keypad_show_down(const bool *down);
+/* window.c: whether a PC key mapped to KEYS[k] is held. */
+bool view_key_held(int k);
+/* Shows or hides the keypad, growing or shrinking the window so the screen
+ * keeps its size. */
+void view_show_keypad_panel(bool show);
 
 /* font.c */
 bool font_init(void);

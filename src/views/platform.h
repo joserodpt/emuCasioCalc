@@ -25,6 +25,8 @@ void platform_shutdown(void);
 /* fb is the panel: PANEL_WIDTH x PANEL_HEIGHT, host-endian RGB565. */
 void platform_present(const uint16_t *fb);
 bool platform_save_screenshot(const char *path);
+/* The whole window as drawn (menu bar, screen, keyboard), as a .bmp. */
+bool platform_save_window(const char *path);
 /* Saves w x h host-endian RGB565 pixels as a .bmp file. */
 bool platform_save_bmp(const char *path, const uint16_t *pixels, int w, int h);
 
@@ -66,6 +68,10 @@ void platform_set_language(int lang);
  * clicking the battery (--battery sets it at start). */
 int platform_battery(void);
 void platform_set_battery(int centivolts);
+
+/* Keys held as the emulator sees them (host keys and the key script): the
+ * on-screen keyboard lights them up. */
+void platform_show_keys(const bool *down);
 
 /* A message on the menu bar for a few seconds. */
 void platform_flash(const char *msg);

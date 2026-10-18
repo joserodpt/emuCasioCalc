@@ -60,6 +60,11 @@ copied into the emulated flash, where they live on the calculator: some
 add-ins read them from there directly (CGDoom finds `doom.wad` that way, so
 put it in `storage/fls0/doom.wad`).
 
+**Hot reload**: while an add-in runs, the emulator watches its `.g3a` file;
+when a build replaces it (`fxsdk build-cg`), the add-in is loaded again on
+its own, so edit, build and see the result without touching the emulator.
+File > Reload when the file changes turns it off.
+
 **Copy add-in to calculator** (File menu): plug the calculator in by USB and
 choose "USB Flash" (F1) on it; it shows up as a drive. The folder dialog
 opens on that drive when one with an `@MainMem` folder is mounted; pick it
@@ -80,6 +85,12 @@ echo 'ACTION=="add|change", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", ATTRS{idVe
   | sudo tee /etc/udev/rules.d/90-casio-calculator.rules
 sudo udevadm control --reload
 ```
+
+**On-screen keyboard** (View > Keyboard, Ctrl+K): the fx-CG50's keys right
+of the screen, with each key's SHIFT function (yellow) and ALPHA letter
+(red) above it. Click a key to press it (held while the mouse button is);
+keys light up while pressed, from the mouse, the PC keyboard or `--keys`.
+`--window-shot F` saves the whole window (with the keyboard) as a .bmp.
 
 Keyboard (all 50 calculator keys): arrows, Enter = EXE, Esc = EXIT,
 Backspace = DEL, Delete = AC, Home = MENU, Tab = SHIFT, Left Alt = ALPHA,
@@ -115,8 +126,13 @@ Headless gint runs stop 0.5 s (emulated) after the last scripted key.
 `tests/gint-hello` (display, keyboard, timers, RTC), `tests/gint-stress`
 (rendering through gint's DSP-loop blitters, heap, frame timing, and F1 for a
 deliberate address error that gint's panic screen must catch) and
-`tests/gint-files` (`Bfile_*` file operations) are fxSDK projects. When `fxsdk` is installed (on the PATH, or in `~/.local/bin` as
-GiteaPC puts it), the CMake build compiles them and CTest runs them.
+`tests/gint-files` (`Bfile_*` file operations) are fxSDK projects, and so is
+`tests/os-apps`: nine add-ins that call the OS syscalls group by group
+(system and dialogs, drawing, SHIFT/ALPHA, status bar, files, timers and
+keyboard, language, text, main memory and system), check the results and
+leave "ok" in a file of `\\fls0\`. When `fxsdk` is installed (on the PATH,
+or in `~/.local/bin` as GiteaPC puts it), the CMake build compiles them and
+CTest runs them all (`ctest`, 20 tests).
 
 ## Layout
 
@@ -147,12 +163,14 @@ GiteaPC puts it), the CMake build compiles them and CTest runs them.
 | `menubar.c` | Menu bar: menus, Info button, shortcuts, actions |
 | `info_window.c` | Add-in information window |
 | `send_addin.c` | File > Copy add-in to calculator |
+| `keypad.c` | The on-screen keyboard (View > Keyboard) |
 | `app_icon.c`, `font.c` | The emulator's icon (drawn in code), the 8x8 font |
 | **`src/utils/`** | **Helpers** |
 | `g3a.c` | Reads a .g3a: header (name, icons...) and code, mapped at `0x00300000` |
 | `keys.c` | Calculator keys: names, GetKey codes, key matrix positions |
 | `tests/test_cpu.c` | CPU tests (division, delay slots, carries, shifts, repeat loops, TRAPA/RTE/banks) |
 | `tests/gint-*` | gint add-ins used as integration tests |
+| `tests/os-apps` | OS syscall test add-ins (one per group), run by CTest |
 | `tools/make_hello_g3a.py` | Hand-assembles the `hello.g3a` smoke test (HLE) |
 
 ## Models

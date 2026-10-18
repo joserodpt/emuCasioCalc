@@ -6,10 +6,11 @@ are implemented, 80 are left. Add-ins only use a small part of them, so the
 groups are ordered by how likely real add-ins are to need them.
 
 Approach that has worked so far: run an add-in, implement what it stops at,
-check it on screen. For calls no add-in at hand uses, write a test app in
-`~/VSCode/casioPrizmApps` (see `apps/os-syscalls`, which tests the system-info
-and dialog calls; also `draw-syscalls`, `key-modifiers`, `status-bar`,
-`file-syscalls`, `time-keys`, `language`, `text-syscalls` and `mcs-system`). Semantics come from WikiPrizm (prizm.cemetech.net),
+check it on screen. For calls no add-in at hand uses, add a test add-in to
+`tests/os-apps` (one source per group: `os-syscalls`, `draw-syscalls`,
+`key-modifiers`, `status-bar`, `file-syscalls`, `time-keys`, `language`,
+`text-syscalls`, `mcs-system`) and an `os_test` line in `CMakeLists.txt`:
+CTest then runs it. Semantics come from WikiPrizm (prizm.cemetech.net),
 libfxcg's headers, and the add-in's source when it has one.
 
 ## Syscalls, likely to be needed
@@ -25,7 +26,7 @@ ones; `Bdisp_AreaClr` and `Bdisp_WriteGraph*` take VRAM coordinates (no
 status bar offset).
 
 ### Text and fonts
-Done (test app `apps/text-syscalls`). Text is drawn with open fonts of the
+Done (test add-in `tests/os-apps/src/text-syscalls.c`). Text is drawn with open fonts of the
 OS's sizes (Spleen 12x24 in PrintXY's 18x24 cells, 8x16 proportional for
 PrintMini and MMPrint, 5x8 for PrintMiniMini, Unifont for symbols), not
 Casio's, which differ in shape. Strings stay in the OS character set:
@@ -42,7 +43,7 @@ isn't documented); Chinese (GB 18030) is decoded but drawn as empty boxes
 one page.
 
 ### Language
-Done (test app `apps/language`): Language menu / `--language`,
+Done (test add-in `tests/os-apps/src/language.c`): Language menu / `--language`,
 `LocalizeMessage1`, `PrintXY_2`, `APP_SYSTEM_LANGUAGE`. Only the ~40
 messages WikiPrizm lists are known (others read `<msg N>`); the Spanish,
 German, French, Portuguese and Chinese texts are our translations, except
@@ -52,7 +53,7 @@ the text and fonts work decodes it. Where the OS keeps the setting is
 unknown: it lasts while the emulator runs.
 
 ### Files
-Done (test app `apps/file-syscalls`) except `SMEM_FindFirst` (0DAC): its
+Done (test add-in `tests/os-apps/src/file-syscalls.c`) except `SMEM_FindFirst` (0DAC): its
 return values are not documented.
 
 Guessed: searches list folders first, then files, sorted by name, without
@@ -63,12 +64,12 @@ copied into flash (opened before); `Bfile_GetBlockAddress` points at the
 copy made when the file was opened.
 
 ### Keyboard
-SHIFT / ALPHA in `GetKey` are done (test app `apps/key-modifiers`). Not
+SHIFT / ALPHA in `GetKey` are done (test add-in `tests/os-apps/src/key-modifiers.c`). Not
 modelled: lowercase alpha (fx-CG50 text entry), the SHIFT functions of
 F1–F6 and of 3, 6, `,` and → (they return the plain key), SHIFT AC/ON
 switching the calculator off (ignored).
 
-The keyboard syscalls are done (test app `apps/time-keys`). Guessed or
+The keyboard syscalls are done (test add-in `tests/os-apps/src/time-keys.c`). Guessed or
 partial: `Keyboard_PutKeycode` returns 0 (-1 when its buffer is full);
 the Bkey flags are kept but GetKey doesn't act on them; with the return to
 the main menu on (the default), GetKey drops MENU and says so on the menu
@@ -78,7 +79,7 @@ unknown); `FKey_Display` draws an empty label tab (the bitmap format is
 unknown, and `GetFKeyPtr` gives blank ones).
 
 ### Timing
-Done (test app `apps/time-keys`). OS timers call the add-in's handler like
+Done (test add-in `tests/os-apps/src/time-keys.c`). OS timers call the add-in's handler like
 an interrupt: between run slices, while GetKey waits (in real time), and
 during delays. Guessed: periods are whole 40 ms ticks (25 Hz, nearest, at
 least one); a blocking key read first runs a timer due within 50 ms (it
@@ -97,7 +98,7 @@ return 1 on a non-hex character.
 ## Syscalls, less likely
 
 ### Status bar
-Drawn (test app `apps/status-bar`). Missing: `Bdisp_HeaderText2` /
+Drawn (test add-in `tests/os-apps/src/status-bar.c`). Missing: `Bdisp_HeaderText2` /
 `Bdisp_HeaderFill2` (1D85, 1D87), `APP_EACT_StatusIcon` (0A87),
 `SetupMode_StatusIcon` (0A8B): parameters unknown. `KeyboardIcon`, `LineIcon`,
 `RadIcon`, `RealIcon`, `NormIcon`, `d_c_Icon` are accepted and ignored
@@ -117,14 +118,14 @@ g3p file dialogs, return values unknown. `ConfirmFileOverwriteDialog` (1802),
 `AUX_DisplayErrorMessage` (0C01), `Bdisp_WriteSystemMessage` (1906).
 
 ### Main memory (MCS)
-Done (test app `apps/mcs-system`). Guessed: main memory holds 61 KB,
+Done (test add-in `tests/os-apps/src/mcs-system.c`). Guessed: main memory holds 61 KB,
 counted as the items' sizes; `MCS_GetMainMemoryStart` points at unused RAM
 (the MCS isn't laid out in memory); items' type flags (read-only...) aren't
 kept; the alpha variables are BCD values in the item @REV2/ALPHAMEM;
 `CLIP_Store` returns 0.
 
 ### System
-Done (test app `apps/mcs-system`): `Restart` ends the add-in;
+Done (test add-in `tests/os-apps/src/mcs-system.c`): `Restart` ends the add-in;
 `TakeScreenshot` / `TakeScreenshot2` save VRAM as `\\fls0\CAPTnnnn.bmp`
 at once (no dialog); `SMEM_MapIconToExt` draws its own icons (a page with
 the extension, coloured by kind, or a folder) and gives message number 0;

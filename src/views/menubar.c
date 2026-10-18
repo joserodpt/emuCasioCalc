@@ -8,7 +8,7 @@
 
 typedef enum {
     A_NONE, A_SEPARATOR, A_OPEN, A_INFO, A_SCREENSHOT, A_SAVE_ICON, A_QUIT, A_PAUSE, A_RESET,
-    A_SEND,
+    A_SEND, A_AUTO_RELOAD, A_KEYPAD,
     A_ZOOM1, A_ZOOM2, A_ZOOM3, A_ZOOM4, A_ZOOM5, A_ZOOM6, /* consecutive */
     A_KEYS, A_ABOUT,
     A_MODEL_AUTO, A_MODEL_CG20, A_MODEL_CG50, A_TIMING_REAL, A_TIMING_FAST,
@@ -32,6 +32,7 @@ static const Item FILE_ITEMS[] = {
     {"Save icon", "", A_SAVE_ICON},
     {"", "", A_SEPARATOR},
     {"Copy add-in to calculator...", "", A_SEND},
+    {"Reload when the file changes", "", A_AUTO_RELOAD},
     {"", "", A_SEPARATOR},
     {"Quit", "Ctrl+Q", A_QUIT},
 };
@@ -55,6 +56,8 @@ static const Item EMU_ITEMS[] = {
     {"Battery: empty (4.00 V)", "", A_BATTERY_EMPTY},
 };
 static const Item VIEW_ITEMS[] = {
+    {"Keyboard", "Ctrl+K", A_KEYPAD},
+    {"", "", A_SEPARATOR},
     {"Zoom 1x", "Ctrl+1", A_ZOOM1},
     {"Zoom 2x", "Ctrl+2", A_ZOOM2},
     {"Zoom 3x", "Ctrl+3", A_ZOOM3},
@@ -176,6 +179,10 @@ static bool checked(Action a)
         return view_show_speed == (a == A_CUSTOM_SPEED);
     if (a == A_TIMING_REAL || a == A_TIMING_FAST)
         return view_realistic == (a == A_TIMING_REAL);
+    if (a == A_AUTO_RELOAD)
+        return view_auto_reload;
+    if (a == A_KEYPAD)
+        return view_show_keypad;
     if (a >= A_LANG_EN && a <= A_LANG_ZH)
         return view_language == (int)(a - A_LANG_EN);
     if (a >= A_BATTERY_FULL && a <= A_BATTERY_EMPTY)
@@ -556,6 +563,12 @@ static void run_action(Action a)
     case A_SEND:
         send_addin_start();
         break;
+    case A_AUTO_RELOAD:
+        view_auto_reload = !view_auto_reload;
+        break;
+    case A_KEYPAD:
+        view_show_keypad_panel(!view_show_keypad);
+        break;
     case A_SCREENSHOT:
         timestamped(path, sizeof path, "screenshot");
         saved(platform_save_screenshot(path), path);
@@ -647,7 +660,7 @@ static bool shortcut(SDL_Keycode k)
         {SDLK_O, A_OPEN}, {SDLK_I, A_INFO}, {SDLK_S, A_SCREENSHOT}, {SDLK_Q, A_QUIT}, {SDLK_P, A_PAUSE},
         {SDLK_R, A_RESET}, {SDLK_EQUALS, A_FASTER}, {SDLK_PLUS, A_FASTER}, {SDLK_MINUS, A_SLOWER},
         {SDLK_0, A_NORMAL_SPEED}, {SDLK_1, A_ZOOM1}, {SDLK_2, A_ZOOM2}, {SDLK_3, A_ZOOM3}, {SDLK_4, A_ZOOM4},
-        {SDLK_5, A_ZOOM5}, {SDLK_6, A_ZOOM6},
+        {SDLK_5, A_ZOOM5}, {SDLK_6, A_ZOOM6}, {SDLK_K, A_KEYPAD},
     };
     for (size_t i = 0; i < sizeof SHORTCUTS / sizeof SHORTCUTS[0]; i++) {
         if (SHORTCUTS[i].key == k) {

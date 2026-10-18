@@ -29,7 +29,7 @@ add_executable(emucasiofxcg
   src/engine/os/syscalls.c src/engine/os/syscalls_text.c src/engine/os/syscalls_keys.c
   src/engine/os/syscalls_mcs.c src/engine/os/syscalls_bfile.c src/engine/os/syscalls_dialogs.c src/engine/os/syscalls_draw.c src/engine/os/syscalls_status.c src/engine/os/syscalls_time.c src/engine/os/messages.c src/engine/os/syscalls_system.c src/engine/os/font_data.c
   src/engine/os/display.c
-  src/views/window.c src/views/menubar.c src/views/info_window.c src/views/send_addin.c src/views/font.c
+  src/views/window.c src/views/menubar.c src/views/info_window.c src/views/send_addin.c src/views/keypad.c src/views/font.c
   src/views/app_icon.c
   src/utils/g3a.c src/utils/keys.c)
 target_include_directories(emucasiofxcg PRIVATE src/engine/os src/views src/utils)
@@ -108,6 +108,50 @@ if(FXSDK)
     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_BINARY_DIR}/gint-files
             sh -c "rm -rf storage && $<TARGET_FILE:emucasiofxcg> --headless --keys EXE GintFiles.g3a && grep -q ok storage/fls0/EMUFILES.txt")
   set_tests_properties(gint_panic PROPERTIES PASS_REGULAR_EXPRESSION "misaligned write at 0x08100001.*key script finished")
+
+  # OS syscall test add-ins (tests/os-apps): one fxSDK project, one .g3a per
+  # group of syscalls. Each run starts with empty storage and must leave
+  # "ok" in its file of storage/fls0.
+  set(os_src ${CMAKE_SOURCE_DIR}/tests/os-apps)
+  set(os_bin ${CMAKE_BINARY_DIR}/os-apps)
+  set(os_apps OsSyscalls DrawSyscalls KeyModifiers StatusBar FileSyscalls TimeKeys Language TextSyscalls McsSystem)
+  set(os_outputs)
+  foreach(app ${os_apps})
+    list(APPEND os_outputs ${os_bin}/${app}.g3a)
+  endforeach()
+  file(GLOB os_sources ${os_src}/src/*.c ${os_src}/src/*.h)
+  add_custom_command(
+    OUTPUT ${os_outputs}
+    COMMAND ${FXSDK_ENV} ${CMAKE_COMMAND} -S ${os_src} -B ${os_bin}
+            -DCMAKE_MODULE_PATH=${FXSDK_CMAKE}
+            -DCMAKE_TOOLCHAIN_FILE=${FXSDK_CMAKE}/FXCG50.cmake
+            -DFXSDK_CMAKE_MODULE_PATH=${FXSDK_CMAKE}
+    COMMAND ${FXSDK_ENV} ${CMAKE_COMMAND} --build ${os_bin}
+    DEPENDS ${os_src}/CMakeLists.txt ${os_sources}
+    COMMENT "Building the OS syscall test add-ins with the fxSDK")
+  add_custom_target(os-apps ALL DEPENDS ${os_outputs})
+
+  # os_test(<name> <g3a> <file left in fls0> [emulator options...])
+  function(os_test name g3a marker)
+    set(dir ${CMAKE_BINARY_DIR}/os-apps/run-${name})
+    string(REPLACE ";" " " opts "${ARGN}")
+    add_test(NAME ${name}
+      COMMAND sh -c "rm -rf '${dir}' && mkdir -p '${dir}' && cd '${dir}' && \
+                     '$<TARGET_FILE:emucasiofxcg>' --headless ${opts} '${CMAKE_BINARY_DIR}/os-apps/${g3a}.g3a' && \
+                     cat storage/fls0/${marker} && grep -q '^ok' storage/fls0/${marker}")
+  endfunction()
+  os_test(os_system_dialogs OsSyscalls OSTEST.txt --keys DOWN,DOWN,EXE,DOWN,EXE,EXIT,EXIT)
+  os_test(os_draw DrawSyscalls DRAWTEST.txt)
+  os_test(os_shift_alpha KeyModifiers KEYTEST.txt
+          --keys ALPHA,7,SHIFT,EXIT,SHIFT,ALPHA,XOT,LOG,DP,ALPHA,7,SHIFT,SHIFT,7,ALPHA,SQUARE,SHIFT,LOG,ALPHA,EXE,7,SHIFT,DEL,SHIFT,AC,1,NEG,FD,VARS)
+  os_test(os_status_bar StatusBar STATTEST.txt --battery low --keys ALPHA,7)
+  os_test(os_files FileSyscalls FILETEST.txt)
+  os_test(os_files_cg20 FileSyscalls FILETEST.txt --model cg20)
+  os_test(os_timers_keyboard TimeKeys TIMETEST.txt --keys 7,MENU)
+  os_test(os_timers_keyboard_cg20 TimeKeys TIMETEST.txt --model cg20 --keys 7,MENU)
+  os_test(os_language Language LANGTEST.txt --language de --keys DOWN,EXE,EXIT,UP,EXE,F6)
+  os_test(os_text TextSyscalls TEXTTEST.txt --keys RIGHT,RIGHT,EXE)
+  os_test(os_mcs_system McsSystem MCSTEST.txt)
 else()
   message(STATUS "fxSDK not found: gint test add-ins will not be built")
 endif()
