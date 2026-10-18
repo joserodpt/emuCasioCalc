@@ -470,7 +470,7 @@ static uint32_t keysc_read(void *ctx, uint32_t addr, int size)
     Sh7305 *hw = ctx;
     uint32_t off = OFF(addr);
     if (off < 12) {
-        hw->keysc_used = true;
+        hw->keysc_used = hw->keysc_read = true;
         for (int i = 0; i < 6; i++) {
             hw->bk_keysc[2 * i] = hw->keys[2 * i + 1];
             hw->bk_keysc[2 * i + 1] = hw->keys[2 * i];

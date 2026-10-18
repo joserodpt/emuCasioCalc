@@ -98,7 +98,9 @@ window follows them with the OS's rules, which most add-ins share, so PC
 letters work there too.
 
 `--keys` works for both kinds of add-ins: OS `GetKey` calls pop the keys in
-order; for gint add-ins each key is held down for 100 ms of emulated time.
+order; for gint add-ins each key is held down for 100 ms of emulated time
+while the add-in reads the keyboard (not while it is in the OS world, where
+its `GetKey` calls take them).
 Headless gint runs stop 0.5 s (emulated) after the last scripted key.
 
 ### gint test add-ins
@@ -224,8 +226,8 @@ transfers and the first access to every peripheral page we don't model. The
 gint sources (`include/gint/mpu/*.h`, `src/*/`) document each register.
 
 Next steps:
-1. **More HLE syscalls** (see `TODO.md`): OS timers, the keyboard group,
-   the OS's localised messages (`PrintXY_2` shows message numbers).
+1. **More HLE syscalls** (see `TODO.md`): text and fonts, main memory
+   (MCS), the OS's localised messages (`PrintXY_2` shows message numbers).
 2. **Text input**: lowercase alpha and the multi-byte character set.
 3. **Real font** for PrintXY (18x24) and PrintMini.
 4. **Proper `free`/`realloc`** in the HLE heap (it is a bump allocator).

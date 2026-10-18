@@ -33,6 +33,7 @@ typedef enum {
     CPU_RUNNING,
     CPU_EXITED,       /* add-in returned from its entry point */
     CPU_ERROR,        /* illegal instruction, memory fault, unimplemented syscall... */
+    CPU_RETURNED,     /* a function run by cpu_call() returned (transient) */
 } CpuState;
 
 typedef struct Cpu Cpu;
@@ -91,6 +92,13 @@ void cpu_reset(Cpu *cpu, Memory *mem, uint32_t entry, uint32_t stack_top);
  * state leaves CPU_RUNNING. */
 void cpu_run(Cpu *cpu, uint64_t max_instructions);
 void cpu_dump(const Cpu *cpu);
+
+/* Runs the add-in's function fn to its return, like an interrupt handler
+ * (OS timers): from anywhere, also inside a syscall. Afterwards every
+ * register is as before; only time, pending events and interrupts carry
+ * over. Gives up after max_cycles. Returns false if fn didn't return (the
+ * state then says why: CPU_ERROR, or still running past max_cycles). */
+bool cpu_call(Cpu *cpu, uint32_t fn, uint64_t max_cycles);
 
 /* Writes SR, switching register banks if MD/RB change. */
 void cpu_set_sr(Cpu *cpu, uint32_t sr);

@@ -173,6 +173,12 @@ void view_flash_status(const char *msg)
     status_until = SDL_GetTicks() + STATUS_MS;
 }
 
+void platform_flash(const char *msg)
+{
+    if (!view_headless)
+        view_flash_status(msg);
+}
+
 void platform_status(const char *msg)
 {
     snprintf(status, sizeof status, "%s", msg ? msg : "");
@@ -452,6 +458,25 @@ int platform_wait_key(void)
         SDL_Event e;
         /* Wake up regularly for the Open dialog and status messages. */
         if (SDL_WaitEventTimeout(&e, 100)) {
+            int k = handle_event(&e);
+            if (k >= 0 && !view_paused)
+                return k;
+        }
+        housekeeping();
+    }
+    return -1;
+}
+
+int platform_wait_key_timeout(uint32_t ms)
+{
+    uint64_t end = SDL_GetTicks() + ms;
+    while (view_pending == CMD_NONE) {
+        uint64_t now = SDL_GetTicks();
+        if (now >= end)
+            return -2;
+        SDL_Event e;
+        uint64_t left = end - now;
+        if (SDL_WaitEventTimeout(&e, (Sint32)(left < 100 ? left : 100))) {
             int k = handle_event(&e);
             if (k >= 0 && !view_paused)
                 return k;

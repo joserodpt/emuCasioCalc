@@ -16,6 +16,8 @@ typedef enum {
     A_BATTERY_FULL, A_BATTERY_HALF, A_BATTERY_LOW, A_BATTERY_EMPTY, /* consecutive, as BATTERY_LEVEL_CV */
 } Action;
 
+#define GITHUB_URL "https://github.com/joserodpt/emuCasioFxCG"
+
 typedef struct {
     const char *label, *shortcut;
     Action action;
@@ -565,12 +567,22 @@ static void run_action(Action a)
                 "(SHIFT then ALPHA locks ALPHA; the menu bar shows the mode).\n"
                 "With ALPHA on, PC letters and space type those characters.");
         break;
-    case A_ABOUT:
-        message("About emuCasioFxCG",
-                "emuCasioFxCG\n\nAn emulator for Casio fx-CG50 add-ins (.g3a):\n"
-                "OS syscalls are emulated on the host, and gint add-ins\n"
-                "run on an emulated SH7305 and R61524 display.");
+    case A_ABOUT: {
+        static const SDL_MessageBoxButtonData buttons[] = {
+            {SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Close"},
+            {SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Open on GitHub"},
+        };
+        const SDL_MessageBoxData box = {
+            SDL_MESSAGEBOX_INFORMATION, view_window, "About emuCasioFxCG",
+            "emuCasioFxCG\n\nAn emulator for Casio fx-CG50 add-ins (.g3a):\n"
+            "OS syscalls are emulated on the host, and gint add-ins\n"
+            "run on an emulated SH7305 and R61524 display.\n\n" GITHUB_URL,
+            2, buttons, NULL};
+        int pressed = 0;
+        if (SDL_ShowMessageBox(&box, &pressed) && pressed == 1 && !SDL_OpenURL(GITHUB_URL))
+            view_flash_status("Could not open the browser");
         break;
+    }
     case A_MODEL_AUTO: case A_MODEL_CG20: case A_MODEL_CG50: {
         ModelChoice c = (ModelChoice)(a - A_MODEL_AUTO);
         if (c != view_model_choice) {

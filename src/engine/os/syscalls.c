@@ -8,7 +8,7 @@
  * Syscall numbers and signatures: WikiPrizm (prizm.cemetech.net) and the
  * syscall stubs in libfxcg (github.com/Jonimoose/libfxcg). This file has
  * the table and the system calls; drawing, keyboard and storage are in
- * syscalls_draw.c, syscalls_status.c, syscalls_text.c, syscalls_keys.c, syscalls_bfile.c and syscalls_mcs.c.
+ * syscalls_draw.c, syscalls_status.c, syscalls_time.c, syscalls_text.c, syscalls_keys.c, syscalls_bfile.c and syscalls_mcs.c.
  */
 #include "syscalls.h"
 
@@ -68,7 +68,7 @@ static SC(sc_rtc_get_time)
 /* OS_InnerWait_ms(ms): time passes without running the add-in. */
 static SC(sc_wait_ms)
 {
-    emu->cpu.instructions += (uint64_t)a[0] * (sh7305_iphi_hz(&emu->hw) / 1000);
+    time_advance(emu, (uint64_t)a[0] * (sh7305_iphi_hz(&emu->hw) / 1000));
     return 0;
 }
 
@@ -172,12 +172,6 @@ static SC(sc_realloc)
 /* Timer_Install(id, handler, ms): OS timers would need their callbacks
  * run like interrupts; report that none is free. (gint's return-to-menu
  * uses one, and simply comes back when it can't get it.) */
-static SC(sc_timer_install)
-{
-    (void)emu; (void)a;
-    return (uint32_t)-1;
-}
-
 static SC(sc_get_setup_setting)
 {
     return emu->setup[a[0] & 0xFF];
@@ -433,8 +427,11 @@ static const Syscall SYSCALLS[] = {
     {0x002B, "GlibGetOSVersionInfo", sc_os_version},
     {0x0031, "GetSetupSetting", sc_get_setup_setting},
     {0x0032, "SetSetupSetting", sc_set_setup_setting},
+    {0x0111, "Bkey_ClrAllFlags", sc_bkey_clr_all_flags},
+    {0x0112, "Bkey_SetFlag", sc_bkey_set_flag},
     {0x0129, "Set_FKeys2", sc_nothing},
     {0x012B, "Set_FKeys1", sc_nothing},
+    {0x0131, "FKey_Display", sc_fkey_display},
     {0x01E6, "GetVRAMAddress", sc_get_vram_address},
     {0x01E9, "GetMiniGlyphPtr", sc_get_mini_glyph_ptr},
     {0x01F9, "Print_OS", sc_print_os},
@@ -461,25 +458,39 @@ static const Syscall SYSCALLS[] = {
     {0x02B7, "EnableStatusArea", sc_enable_status_area},
     {0x02B8, "DefineStatusAreaFlags", sc_define_status_area_flags},
     {0x02BB, "DrawHeaderLine", sc_draw_header_line},
+    {0x02BF, "RTC_Reset", sc_rtc_reset},
     {0x02C0, "RTC_GetTime", sc_rtc_get_time},
     {0x02C1, "RTC_GetTicks", sc_rtc_get_ticks},
+    {0x02C2, "RTC_Elapsed_ms", sc_rtc_elapsed_ms},
     {0x02C7, "HourGlass", sc_nothing},       /* status bar busy icon: no status bar */
     {0x08C7, "Cursor_SetFlashOn", sc_nothing}, /* we don't draw the text cursor */
     {0x08C8, "Cursor_SetFlashOff", sc_nothing},
+    {0x08CA, "Keyboard_CursorFlash", sc_nothing}, /* function unknown; no text cursor drawn */
+    {0x08D2, "SetCursorFlashToggle", sc_nothing}, /* parameter unknown */
     {0x08D9, "Timer_Install", sc_timer_install},
+    {0x08DA, "Timer_Deinstall", sc_timer_deinstall},
+    {0x08DB, "Timer_Start", sc_timer_start},
+    {0x08DC, "Timer_Stop", sc_timer_stop},
     {0x0921, "Bdisp_EnableColor", sc_nothing},
     {0x0924, "Bdisp_Rectangle", sc_rectangle},
     {0x0925, "Bdisp_FilledRectangle", sc_filled_rectangle},
     {0x0926, "Bdisp_FilledRectangleFullColor", sc_filled_rectangle_full},
     {0x0D39, "PRGM_GetKey_OS", sc_prgm_get_key_os},
+    {0x0EA0, "Bkey_GetAllFlags", sc_bkey_get_all_flags},
+    {0x0EA1, "Bkey_SetAllFlags", sc_bkey_set_all_flags},
     {0x0EAB, "GetKey", sc_get_key},
     {0x1170, "itoa", sc_itoa},
     {0x1186, "GetMainBatteryVoltage", sc_battery_voltage},
+    {0x11D6, "CMT_Delay_micros", sc_delay_micros},
+    {0x11D7, "CMT_Delay_100micros", sc_delay_100micros},
+    {0x11DE, "RTC_SetDateTime", sc_rtc_set_date_time},
     {0x120A, "EditMBStringCtrl2", sc_edit_mbstring_ctrl2},
     {0x1218, "DisplayMBString2", sc_display_mbstring2},
     {0x1224, "EditMBStringChar", sc_edit_mbstring_char},
     {0x12BF, "GetKeyWait_OS", sc_get_key_wait_os},
+    {0x12C6, "Keyboard_PutKeycode", sc_put_keycode},
     {0x12C7, "Keyboard_ClearKeyBuffer", sc_nothing},
+    {0x12C9, "Keyboard_SpyMatrixCode", sc_spy_matrix_code},
     {0x12D4, "SetBatteryType", sc_set_battery_type},
     {0x12D5, "GetBatteryType", sc_get_battery_type},
     {0x12D8, "SetBacklightDuration", sc_set_backlight},
@@ -562,13 +573,17 @@ static const Syscall SYSCALLS[] = {
     {0x1E23, "ResetAllDialog", sc_nothing},   /* nothing to reset */
     {0x1E4B, "DisplayMessageBox", sc_display_message_box},
     {0x1E50, "GetSecondaryVRAMAddress", sc_get_secondary_vram_address},
+    {0x1E60, "SpecialMatrixcodeProcessing", sc_nothing}, /* OS update contact...: nothing here */
     {0x1E62, "SaveVRAM_1", sc_save_vram_1},
     {0x1E63, "LoadVRAM_1", sc_load_vram_1},
     {0x1E6A, "DisplayMainMenu", sc_nothing},  /* no OS main menu */
     {0x1E6E, "SetQuitHandler", sc_nothing}, /* no OS menu to quit through */
     {0x1E90, "SetAutoPowerOffTime", sc_set_power_off},
     {0x1E91, "GetAutoPowerOffTime", sc_get_power_off},
+    {0x1E99, "GetGetkeyToMainFunctionReturnFlag", sc_get_menu_return},
     {0x1E9F, "GetAppName", sc_get_app_name},
+    {0x1EA6, "EnableGetkeyToMainFunctionReturn", sc_enable_menu_return},
+    {0x1EA7, "DisableGetkeyToMainFunctionReturn", sc_disable_menu_return},
     {0x1EF8, "SetBackGround", sc_nothing},
     {0x1F42, "sys_free", sc_free},
     {0x1F44, "sys_malloc", sc_malloc},

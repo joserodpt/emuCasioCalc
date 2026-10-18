@@ -9,6 +9,7 @@
 
 #include "keys.h"
 #include "platform.h"
+#include "syscalls.h"
 #include "syscalls_impl.h"
 
 /* OS matrix position of KEYS[k]: columns 7..2 left to right, rows 2..10
@@ -40,6 +41,45 @@ static int held_key(Emu *emu)
     return -1;
 }
 
+/* KEYS index of an OS matrix position, or -1. */
+static int key_at(int col, int row)
+{
+    for (int k = 0; k < KEY_COUNT; k++) {
+        int c, r;
+        os_matrix(k, &c, &r);
+        if (c == col && r == row)
+            return k;
+    }
+    return -1;
+}
+
+/* Takes injected key i out of the queue. */
+static void inject_take(Emu *emu, int i)
+{
+    memmove(&emu->inject[i], &emu->inject[i + 1], (size_t)(emu->inject_count - i - 1) * sizeof emu->inject[0]);
+    emu->inject_count--;
+}
+
+/* The next key for a blocking read: an injected one first (GetKey codes
+ * only for GetKey: getkey set), else the script or the keyboard. Returns a
+ * KEYS index, -2 with a GetKey code in *code, or -1 to stop. */
+static int next_input(Emu *emu, bool getkey, int *code)
+{
+    for (;;) {
+        for (int i = 0; i < emu->inject_count; i++) {
+            if (emu->inject[i].key < 0 && !getkey)
+                continue;
+            int key = emu->inject[i].key;
+            *code = emu->inject[i].code;
+            inject_take(emu, i);
+            return key < 0 ? -2 : key;
+        }
+        int key = emu_next_key(emu);
+        if (key != -3) /* -3: a timer injected a key, look again */
+            return key;
+    }
+}
+
 static void set_mode(Emu *emu, bool shift, KeyAlpha alpha)
 {
     emu->key_shift = shift;
@@ -58,13 +98,27 @@ static void show(Emu *emu)
     r61524_blit_vram(&emu->lcd, emu->vram);
 }
 
+/* With GetKey's return to the main menu on (the OS default), MENU leaves
+ * the add-in for the main menu, which isn't emulated: the key is dropped. */
+static bool menu_dropped(Emu *emu, int code)
+{
+    if (code != KEY_CTRL_MENU || emu->menu_return_off)
+        return false;
+    platform_flash("MENU: the calculator would show its main menu (not emulated)");
+    return true;
+}
+
 /* GetKey draws the status area (unless disabled) before waiting, and again
- * when SHIFT or ALPHA changes its indicator. */
+ * when SHIFT or ALPHA changes its indicator. Keys injected with
+ * Keyboard_PutKeycode come first. */
 int sc_wait_key(Emu *emu)
 {
     show(emu);
     for (;;) {
-        int key = emu_next_key(emu);
+        int injected = 0;
+        int key = next_input(emu, true, &injected);
+        if (key == -2)
+            return injected;
         if (key < 0) {
             emu->cpu.state = CPU_EXITED;
             return -1;
@@ -86,16 +140,20 @@ int sc_wait_key(Emu *emu)
             continue;
         }
         set_mode(emu, false, alpha == ALPHA_ONCE ? ALPHA_OFF : alpha);
+        int code = k->getkey;
         if (shift) {
             if (k->getkey == KEY_CTRL_AC)
                 continue;
             if (k->getkey == KEY_CTRL_DEL && emu->model == MODEL_CG50)
-                return KEY_CTRL_UNDO;
-            return k->shift ? k->shift : k->getkey;
+                code = KEY_CTRL_UNDO;
+            else if (k->shift)
+                code = k->shift;
+        } else if (alpha != ALPHA_OFF && k->alpha) {
+            code = k->alpha;
         }
-        if (alpha != ALPHA_OFF)
-            return k->alpha ? k->alpha : k->getkey;
-        return k->getkey;
+        if (menu_dropped(emu, code))
+            continue;
+        return code;
     }
 }
 
@@ -117,15 +175,25 @@ SC(sc_get_key_wait_os)
     Memory *mem = &emu->mem;
     uint32_t type = a[2];
     int key;
-    if (type == 1) {
+    int ignored = 0;
+    key = -1;
+    for (int i = 0; i < emu->inject_count && key < 0; i++) { /* injected matrix codes first */
+        if (emu->inject[i].key >= 0) {
+            key = emu->inject[i].key;
+            inject_take(emu, i);
+        }
+    }
+    if (key >= 0) {
+        /* injected */
+    } else if (type == 1) {
         key = held_key(emu);
         if (key < 0)
             return 0;
     } else if (type == 2 && emu->headless && emu->script_pos >= emu->script_len) {
-        emu->cpu.instructions += (uint64_t)a[3] * sh7305_iphi_hz(&emu->hw);
+        time_advance(emu, (uint64_t)a[3] * sh7305_iphi_hz(&emu->hw));
         return 2;
     } else {
-        key = emu_next_key(emu);
+        key = next_input(emu, false, &ignored);
         if (key < 0) {
             emu->cpu.state = CPU_EXITED;
             return 0;
@@ -225,3 +293,61 @@ SC(sc_edit_mbstring_ctrl2)
         mem_write32(mem, a[4], 0);
     return 0;
 }
+
+/* Keyboard_PutKeycode(x, y, keycode): x and y below 0 put keycode in
+ * GetKey's buffer; else (x, y) is a matrix code read as a key press by the
+ * next keyboard read. Returns 0, or -1 if the buffer is full or (x, y)
+ * isn't a key. */
+SC(sc_put_keycode)
+{
+    int32_t x = (int32_t)a[0], y = (int32_t)a[1];
+    int key = -1;
+    if (x >= 0 || y >= 0) {
+        key = key_at(x, y);
+        if (key < 0)
+            return (uint32_t)-1;
+    }
+    if (emu->inject_count == (int)(sizeof emu->inject / sizeof emu->inject[0]))
+        return (uint32_t)-1;
+    emu->inject[emu->inject_count].key = key;
+    emu->inject[emu->inject_count].code = (int32_t)a[2];
+    emu->inject_count++;
+    emu->inject_serial++;
+    return 0;
+}
+
+/* Keyboard_SpyMatrixCode(char *column, char *row): the next matrix code
+ * waiting (injected, else a key held now), left in place. Returns how many
+ * are waiting. */
+SC(sc_spy_matrix_code)
+{
+    int count = 0, first = -1;
+    for (int i = 0; i < emu->inject_count; i++)
+        if (emu->inject[i].key >= 0 && count++ == 0)
+            first = emu->inject[i].key;
+    if (first < 0) {
+        for (int k = 0; k < KEY_COUNT && first < 0; k++)
+            if (emu->key_down[k])
+                first = k;
+        count = first >= 0;
+    }
+    if (first >= 0) {
+        int col, row;
+        os_matrix(first, &col, &row);
+        if (a[0]) mem_write8(&emu->mem, a[0], (uint8_t)col);
+        if (a[1]) mem_write8(&emu->mem, a[1], (uint8_t)row);
+    }
+    return (uint32_t)count;
+}
+
+/* Bkey flags: keyboard-related OS flags (OPTN, VARS, PRGM, CLIP, CATALOG
+ * handling in GetKey); kept, not acted on. */
+SC(sc_bkey_clr_all_flags) { (void)a; emu->bkey_flags = 0; return 0; }
+SC(sc_bkey_set_flag) { emu->bkey_flags |= (uint16_t)a[0]; return 0; }
+SC(sc_bkey_get_all_flags) { (void)a; return emu->bkey_flags; }
+SC(sc_bkey_set_all_flags) { emu->bkey_flags = (uint16_t)a[0]; return 0; }
+
+/* GetKey's MENU: back to the main menu (1, default) or a key (0). */
+SC(sc_get_menu_return) { (void)a; return !emu->menu_return_off; }
+SC(sc_enable_menu_return) { (void)a; emu->menu_return_off = false; return 0; }
+SC(sc_disable_menu_return) { (void)a; emu->menu_return_off = true; return 0; }

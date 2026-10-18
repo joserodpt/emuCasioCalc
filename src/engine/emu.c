@@ -177,6 +177,15 @@ bool emu_parse_keys(Emu *emu, const char *list)
 
 int emu_next_key(Emu *emu)
 {
+    /* A timer about to run (within 50 ms) runs first: it may inject a key,
+     * as gint does to go back to the main menu. */
+    uint64_t per_ms = sh7305_iphi_hz(&emu->hw) / 1000, due = timers_next_due(emu);
+    uint32_t serial = emu->inject_serial;
+    if (due != UINT64_MAX && due <= emu->cpu.instructions + 50 * per_ms) {
+        time_advance(emu, due > emu->cpu.instructions ? due - emu->cpu.instructions : 0);
+        if (emu->inject_serial != serial)
+            return -3;
+    }
     if (emu->script_pos < emu->script_len)
         return emu->script[emu->script_pos++];
     if (emu->headless) {
@@ -184,7 +193,42 @@ int emu_next_key(Emu *emu)
         return -1;
     }
     emu_present(emu);
+    /* With OS timers running, time goes on while waiting: their handlers
+     * run when due (in real time), and the screen follows. */
+    while (timers_next_due(emu) != UINT64_MAX && emu->cpu.state == CPU_RUNNING) {
+        due = timers_next_due(emu);
+        uint64_t left = due > emu->cpu.instructions ? due - emu->cpu.instructions : 0;
+        /* wait in whole ms, rounded up, at most 1 s at a time */
+        uint64_t ms = (left + per_ms - 1) / per_ms;
+        if (ms > 1000) {
+            ms = 1000;
+            left = 1000 * per_ms;
+        }
+        int key = platform_wait_key_timeout((uint32_t)ms);
+        if (key != -2)
+            return key;
+        time_advance(emu, left); /* exactly to the timer (or 1 s on) */
+        emu_present(emu);
+        if (emu->inject_serial != serial)
+            return -3;
+    }
+    if (emu->cpu.state != CPU_RUNNING)
+        return -1;
     return platform_wait_key();
+}
+
+void emu_run(Emu *emu, uint64_t cycles)
+{
+    Cpu *cpu = &emu->cpu;
+    uint64_t end = cpu->instructions + cycles;
+    while (cpu->state == CPU_RUNNING && cpu->instructions < end) {
+        uint64_t due = timers_next_due(emu);
+        uint64_t stop = due < end ? due : end;
+        if (stop > cpu->instructions)
+            cpu_run(cpu, stop - cpu->instructions);
+        if (cpu->instructions >= due)
+            timers_fire_due(emu);
+    }
 }
 
 void emu_update_keys(Emu *emu, const bool *host_down)
@@ -193,7 +237,12 @@ void emu_update_keys(Emu *emu, const bool *host_down)
     bool down[256];
     memcpy(down, host_down, (size_t)KEY_COUNT * sizeof *down);
 
-    bool polled = emu->hw.keysc_used || emu->polls_keys;
+    /* The script goes on in the matrix only while the add-in reads it: a
+     * gint add-in in the OS world (gint_world_switch) doesn't, and its OS
+     * GetKey calls take the keys instead. */
+    bool polled = emu->hw.keysc_read || emu->polls_keys;
+    emu->hw.keysc_read = false;
+    emu->polls_keys = false;
     if (polled && emu->script_pos < emu->script_len) {
         if (!emu->script_next) {
             emu->script_next = now + KEY_START_MS * ms;

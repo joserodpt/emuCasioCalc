@@ -65,6 +65,7 @@ typedef struct {
 
     uint8_t keys[12];       /* key matrix: keys[row] bit col, as KEYSC reports it */
     bool keysc_used;        /* the add-in scans the keyboard itself (gint) */
+    bool keysc_read;        /* ...and did since the last emu_update_keys() */
 
     /* U0 mappings, reported through the UTLB address/data arrays. */
     Mapping maps[4];

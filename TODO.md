@@ -1,15 +1,15 @@
 # TODO
 
 What emuCasioFxCG still lacks. The syscall list is measured against
-[libfxcg](https://github.com/Jonimoose/libfxcg)'s stubs: 139 of its 273 syscalls
-are implemented, 134 are left. Add-ins only use a small part of them, so the
+[libfxcg](https://github.com/Jonimoose/libfxcg)'s stubs: 160 of its 273 syscalls
+are implemented, 113 are left. Add-ins only use a small part of them, so the
 groups are ordered by how likely real add-ins are to need them.
 
 Approach that has worked so far: run an add-in, implement what it stops at,
 check it on screen. For calls no add-in at hand uses, write a test app in
 `~/VSCode/casioPrizmApps` (see `apps/os-syscalls`, which tests the system-info
-and dialog calls, and `apps/draw-syscalls`, the drawing and memory/string
-calls). Semantics come from WikiPrizm (prizm.cemetech.net),
+and dialog calls; also `draw-syscalls`, `key-modifiers`, `status-bar`,
+`file-syscalls` and `time-keys`). Semantics come from WikiPrizm (prizm.cemetech.net),
 libfxcg's headers, and the add-in's source when it has one.
 
 ## Syscalls, likely to be needed
@@ -50,24 +50,25 @@ copy made when the file was opened.
 SHIFT / ALPHA in `GetKey` are done (test app `apps/key-modifiers`). Not
 modelled: lowercase alpha (fx-CG50 text entry), the SHIFT functions of
 F1–F6 and of 3, 6, `,` and → (they return the plain key), SHIFT AC/ON
-switching the calculator off (ignored). The status bar's S / A indicator
-is on the menu bar instead.
+switching the calculator off (ignored).
 
-`Keyboard_PutKeycode` (12C6), `Keyboard_SpyMatrixCode` (12C9), `Bkey_ClrAllFlags`
-(0111), `Bkey_SetFlag` (0112), `Bkey_GetAllFlags` (0EA0), `Bkey_SetAllFlags`
-(0EA1), `GetGetkeyToMainFunctionReturnFlag` (1E99),
-`EnableGetkeyToMainFunctionReturn` (1EA6), `DisableGetkeyToMainFunctionReturn`
-(1EA7), `SpecialMatrixcodeProcessing` (1E60), `Keyboard_CursorFlash` (08CA),
-`SetCursorFlashToggle` (08D2), `FKey_Display` (0131).
+The keyboard syscalls are done (test app `apps/time-keys`). Guessed or
+partial: `Keyboard_PutKeycode` returns 0 (-1 when its buffer is full);
+the Bkey flags are kept but GetKey doesn't act on them; with the return to
+the main menu on (the default), GetKey drops MENU and says so on the menu
+bar, as there is no main menu; `SpecialMatrixcodeProcessing`,
+`Keyboard_CursorFlash` and `SetCursorFlashToggle` do nothing (function
+unknown); `FKey_Display` draws an empty label tab (the bitmap format is
+unknown, and `GetFKeyPtr` gives blank ones).
 
 ### Timing
-`RTC_Elapsed_ms` (02C2), `RTC_Reset` (02BF), `RTC_SetDateTime` (11DE),
-`CMT_Delay_micros` (11D6), `CMT_Delay_100micros` (11D7).
-
-OS timers: `Timer_Install` (08D9) is answered with "no timer free";
-`Timer_Start` / `Timer_Stop` / `Timer_Deinstall` (08DB, 08DC, 08DA) are
-missing. Doing them properly means calling the add-in's handler
-periodically, like an interrupt.
+Done (test app `apps/time-keys`). OS timers call the add-in's handler like
+an interrupt: between run slices, while GetKey waits (in real time), and
+during delays. Guessed: periods are whole 40 ms ticks (25 Hz, nearest, at
+least one); a blocking key read first runs a timer due within 50 ms (it
+may inject a key, as gint does to reach the main menu); `RTC_Reset` with a
+nonzero mode sets the clock to 2000-01-01 00:00:00; `RTC_GetTicks` counts
+from the add-in's start, not from midnight.
 
 ### Memory and strings
 `memcmp3` (115E), `strcmp_ignore_case` (1635), `ItoA_10digit` (1633): their
@@ -147,6 +148,6 @@ Casio's own apps are not emulated: `APP_RUNMAT` (1A03), `APP_Program` (1945),
 - **Model detection** is a guess (build date, then memory addresses);
   Emulation > Model overrides it.
 - **Fonts**: real Casio fonts instead of the 8x8 approximation.
-- **Status bar**: draw it (battery, SHIFT/ALPHA, the add-in's text).
-- **Main menu**: MENU does nothing in OS add-ins and returns at once in gint
-  ones; there is no OS main menu to show.
+- **Main menu**: there is no OS main menu to show. In OS add-ins GetKey
+  drops MENU (unless the add-in turned the return to the menu off); gint
+  add-ins' `gint_osmenu()` returns at once.

@@ -77,12 +77,31 @@ typedef struct {
     bool script_down;
     uint64_t script_next; /* cycle of the next press/release, 0 = not started */
     uint64_t script_done; /* cycle when the last scripted key was released */
-    bool polls_keys;      /* the add-in reads the key state (PRGM_GetKey...) */
+    bool polls_keys;      /* the add-in read the key state (PRGM_GetKey...) since the last update */
     bool key_down[256];   /* KEYS currently held (host keyboard + script) */
     /* GetKey's modifiers: SHIFT pressed, ALPHA for one key or locked. */
     bool key_shift;
     KeyAlpha key_alpha;
     int battery_cv;         /* battery voltage, 1/100 V */
+
+    /* OS timers (Timer_Install...), slots 1-10; 5-10 are the add-in's. */
+    struct {
+        bool installed, running;
+        uint32_t handler;
+        uint32_t period_ms;  /* in whole 25 Hz ticks */
+        uint64_t next;       /* cycle of the next call */
+    } timers[11];
+    bool in_timer;          /* a handler is running: no nested calls */
+
+    /* Keyboard_PutKeycode: keys injected for the next reads. key is a KEYS
+     * index (a matrix code, for every reader), or -1 with a GetKey code. */
+    struct {
+        int key, code;
+    } inject[8];
+    int inject_count;
+    uint32_t inject_serial;  /* counts injections, to notice new ones */
+    uint16_t bkey_flags;     /* Bkey_SetFlag / GetAllFlags... */
+    bool menu_return_off;    /* DisableGetkeyToMainFunctionReturn */
 
     /* The OS status area, the top 24 rows of VRAM (syscalls_status.c). */
     bool status_off;        /* EnableStatusArea(3) */
@@ -137,9 +156,12 @@ void emu_start(Emu *emu);
 
 bool emu_parse_keys(Emu *emu, const char *list);
 /* GetKey: next scripted key, else waits for the host keyboard.
- * Returns a KEYS index, or -1 when there is nothing left (headless) or the
- * window was closed. */
+ * Returns a KEYS index, -1 when there is nothing left (headless) or the
+ * window was closed, or -3 when an OS timer injected a key meanwhile
+ * (Keyboard_PutKeycode: read emu->inject). */
 int emu_next_key(Emu *emu);
+/* Runs the add-in for cycles of time, with the OS timers due meanwhile. */
+void emu_run(Emu *emu, uint64_t cycles);
 /* Feeds the key matrix with host-held keys and the key script. */
 void emu_update_keys(Emu *emu, const bool *host_down);
 /* Headless runs of keyboard-scanning add-ins end this long after the script. */

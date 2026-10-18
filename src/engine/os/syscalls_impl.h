@@ -44,6 +44,7 @@ SC(sc_get_mini_glyph_ptr);
 SC(sc_print_mini_glyph);
 SC(sc_draw_frame);
 SC(sc_get_fkey_ptr);
+SC(sc_fkey_display);
 SC(sc_msgbox_push);
 SC(sc_msgbox_pop);
 SC(sc_display_mbstring2);
@@ -83,6 +84,17 @@ SC(sc_draw_header_line);
 SC(sc_enable_display_header);
 SC(sc_battery_icon);
 
+/* syscalls_time.c: OS timers, RTC, delays */
+SC(sc_timer_install);
+SC(sc_timer_start);
+SC(sc_timer_stop);
+SC(sc_timer_deinstall);
+SC(sc_rtc_elapsed_ms);
+SC(sc_rtc_reset);
+SC(sc_rtc_set_date_time);
+SC(sc_delay_micros);
+SC(sc_delay_100micros);
+
 /* syscalls_dialogs.c: OS dialogs */
 SC(sc_display_message_box);
 SC(sc_color_index_dialog);
@@ -99,6 +111,15 @@ SC(sc_get_key_wait_os);
 SC(sc_prgm_get_key_os);
 SC(sc_edit_mbstring_char);
 SC(sc_edit_mbstring_ctrl2);
+SC(sc_put_keycode);
+SC(sc_spy_matrix_code);
+SC(sc_bkey_clr_all_flags);
+SC(sc_bkey_set_flag);
+SC(sc_bkey_get_all_flags);
+SC(sc_bkey_set_all_flags);
+SC(sc_get_menu_return);
+SC(sc_enable_menu_return);
+SC(sc_disable_menu_return);
 
 /* syscalls_bfile.c: storage memory files (Bfile_*) */
 SC(sc_bfile_open);

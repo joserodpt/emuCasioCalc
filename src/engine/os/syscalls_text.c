@@ -259,6 +259,23 @@ SC(sc_get_fkey_ptr)
     return 0;
 }
 
+/* FKey_Display(n, bitmap): an F-key label over F1..F6 (n = 0..5), in the
+ * last 24 rows. The bitmaps' format isn't documented (and GetFKeyPtr gives
+ * blank ones): we draw an empty label tab. */
+SC(sc_fkey_display)
+{
+    int n = (int32_t)a[0];
+    if (n < 0 || n > 5)
+        return 0;
+    int x0 = n * 64, y0 = LCD_HEIGHT - 24;
+    display_rect(emu->vram, x0, y0, x0 + 63, LCD_HEIGHT - 1, 0xFFFF);
+    display_rect(emu->vram, x0 + 1, y0 + 1, x0 + 62, y0 + 1, 0x0000);
+    display_rect(emu->vram, x0 + 1, LCD_HEIGHT - 2, x0 + 62, LCD_HEIGHT - 2, 0x0000);
+    display_rect(emu->vram, x0 + 1, y0 + 1, x0 + 1, LCD_HEIGHT - 2, 0x0000);
+    display_rect(emu->vram, x0 + 62, y0 + 1, x0 + 62, LCD_HEIGHT - 2, 0x0000);
+    return 0;
+}
+
 /* Message box geometry is our guess: a box of `lines` lines frames PrintXY
  * rows 2..lines+1, columns 2..19, which is where add-ins print their
  * message text. */

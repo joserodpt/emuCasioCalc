@@ -62,6 +62,9 @@ void platform_set_os_status(const char *msg);
 int platform_battery(void);
 void platform_set_battery(int centivolts);
 
+/* A message on the menu bar for a few seconds. */
+void platform_flash(const char *msg);
+
 /* Text on the right of the menu bar until replaced (NULL clears it). */
 void platform_status(const char *text);
 
@@ -72,6 +75,8 @@ bool platform_poll(bool *down);
 /* Blocks until a calculator key is pressed; returns its KEYS index, or -1
  * when a command is waiting. */
 int platform_wait_key(void);
+/* The same, giving up after ms: -2 then. */
+int platform_wait_key_timeout(uint32_t ms);
 
 /* Waits up to ms for window events (while paused or after the add-in
  * exited). Returns false when a command is waiting. */

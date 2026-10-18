@@ -37,6 +37,7 @@
 /* Magic addresses the CPU loop intercepts instead of executing. */
 #define SYSCALL_ENTRY 0x80020070u  /* jump here with the syscall number in r0 */
 #define EXIT_ADDR     0xDEAD0000u  /* PR when main() starts: returning here ends the run */
+#define CALL_RETURN   0xDEAD0004u  /* PR of a function called by cpu_call() */
 
 /* The OS draws 384x216 (VRAM); the panel behind it is 396x224. */
 #define LCD_WIDTH     384

@@ -671,6 +671,11 @@ static inline void step_one(Cpu *cpu)
         cpu->attention = true;
         return;
     }
+    if (cpu->pc == CALL_RETURN) {
+        cpu->state = CPU_RETURNED;
+        cpu->attention = true;
+        return;
+    }
 
     cpu->exception = false;
     exec(cpu, cpu->pc);
@@ -724,6 +729,37 @@ static void run_until(Cpu *cpu, uint64_t end)
 void cpu_run(Cpu *cpu, uint64_t max_instructions)
 {
     run_until(cpu, cpu->instructions + max_instructions);
+}
+
+bool cpu_call(Cpu *cpu, uint32_t fn, uint64_t max_cycles)
+{
+    if (cpu->state != CPU_RUNNING)
+        return false;
+    Cpu saved = *cpu;
+    cpu->pc = fn;
+    cpu->pr = CALL_RETURN;
+    cpu->r[15] = (saved.r[15] - 64) & ~3u; /* below what the interrupted code uses */
+    cpu->sleeping = false;
+    cpu->in_delay_slot = false;
+    run_until(cpu, cpu->instructions + max_cycles);
+    CpuState state = cpu->state;
+    if (state == CPU_RUNNING || state == CPU_ERROR || state == CPU_EXITED) {
+        if (state == CPU_RUNNING)
+            cpu_report(cpu, "function at 0x%08X called by the OS did not return", fn);
+        cpu->state = state == CPU_EXITED ? CPU_EXITED : CPU_ERROR;
+        return false;
+    }
+    /* Returned: back to the interrupted code, keeping what moved on. */
+    uint64_t instructions = cpu->instructions, next_event = cpu->next_event;
+    int irq_level = cpu->irq_level;
+    uint32_t irq_code = cpu->irq_code;
+    *cpu = saved;
+    cpu->instructions = instructions;
+    cpu->next_event = next_event;
+    cpu->irq_level = irq_level;
+    cpu->irq_code = irq_code;
+    cpu->attention = true;
+    return true;
 }
 
 void cpu_dump(const Cpu *cpu)

@@ -174,7 +174,7 @@ static bool run(Emu *emu, bool headless)
         if (emu->realistic != platform_realistic())
             emu_set_realistic(emu, platform_realistic());
         emu->battery_cv = platform_battery();
-        cpu_run(cpu, (uint64_t)hz / 1000 * SLICE_MS);
+        emu_run(emu, (uint64_t)hz / 1000 * SLICE_MS);
         if (!platform_poll(down))
             return true;
         emu_update_keys(emu, down);
