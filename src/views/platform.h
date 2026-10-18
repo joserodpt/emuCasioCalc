@@ -38,6 +38,11 @@ void platform_set_app(const G3aInfo *info, const char *path, Model model);
 typedef enum { CHOICE_AUTO, CHOICE_CG20, CHOICE_CG50 } ModelChoice;
 ModelChoice platform_model_choice(void);
 
+/* The toolbar's speed slider: emulated time / real time (1 = real time),
+ * 0 = as fast as possible. */
+double platform_speed(void);
+void platform_set_speed(double speed);
+
 /* Emulation > Timing: realistic (default) or fast. */
 bool platform_realistic(void);
 void platform_set_realistic(bool realistic);

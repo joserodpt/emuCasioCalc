@@ -48,11 +48,11 @@ add_test(NAME cpu COMMAND test_cpu)
 add_test(NAME hello
   COMMAND emucasiofxcg --headless --keys EXE,EXIT --screenshot hello.bmp hello.g3a
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-# No date, no old addresses: detected as an fx-CG50 add-in; also runs as fx-CG10/20.
+# No build date, no old addresses: detected as an fx-CG50 add-in; also runs as fx-CG10/20.
 add_test(NAME hello_model
   COMMAND emucasiofxcg --headless --keys EXIT hello.g3a
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-set_tests_properties(hello_model PROPERTIES PASS_REGULAR_EXPRESSION "running as fx-CG50 \\(no sign")
+set_tests_properties(hello_model PROPERTIES PASS_REGULAR_EXPRESSION "running as fx-CG50 \\(no build date")
 add_test(NAME hello_cg20
   COMMAND emucasiofxcg --headless --model cg20 --keys EXE,EXIT hello.g3a
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})

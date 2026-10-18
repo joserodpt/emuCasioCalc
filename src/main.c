@@ -34,6 +34,7 @@ static void usage(const char *argv0)
             "  --info             open the add-in information window at start\n"
             "  --model M          calculator to emulate: auto (default, detected from the\n"
             "                     add-in), cg20 (fx-CG10/20) or cg50 (fx-CG50)\n"
+            "  --speed S          window speed in percent (10-400, default 100) or max\n"
             "  --timing T         realistic (default: OS calls, memory and DMA take\n"
             "                     the time they would on the calculator) or fast\n",
             argv0);
@@ -158,13 +159,14 @@ static bool run(Emu *emu, bool headless)
 {
     bool down[256] = {0};
     uint64_t host_start = platform_ticks_ms();
+    double last_speed = -1;
     while (emu->cpu.state == CPU_RUNNING) {
         uint32_t hz = sh7305_iphi_hz(&emu->hw);
         Cpu *cpu = &emu->cpu;
         if (platform_paused()) {
             if (!platform_idle(20))
                 return true;
-            host_start = platform_ticks_ms() - cpu->instructions * 1000 / hz;
+            last_speed = -1; /* resynchronise after the pause */
             continue;
         }
         if (emu->realistic != platform_realistic())
@@ -185,13 +187,22 @@ static bool run(Emu *emu, bool headless)
             return false;
         }
         if (!headless) {
-            /* Keep emulated time in step with real time. */
+            /* Keep emulated time in step with real time, times the speed
+             * slider (0 = no limit). */
+            double speed = platform_speed();
             uint64_t emu_ms = cpu->instructions * 1000 / hz;
-            uint64_t host_ms = platform_ticks_ms() - host_start;
-            if (emu_ms > host_ms)
-                platform_delay_ms((uint32_t)(emu_ms - host_ms < 50 ? emu_ms - host_ms : 50));
-            else if (host_ms - emu_ms > 100)
-                host_start = platform_ticks_ms() - emu_ms; /* we were blocked or slow: don't race */
+            uint64_t now = platform_ticks_ms();
+            if (speed != last_speed) { /* restart the reference at the new pace */
+                last_speed = speed;
+                host_start = now - (uint64_t)(speed > 0 ? emu_ms / speed : 0);
+            }
+            if (speed > 0) {
+                uint64_t target = host_start + (uint64_t)(emu_ms / speed); /* when we should be here */
+                if (target > now)
+                    platform_delay_ms((uint32_t)(target - now < 50 ? target - now : 50));
+                else if (now - target > 100)
+                    host_start = now - (uint64_t)(emu_ms / speed); /* blocked or too slow: don't race */
+            }
         }
     }
     /* A blocking GetKey interrupted by a menu command also stops here. */
@@ -204,7 +215,7 @@ int main(int argc, char **argv)
     Options opt = {0};
     const char *path = NULL, *screenshot = NULL, *icon = NULL;
     bool show_info = false;
-    const char *model = "auto", *timing = "realistic";
+    const char *model = "auto", *timing = "realistic", *speed = NULL;
     static Emu emu;
     static G3aInfo info;
 
@@ -219,6 +230,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--info")) show_info = true;
         else if (!strcmp(argv[i], "--model") && i + 1 < argc) model = argv[++i];
         else if (!strcmp(argv[i], "--timing") && i + 1 < argc) timing = argv[++i];
+        else if (!strcmp(argv[i], "--speed") && i + 1 < argc) speed = argv[++i];
         else if (argv[i][0] != '-' && !path) path = argv[i];
         else { usage(argv[0]); return 2; }
     }
@@ -234,6 +246,8 @@ int main(int argc, char **argv)
         usage(argv[0]);
         return 2;
     }
+    if (speed)
+        platform_set_speed(!strcmp(speed, "max") ? 0 : atof(speed) / 100);
     if (!strcmp(timing, "fast")) {
         platform_set_realistic(false);
     } else if (strcmp(timing, "realistic")) {
@@ -279,8 +293,10 @@ int main(int argc, char **argv)
         while (platform_idle(100)) {
         }
         Command cmd = platform_take_command();
-        if (cmd == CMD_QUIT)
+        if (cmd == CMD_QUIT) {
+            printf("window closed after %llu instructions\n", (unsigned long long)emu.cpu.instructions);
             break;
+        }
         if (cmd == CMD_OPEN)
             snprintf(current, sizeof current, "%s", platform_open_path());
         if (!current[0]) { /* Reset with nothing loaded */

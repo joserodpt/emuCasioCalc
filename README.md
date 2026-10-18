@@ -31,6 +31,7 @@ ctest --test-dir build --output-on-failure
 ./build/emucasiofxcg --info some-addin.g3a              # open the add-in info window at start
 ./build/emucasiofxcg --model cg20 some-addin.g3a        # force the fx-CG10/20 (default: detect)
 ./build/emucasiofxcg --timing fast some-addin.g3a       # no OS/memory/DMA delays (default: realistic)
+./build/emucasiofxcg --speed 50 some-addin.g3a          # half speed (10-400, or max)
 
 ./run.sh                  # rebuilds if the sources changed, opens an empty window (File > Open)
 ./run.sh some-addin.g3a   # same, starting that add-in (quote paths with spaces)
@@ -103,10 +104,10 @@ much there is (2 MB vs 8 MB), where the OS puts VRAM and the stack, and the
 clock (58.98 MHz vs 117.96 MHz CPU). The emulator can be either:
 
 - **Automatic** (default): g3a files have no "made for" field, so the model is
-  guessed from the add-in. Code that refers to fx-CG50 memory (gint add-ins
-  do) runs as an fx-CG50; otherwise an add-in built before 2017, or that
-  draws straight to the fx-CG10/20 VRAM address, runs as an fx-CG10/20;
-  anything else runs as an fx-CG50.
+  guessed. The build date in the header decides when there is one (before
+  2017, when the fx-CG50 came out: fx-CG10/20). Without a date, code that
+  refers to fx-CG50 memory runs as an fx-CG50, code that draws straight to
+  the fx-CG10/20 VRAM address as an fx-CG10/20, anything else as an fx-CG50.
 - **Forced**: Emulation > Model, or `--model cg20` / `--model cg50`.
 
 The model and the reason it was picked appear in the window title, in
@@ -155,6 +156,10 @@ Two timing modes (Emulation > Timing, or `--timing`):
   measurements.
 - **Fast**: all of the above takes no time; add-ins run as fast as the
   interpreter allows.
+
+Independently of the mode, the **speed slider** in the toolbar (also
+Ctrl+= / Ctrl+- / Ctrl+0, or `--speed`) sets how fast emulated time runs
+compared with real time: 10% to 400%, or Max (no limit).
 
 ## How to grow it
 

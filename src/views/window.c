@@ -24,6 +24,7 @@ char view_app_path[1024];
 Model view_model;
 ModelChoice view_model_choice;
 bool view_realistic = true;
+int view_speed = 4; /* the 100% step */
 
 static SDL_Texture *screen;    /* the panel, 396 x 224 */
 static SDL_Texture *upscaled;  /* the panel at a whole scale, see draw_screen() */
@@ -137,7 +138,8 @@ void view_redraw(void)
 void view_set_scale(int scale)
 {
     int w = PANEL_WIDTH * scale;
-    int bar = 8 * text_scale_for(w) + 16; /* BAR_H at that width */
+    int ts = text_scale_for(w);
+    int bar = (8 * ts + 16) + (8 * ts + 14); /* BAR_H at that width */
     SDL_SetWindowSize(view_window, w, bar + PANEL_HEIGHT * scale);
     SDL_SyncWindow(view_window);
     update_layout();
@@ -237,7 +239,7 @@ bool platform_init(int scale, bool headless)
     screen = SDL_CreateTexture(view_renderer, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING, PANEL_WIDTH,
                                PANEL_HEIGHT);
     SDL_SetTextureScaleMode(screen, SDL_SCALEMODE_NEAREST);
-    SDL_SetWindowMinimumSize(view_window, PANEL_WIDTH, 8 + 16 + PANEL_HEIGHT); /* 1x screen, 1x bar */
+    SDL_SetWindowMinimumSize(view_window, PANEL_WIDTH, (8 + 16) + (8 + 14) + PANEL_HEIGHT); /* 1x screen and bar */
     update_layout();
     return screen != NULL;
 }
@@ -286,6 +288,16 @@ void platform_set_app(const G3aInfo *info, const char *path, Model model)
              model_name(model));
     SDL_SetWindowTitle(view_window, title);
     info_window_refresh();
+}
+
+double platform_speed(void)
+{
+    return menubar_speed();
+}
+
+void platform_set_speed(double speed)
+{
+    menubar_set_speed(speed);
 }
 
 bool platform_realistic(void)

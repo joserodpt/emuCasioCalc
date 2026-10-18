@@ -21,6 +21,7 @@ extern char view_app_path[1024];
 extern Model view_model;        /* the model being emulated */
 extern ModelChoice view_model_choice;
 extern bool view_realistic;
+extern int view_speed;          /* index into the speed steps, see menubar.c */
 
 void view_redraw(void);
 /* View > Zoom: sizes the window for the screen at exactly scale x. */
@@ -35,7 +36,9 @@ void view_flash_status(const char *msg);
 #define TEXT_SCALE view_text_scale
 #define CHAR_W     (8 * TEXT_SCALE)
 #define GLYPH_H    (8 * TEXT_SCALE)
-#define BAR_H      (GLYPH_H + 16)
+#define MENU_H     (GLYPH_H + 16)       /* the menu row */
+#define TOOL_H     (GLYPH_H + 14)       /* the toolbar row under it (speed, status) */
+#define BAR_H      (MENU_H + TOOL_H)    /* everything above the screen */
 #define ITEM_H     (GLYPH_H + 18)
 #define PAD        (6 + 4 * TEXT_SCALE)
 
@@ -50,6 +53,10 @@ bool menubar_event(const SDL_Event *e);
 /* Turns a finished File > Open dialog into CMD_OPEN. */
 void menubar_poll(void);
 const char *menubar_open_path(void);
+/* The slider's speed: emulated time / real time, 0 = as fast as possible. */
+double menubar_speed(void);
+/* Moves the slider to the step nearest to speed (0 = Max). */
+void menubar_set_speed(double speed);
 
 /* info_window.c */
 void info_window_open(void);

@@ -42,16 +42,27 @@ static void read_info(const unsigned char *buf, long size, G3aInfo *info)
 
 /*
  * Guesses the model an add-in was made for. There is no field for it, so:
- * 1. code that refers to fx-CG50 RAM (0x8C000000.., 0xAC000000..) knows the
- *    fx-CG50: gint add-ins are like this, they pick the model at run time;
- * 2. else, built before 2017 (the fx-CG50 came out then) or drawing straight
- *    to the fx-CG10/20 VRAM (0xA8000000): fx-CG10/20;
+ * 1. the build date in the header decides when there is one: before 2017
+ *    (when the fx-CG50 came out) means fx-CG10/20, later means fx-CG50;
+ * 2. without a date, code that refers to fx-CG50 RAM (0x8C000000..,
+ *    0xAC000000..) means fx-CG50, code that draws straight to the
+ *    fx-CG10/20 VRAM (0xA8000000) means fx-CG10/20;
  * 3. else fx-CG50, the current model.
  * Addresses are looked for as 32-bit constants (literal pools are 2-byte
  * aligned at least).
  */
 static void detect_model(const unsigned char *code, uint32_t size, const char *date, G3aInfo *info)
 {
+    int year = 0;
+    if (sscanf(date, "%4d", &year) != 1 || year < 2000)
+        year = 0;
+    if (year) {
+        info->model = year < 2017 ? MODEL_CG20 : MODEL_CG50;
+        snprintf(info->model_reason, sizeof info->model_reason, "built in %d, %s the fx-CG50", year,
+                 year < 2017 ? "before" : "after");
+        return;
+    }
+
     int cg50_refs = 0, cg20_vram_refs = 0;
     for (uint32_t i = 0; i + 4 <= size; i += 2) {
         uint32_t v = (uint32_t)code[i] << 24 | (uint32_t)code[i + 1] << 16 | (uint32_t)code[i + 2] << 8 | code[i + 3];
@@ -60,22 +71,15 @@ static void detect_model(const unsigned char *code, uint32_t size, const char *d
         if (v >= 0xA8000000u && v < 0xA8000000u + VRAM_SIZE)
             cg20_vram_refs++;
     }
-    int year = 0;
-    if (sscanf(date, "%4d", &year) != 1)
-        year = 0;
-
     if (cg50_refs) {
         info->model = MODEL_CG50;
-        snprintf(info->model_reason, sizeof info->model_reason, "uses fx-CG50 memory");
-    } else if (year >= 2000 && year < 2017) {
-        info->model = MODEL_CG20;
-        snprintf(info->model_reason, sizeof info->model_reason, "built in %d, before the fx-CG50", year);
+        snprintf(info->model_reason, sizeof info->model_reason, "no build date; uses fx-CG50 memory");
     } else if (cg20_vram_refs) {
         info->model = MODEL_CG20;
-        snprintf(info->model_reason, sizeof info->model_reason, "draws to the fx-CG10/20 VRAM address");
+        snprintf(info->model_reason, sizeof info->model_reason, "no build date; uses the fx-CG10/20 VRAM");
     } else {
         info->model = MODEL_CG50;
-        snprintf(info->model_reason, sizeof info->model_reason, "no sign of an older model");
+        snprintf(info->model_reason, sizeof info->model_reason, "no build date or older-model sign");
     }
 }
 
