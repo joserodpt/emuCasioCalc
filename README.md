@@ -64,9 +64,12 @@ A = →, Q = x², P = ^ (Help > Keyboard controls lists them).
 
 In OS add-ins, `GetKey` handles SHIFT and ALPHA like the calculator: the
 next key returns its yellow or red function (ALPHA 7 = `M`, SHIFT EXIT =
-QUIT), and SHIFT then ALPHA locks ALPHA. The title bar shows the mode. With
+QUIT), and SHIFT then ALPHA locks ALPHA. The right of the menu bar shows
+SHIFT, ALPHA and the battery, like the calculator's status bar. With
 ALPHA on, PC letters and space type those characters directly. gint add-ins
-read the keyboard themselves and see SHIFT and ALPHA as plain keys.
+read the keyboard themselves and see SHIFT and ALPHA as plain keys; the
+window follows them with the OS's rules, which most add-ins share, so PC
+letters work there too.
 
 `--keys` works for both kinds of add-ins: OS `GetKey` calls pop the keys in
 order; for gint add-ins each key is held down for 100 ms of emulated time.

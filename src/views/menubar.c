@@ -177,13 +177,112 @@ static void text(float x, float y, const char *s)
     view_text(view_renderer, x, y, s, TEXT_SCALE);
 }
 
+/*
+ * Right of the menu row, like the calculator's status bar: SHIFT and ALPHA
+ * (yellow and red, as on the keys; dim when off) and the battery. Full
+ * labels if they fit after the menu titles, else S / A, else nothing.
+ */
+#define GAP (4 * TEXT_SCALE)
+
+static const char *shift_label(bool compact)
+{
+    return compact ? "S" : "SHIFT";
+}
+
+static const char *alpha_label(bool compact)
+{
+    if (view_key_alpha == 2)
+        return compact ? "A+" : "ALPHA LOCK";
+    return compact ? "A" : "ALPHA";
+}
+
+static int badge_w(const char *s)
+{
+    return (int)strlen(s) * CHAR_W + 6 * TEXT_SCALE;
+}
+
+static int battery_w(void)
+{
+    return 15 * TEXT_SCALE + GAP + 5 * CHAR_W; /* icon, "5.20V" */
+}
+
+static int indicators_w(bool compact)
+{
+    return badge_w(shift_label(compact)) + GAP + badge_w(alpha_label(compact)) + 2 * GAP + battery_w() + PAD;
+}
+
+/* Width the indicators take (0 if they don't fit), and their form. */
+static int indicators_fit(int width, bool *compact)
+{
+    int room = width - title_x(MENU_COUNT - 1) - title_w(MENU_COUNT - 1) - PAD;
+    for (int c = 0; c < 2; c++) {
+        *compact = c;
+        if (indicators_w(*compact) <= room)
+            return indicators_w(*compact);
+    }
+    return 0;
+}
+
+static void badge(float x, const char *s, bool on, int r, int g, int b, bool light_text)
+{
+    float h = GLYPH_H + 6, y = (MENU_H - h) / 2;
+    SDL_FRect box = {x, y, (float)badge_w(s), h};
+    if (on) {
+        color(r, g, b);
+        SDL_RenderFillRect(view_renderer, &box);
+        color(light_text ? 255 : 0, light_text ? 255 : 0, light_text ? 255 : 0);
+    } else {
+        color(200, 200, 200);
+        SDL_RenderRect(view_renderer, &box);
+        color(175, 175, 175);
+    }
+    text(x + 3 * TEXT_SCALE, (MENU_H - GLYPH_H) / 2.0f, s);
+}
+
+static void draw_indicators(int width)
+{
+    bool compact;
+    int w = indicators_fit(width, &compact);
+    if (!w)
+        return;
+    float x = (float)(width - w);
+    const char *s = shift_label(compact), *a = alpha_label(compact);
+    badge(x, s, view_key_shift, 240, 190, 0, false);
+    x += badge_w(s) + GAP;
+    badge(x, a, view_key_alpha != 0, 200, 30, 30, true);
+    x += badge_w(a) + 2 * GAP;
+
+    /* Battery: body, terminal, four bars (5.2 V and up: full) */
+    int k = TEXT_SCALE;
+    float bh = 8.0f * k, by = (MENU_H - bh) / 2;
+    color(60, 60, 60);
+    SDL_FRect body = {x, by, 13.0f * k, bh};
+    SDL_RenderRect(view_renderer, &body);
+    fill(x + 13.0f * k, by + 2.0f * k, 2.0f * k, bh - 4.0f * k);
+    int bars = (view_battery_cv - 440) / 20;
+    bars = bars < 0 ? 0 : bars > 4 ? 4 : bars;
+    if (bars <= 1)
+        color(200, 30, 30);
+    else
+        color(40, 160, 40);
+    for (int i = 0; i < bars; i++)
+        fill(x + (1.0f + 3.0f * i) * k, by + 1.0f * k, 2.0f * k, bh - 2.0f * k);
+    x += 15 * k + GAP;
+    char volts[16];
+    snprintf(volts, sizeof volts, "%d.%02dV", view_battery_cv / 100, view_battery_cv % 100);
+    color(0, 0, 0);
+    text(x, (MENU_H - GLYPH_H) / 2.0f, volts);
+}
+
 /* Status on the right: in the speed row next to the slider when it is
- * shown, else in the menu row after the titles. Smaller text, then cut, if
+ * shown, else in the menu row after the titles (left of the indicators). Smaller text, then cut, if
  * it doesn't fit. */
 static void draw_status(int width, const char *right)
 {
+    bool compact;
+    int right_edge = view_show_speed ? width : width - indicators_fit(width, &compact);
     int room = view_show_speed ? width - VALUE_X - 5 * CHAR_W - 2 * PAD
-                               : width - title_x(MENU_COUNT - 1) - title_w(MENU_COUNT - 1) - 2 * PAD;
+                               : right_edge - title_x(MENU_COUNT - 1) - title_w(MENU_COUNT - 1) - 2 * PAD;
     float row = view_show_speed ? MENU_H : 0, row_h = view_show_speed ? TOOL_H : MENU_H;
     int k = (int)strlen(right) * CHAR_W <= room ? TEXT_SCALE : 1;
     int fit = room / (8 * k);
@@ -196,7 +295,7 @@ static void draw_status(int width, const char *right)
         shown = cut;
     }
     color(view_paused ? 170 : 60, view_paused ? 0 : 60, 0);
-    view_text(view_renderer, (float)(width - PAD - (int)strlen(shown) * 8 * k), row + (row_h - 8.0f * k) / 2,
+    view_text(view_renderer, (float)(right_edge - PAD - (int)strlen(shown) * 8 * k), row + (row_h - 8.0f * k) / 2,
               shown, k);
 }
 
@@ -329,6 +428,7 @@ void menubar_draw(int width, const char *status)
         color(0, 0, 0);
         text((float)(title_x(m) + PAD), (MENU_H - GLYPH_H) / 2.0f, MENUS[m].title);
     }
+    draw_indicators(width);
     if (view_show_speed)
         draw_toolbar(width);
     char right[400];
@@ -438,7 +538,7 @@ static void run_action(Action a)
                 "X: X,theta,T\nL: log\nN: ln\nS C T: sin cos tan\n"
                 "F: a b/c\nD: F<>D\nA: ->\nQ: x^2\nP: ^\n\n"
                 "In OS add-ins, SHIFT and ALPHA work as on the calculator\n"
-                "(SHIFT then ALPHA locks ALPHA; the title bar shows the mode).\n"
+                "(SHIFT then ALPHA locks ALPHA; the menu bar shows the mode).\n"
                 "With ALPHA on, PC letters and space type those characters.");
         break;
     case A_ABOUT:

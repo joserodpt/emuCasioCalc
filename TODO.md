@@ -47,7 +47,7 @@ SHIFT / ALPHA in `GetKey` are done (test app `apps/key-modifiers`). Not
 modelled: lowercase alpha (fx-CG50 text entry), the SHIFT functions of
 F1–F6 and of 3, 6, `,` and → (they return the plain key), SHIFT AC/ON
 switching the calculator off (ignored). The status bar's S / A indicator
-is in the title bar instead.
+is on the menu bar instead.
 
 `Keyboard_PutKeycode` (12C6), `Keyboard_SpyMatrixCode` (12C9), `Bkey_ClrAllFlags`
 (0111), `Bkey_SetFlag` (0112), `Bkey_GetAllFlags` (0EA0), `Bkey_SetAllFlags`

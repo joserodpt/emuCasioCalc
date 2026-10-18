@@ -22,6 +22,9 @@ const char *model_name(Model model);
 /* Where things are on a model. Addresses are what the CPU sees. */
 typedef enum { ALPHA_OFF, ALPHA_ONCE, ALPHA_LOCK } KeyAlpha;
 
+/* The main battery (GetMainBatteryVoltage): four fresh-ish AAA cells. */
+#define BATTERY_CENTIVOLTS 520
+
 typedef struct {
     uint32_t ram_phys, ram_size;   /* physical RAM */
     uint32_t uram_phys;            /* add-in static RAM behind URAM_BASE */

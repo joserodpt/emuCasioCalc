@@ -26,6 +26,9 @@ ModelChoice view_model_choice;
 bool view_realistic = true;
 int view_speed = 4; /* the 100% step */
 bool view_show_speed;
+bool view_key_shift;
+int view_key_alpha;
+int view_battery_cv = BATTERY_CENTIVOLTS;
 
 static SDL_Texture *screen;    /* the panel, 396 x 224 */
 static SDL_Texture *upscaled;  /* the panel at a whole scale, see draw_screen() */
@@ -55,10 +58,7 @@ static const struct { const char *name; SDL_Keycode sdl; } KEYMAP[] = {
     {"FD", SDLK_D}, {"COMMA", SDLK_COMMA}, {"ARROW", SDLK_A}, {"SQUARE", SDLK_Q},
     {"POWER", SDLK_P}, {"NEG", SDLK_U},
 };
-/* GetKey's modifiers (platform_set_key_mode). */
-static bool key_shift;
-static int key_alpha;
-static char base_title[64] = "emuCasioFxCG";
+
 
 void view_text(SDL_Renderer *r, float x, float y, const char *s, int k)
 {
@@ -212,12 +212,32 @@ const char *view_calc_key(int key)
  * press the key whose alpha function they are. */
 static int key_for(SDL_Keycode k)
 {
-    if (key_alpha && ((k >= SDLK_A && k <= SDLK_Z) || k == SDLK_SPACE))
+    if (view_key_alpha && ((k >= SDLK_A && k <= SDLK_Z) || k == SDLK_SPACE))
         return key_for_letter(k == SDLK_SPACE ? ' ' : (int)(k - SDLK_A) + 'A');
     for (size_t i = 0; i < sizeof KEYMAP / sizeof KEYMAP[0]; i++)
         if (KEYMAP[i].sdl == k)
             return key_find(KEYMAP[i].name);
     return -1;
+}
+
+/* SHIFT and ALPHA as the calculator's keyboard handling sees them. gint
+ * add-ins read the keyboard themselves, so the window follows the keys
+ * pressed with the OS's rules; in OS add-ins GetKey has the last word
+ * (platform_set_key_mode). */
+static void track_modifiers(int k)
+{
+    int code = KEYS[k].getkey;
+    if (code == KEY_CTRL_SHIFT) {
+        view_key_shift = !view_key_shift;
+    } else if (code == KEY_CTRL_ALPHA) {
+        view_key_alpha = view_key_shift ? 2 : view_key_alpha ? 0 : 1;
+        view_key_shift = false;
+    } else {
+        view_key_shift = false;
+        if (view_key_alpha == 1)
+            view_key_alpha = 0;
+    }
+    view_redraw();
 }
 
 /* Handles one event. Returns the KEYS index of a calculator key pressed,
@@ -238,6 +258,8 @@ static int handle_event(const SDL_Event *e)
         if (!e->key.repeat) {
             int k = key_for(e->key.key);
             held[e->key.scancode] = (uint8_t)(k + 1);
+            if (k >= 0)
+                track_modifiers(k);
             return k;
         }
         break;
@@ -336,25 +358,28 @@ void platform_set_app(const G3aInfo *info, const char *path, Model model)
     snprintf(view_app_path, sizeof view_app_path, "%s", path);
     if (view_headless)
         return;
-    snprintf(base_title, sizeof base_title, "%s - %s - emuCasioFxCG",
-             view_app.name[0] ? view_app.name : "add-in", model_name(model));
+    char title[64];
+    snprintf(title, sizeof title, "%s - %s - emuCasioFxCG", view_app.name[0] ? view_app.name : "add-in",
+             model_name(model));
+    SDL_SetWindowTitle(view_window, title);
     platform_set_key_mode(false, 0);
     info_window_refresh();
 }
 
 void platform_set_key_mode(bool shift, int alpha)
 {
-    static bool shown;
-    if (view_headless || (shown && shift == key_shift && alpha == key_alpha))
+    if (view_headless || (shift == view_key_shift && alpha == view_key_alpha))
         return;
-    shown = true;
-    key_shift = shift;
-    key_alpha = alpha;
-    static const char *const ALPHA[] = {"", " [ALPHA]", " [ALPHA lock]"};
-    char title[96];
-    snprintf(title, sizeof title, "%s%s%s", base_title, shift ? " [SHIFT]" : "",
-             ALPHA[alpha >= 0 && alpha <= 2 ? alpha : 0]);
-    SDL_SetWindowTitle(view_window, title);
+    view_key_shift = shift;
+    view_key_alpha = alpha;
+    view_redraw();
+}
+
+void platform_set_battery(int centivolts)
+{
+    view_battery_cv = centivolts;
+    if (!view_headless)
+        view_redraw();
 }
 
 double platform_speed(void)

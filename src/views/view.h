@@ -23,6 +23,9 @@ extern ModelChoice view_model_choice;
 extern bool view_realistic;
 extern int view_speed;          /* index into the speed steps, see menubar.c */
 extern bool view_show_speed;    /* Emulation > Speed: custom shows the slider row */
+extern bool view_key_shift;     /* SHIFT is on (for the next key) */
+extern int view_key_alpha;      /* ALPHA: 0 off, 1 for the next key, 2 locked */
+extern int view_battery_cv;     /* battery voltage, 1/100 V */
 
 void view_redraw(void);
 /* View > Zoom: sizes the window for the screen at exactly scale x. */

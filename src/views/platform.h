@@ -51,9 +51,13 @@ void platform_set_model_choice(ModelChoice choice);
 /* Opens the Add-in information window (as the Info button does). */
 void platform_show_info(void);
 
-/* GetKey's SHIFT / ALPHA state (shown in the title bar; with ALPHA on,
- * PC letters type the calculator's alpha letters). */
+/* GetKey's SHIFT / ALPHA state (alpha: 0 off, 1 next key, 2 locked),
+ * shown on the right of the menu bar; with ALPHA on, PC letters type the
+ * calculator's alpha letters. */
 void platform_set_key_mode(bool shift, int alpha);
+
+/* The battery voltage shown on the menu bar, in 1/100 V. */
+void platform_set_battery(int centivolts);
 
 /* Text on the right of the menu bar until replaced (NULL clears it). */
 void platform_status(const char *text);

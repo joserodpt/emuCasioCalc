@@ -404,7 +404,7 @@ static SC(sc_get_app_name)
 static SC(sc_battery_voltage)
 {
     (void)emu; (void)a;
-    return 520; /* 5.20 V: four fresh-ish AAA cells */
+    return BATTERY_CENTIVOLTS;
 }
 
 static SC(sc_get_battery_type) { (void)a; return (uint32_t)emu->battery_type; }

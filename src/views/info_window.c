@@ -7,10 +7,10 @@
 #include "view.h"
 
 #define INFO_W      640
-#define CONTROLS_Y  300  /* "Controls" title */
+#define CONTROLS_Y  290  /* "Controls" title */
 #define LIST_Y      (CONTROLS_Y + 26)
 #define ICON_X      20
-#define ICON_Y      64
+#define ICON_Y      24
 #define ICON_SCALE  2   /* icons shown at 2x: 184 x 128 */
 #define TEXT        2   /* debug font at 2x: 16 px characters */
 #define ROW         26
@@ -33,6 +33,27 @@ static SDL_Texture *icon_texture(const uint16_t *pixels)
 static bool over_icon(float x, float y)
 {
     return x >= ICON_X && x < ICON_X + G3A_ICON_W * ICON_SCALE && y >= ICON_Y && y < ICON_Y + G3A_ICON_H * ICON_SCALE;
+}
+
+/* The add-in's name over the top of its icon, as the calculator's main
+ * menu shows it: centred, black with a white outline so it reads on any
+ * icon; smaller if it doesn't fit. */
+static void name_on_icon(const char *name)
+{
+    if (!name[0])
+        return;
+    float w = G3A_ICON_W * ICON_SCALE;
+    int k = (int)strlen(name) * 8 * TEXT + 8 <= w ? TEXT : 1;
+    char shown[32];
+    snprintf(shown, sizeof shown, "%.*s", (int)(w - 4) / (8 * k), name);
+    float x = ICON_X + (w - (float)strlen(shown) * 8 * k) / 2, y = ICON_Y + 4;
+    SDL_SetRenderDrawColor(ren, 255, 255, 255, 255);
+    for (int dy = -1; dy <= 1; dy++)
+        for (int dx = -1; dx <= 1; dx++)
+            if (dx || dy)
+                view_text(ren, x + dx, y + dy, shown, k);
+    SDL_SetRenderDrawColor(ren, 0, 0, 0, 255);
+    view_text(ren, x, y, shown, k);
 }
 
 static void field(float x, float y, const char *label, const char *value)
@@ -106,9 +127,6 @@ static void redraw(void)
     SDL_SetRenderDrawColor(ren, 250, 250, 250, 255);
     SDL_RenderClear(ren);
 
-    SDL_SetRenderDrawColor(ren, 0, 0, 0, 255);
-    view_text(ren, ICON_X, 18, have && app->name[0] ? app->name : "(no name)", 3);
-
     /* Icon, selected version while hovered */
     SDL_FRect box = {ICON_X - 1, ICON_Y - 1, G3A_ICON_W * ICON_SCALE + 2, G3A_ICON_H * ICON_SCALE + 2};
     SDL_SetRenderDrawColor(ren, 180, 180, 180, 255);
@@ -116,6 +134,7 @@ static void redraw(void)
     SDL_FRect dst = {ICON_X, ICON_Y, G3A_ICON_W * ICON_SCALE, G3A_ICON_H * ICON_SCALE};
     if (have && app->has_icon) {
         SDL_RenderTexture(ren, icons[hover ? 1 : 0], NULL, &dst);
+        name_on_icon(app->name);
     } else {
         SDL_SetRenderDrawColor(ren, 120, 120, 120, 255);
         view_text(ren, ICON_X + 36, ICON_Y + 56, "no icon", TEXT);
@@ -131,9 +150,9 @@ static void redraw(void)
         snprintf(why, sizeof why, "Model chosen in Emulation > Model (detected: %s, %s).",
                  model_name(app->model), app->model_reason);
     SDL_SetRenderDrawColor(ren, 60, 60, 60, 255);
-    view_text(ren, ICON_X, ICON_Y + 7 * ROW + 8, why, 1);
+    view_text(ren, ICON_X, ICON_Y + 8 * ROW + 8, why, 1);
     SDL_SetRenderDrawColor(ren, 120, 120, 120, 255);
-    view_text(ren, ICON_X, ICON_Y + 7 * ROW + 24,
+    view_text(ren, ICON_X, ICON_Y + 8 * ROW + 24,
               hover ? "Selected icon" : "Unselected icon (hover it to see the selected one)", 1);
 
     /* Header fields */
@@ -142,7 +161,8 @@ static void redraw(void)
     const char *base = strrchr(view_app_path, '/');
     const char *file = base ? base + 1 : view_app_path;
     float x = ICON_X + G3A_ICON_W * ICON_SCALE + 20, y = ICON_Y;
-    field(x, y, "Model", have ? model_name(view_model) : "");
+    field(x, y, "Name", have ? app->name : "");
+    field(x, y += ROW, "Model", have ? model_name(view_model) : "");
     field(x, y += ROW, "Internal", have ? app->internal : "");
     field(x, y += ROW, "Version", have ? app->version : "");
     field(x, y += ROW, "Date", have ? app->date : "");

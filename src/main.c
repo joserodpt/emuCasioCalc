@@ -148,6 +148,7 @@ static bool load(Emu *emu, const Options *opt, const char *path, G3aInfo *info, 
            model_name(model), platform_model_choice() == CHOICE_AUTO ? "" : "chosen; detected: ",
            platform_model_choice() == CHOICE_AUTO ? info->model_reason : model_name(info->model));
     platform_set_app(info, path, model);
+    platform_set_battery(BATTERY_CENTIVOLTS);
     emu_start(emu);
     platform_status(NULL);
     return true;
