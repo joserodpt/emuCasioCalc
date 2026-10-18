@@ -4,12 +4,14 @@
 #include <string.h>
 #include <time.h>
 
+#include "casio_font.h"
+#include "display.h"
 #include "view.h"
 
 typedef enum {
     A_NONE, A_SEPARATOR, A_OPEN, A_INFO, A_SCREENSHOT, A_SAVE_ICON, A_QUIT, A_PAUSE, A_RESET,
-    A_SEND, A_AUTO_RELOAD, A_KEYPAD,
-    A_FONT_CLASSIC, A_FONT_SPLEEN, A_FONT_UNIFONT, /* consecutive, as FONT_STYLE_* */
+    A_SEND, A_AUTO_RELOAD, A_KEYPAD, A_LOAD_OS_DUMP,
+    A_FONT_CLASSIC, A_FONT_SPLEEN, A_FONT_UNIFONT, A_FONT_CASIO, /* consecutive, as FONT_STYLE_* */
     A_ZOOM1, A_ZOOM2, A_ZOOM3, A_ZOOM4, A_ZOOM5, A_ZOOM6, /* consecutive */
     A_KEYS, A_ABOUT,
     A_MODEL_AUTO, A_MODEL_CG20, A_MODEL_CG50, A_TIMING_REAL, A_TIMING_FAST,
@@ -32,6 +34,8 @@ static const Item FILE_ITEMS[] = {
     {"", "", A_SEPARATOR},
     {"Copy add-in to calculator...", "", A_SEND},
     {"Reload when the file changes", "", A_AUTO_RELOAD},
+    {"", "", A_SEPARATOR},
+    {"Load OS dump (Casio's fonts)...", "", A_LOAD_OS_DUMP},
     {"", "", A_SEPARATOR},
     {"Quit", "Ctrl+Q", A_QUIT},
 };
@@ -60,6 +64,7 @@ static const Item VIEW_ITEMS[] = {
     {"Font: Classic", "", A_FONT_CLASSIC},
     {"Font: Spleen", "", A_FONT_SPLEEN},
     {"Font: Unifont", "", A_FONT_UNIFONT},
+    {"Font: Casio (from the OS dump)", "", A_FONT_CASIO},
     {"", "", A_SEPARATOR},
     {"Zoom 1x", "Ctrl+1", A_ZOOM1},
     {"Zoom 2x", "Ctrl+2", A_ZOOM2},
@@ -126,6 +131,8 @@ static float mouse_x, mouse_y;
  * another thread, so it hands the path over through an atomic flag. */
 static char open_path[1024];
 static SDL_AtomicInt open_ready;
+static char dump_path[1024]; /* File > Load OS dump's choice */
+static SDL_AtomicInt dump_ready;
 
 /*---------------------------------------------------------------------------
  * Layout
@@ -192,7 +199,7 @@ static bool checked(Action a)
         return view_auto_reload;
     if (a == A_KEYPAD)
         return view_show_keypad;
-    if (a >= A_FONT_CLASSIC && a <= A_FONT_UNIFONT)
+    if (a >= A_FONT_CLASSIC && a <= A_FONT_CASIO)
         return view_font == (int)(a - A_FONT_CLASSIC);
     if (a >= A_LANG_EN && a <= A_LANG_ZH)
         return view_language == (int)(a - A_LANG_EN);
@@ -549,9 +556,38 @@ static void SDLCALL open_done(void *user, const char *const *files, int filter)
     SDL_SetAtomicInt(&open_ready, 1);
 }
 
+static void SDLCALL dump_done(void *user, const char *const *files, int filter)
+{
+    (void)user; (void)filter;
+    if (!files || !files[0] || !files[0][0])
+        return;
+    snprintf(dump_path, sizeof dump_path, "%s", files[0]);
+    SDL_SetAtomicInt(&dump_ready, 1);
+}
+
+/* Reads Casio's fonts from the dump, switches to them and keeps the dump
+ * for the next runs. */
+static void load_os_dump(const char *path)
+{
+    char err[256], msg[1400];
+    if (!casio_fonts_load_file(path, err, sizeof err)) {
+        snprintf(msg, sizeof msg, "%s:\n%s", path, err);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Load OS dump", msg, view_window);
+        return;
+    }
+    view_font = FONT_STYLE_CASIO;
+    snprintf(msg, sizeof msg, "Casio's fonts from OS %s%s", casio_fonts_os_version(),
+             view_keep_os_dump(path) ? "" : " (couldn't keep the dump for next time)");
+    view_flash_status(msg);
+}
+
 void menubar_poll(void)
 {
     send_addin_poll();
+    if (SDL_GetAtomicInt(&dump_ready)) {
+        SDL_SetAtomicInt(&dump_ready, 0);
+        load_os_dump(dump_path);
+    }
     if (SDL_GetAtomicInt(&open_ready)) {
         SDL_SetAtomicInt(&open_ready, 0);
         view_pending = CMD_OPEN;
@@ -587,6 +623,7 @@ static void request_reset(void)
 static void run_action(Action a)
 {
     static const SDL_DialogFileFilter FILTERS[] = {{"Casio fx-CG add-ins", "g3a"}, {"All files", "*"}};
+    static const SDL_DialogFileFilter DUMPS[] = {{"OS dumps", "bin"}, {"All files", "*"}};
     char path[256];
     switch (a) {
     case A_OPEN:
@@ -604,6 +641,17 @@ static void run_action(Action a)
     case A_KEYPAD:
         view_show_keypad_panel(!view_show_keypad);
         break;
+    case A_LOAD_OS_DUMP:
+        SDL_ShowOpenFileDialog(dump_done, NULL, view_window, DUMPS, 2, NULL, false);
+        break;
+    case A_FONT_CASIO:
+        if (!casio_fonts_loaded()) {
+            message("Font: Casio",
+                    "Casio's fonts are read from a dump of your calculator's OS, made with the "
+                    "FirmDump add-in: load it with File > Load OS dump.");
+            break;
+        }
+        /* fall through */
     case A_FONT_CLASSIC: case A_FONT_SPLEEN: case A_FONT_UNIFONT:
         view_font = (int)(a - A_FONT_CLASSIC);
         view_flash_status("Font changed: the add-in's next text uses it");

@@ -238,6 +238,46 @@ void platform_set_font(int style)
     view_font = style;
 }
 
+/* File > Load OS dump keeps the dump's OS part here, for the next runs
+ * (~/.local/share/emuCasioFxCG/ on Linux). */
+#define KEPT_OS_DUMP "os-dump.bin"
+#define OS_PART      0x00800000 /* the OS; the rest of a ROM dump is the user's storage */
+
+static bool kept_os_dump_path(char *path, size_t cap)
+{
+    char *dir = SDL_GetPrefPath("", "emuCasioFxCG");
+    if (!dir)
+        return false;
+    snprintf(path, cap, "%s%s", dir, KEPT_OS_DUMP);
+    SDL_free(dir);
+    return true;
+}
+
+bool platform_kept_os_dump(char *path, size_t cap)
+{
+    return kept_os_dump_path(path, cap) && SDL_GetPathInfo(path, NULL);
+}
+
+bool view_keep_os_dump(const char *src)
+{
+    char dst[1024];
+    if (!kept_os_dump_path(dst, sizeof dst))
+        return false;
+    if (!strcmp(src, dst))
+        return true;
+    static unsigned char buf[OS_PART];
+    FILE *in = fopen(src, "rb");
+    if (!in)
+        return false;
+    size_t n = fread(buf, 1, sizeof buf, in);
+    fclose(in);
+    FILE *out = fopen(dst, "wb");
+    if (!out)
+        return false;
+    bool ok = fwrite(buf, 1, n, out) == n;
+    return fclose(out) == 0 && ok;
+}
+
 void platform_set_ui_scale(float scale)
 {
     ui_scale_forced = scale;

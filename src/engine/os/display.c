@@ -1,5 +1,6 @@
 #include "display.h"
 
+#include "casio_font.h"
 #include "font.h"
 #include "mem.h"
 #include "platform.h"
@@ -170,6 +171,20 @@ const FontGlyph *font_glyph(const Font *font, uint32_t cp)
     return NULL;
 }
 
+/* The OS's code of the character at text (len bytes): a byte, or lead
+ * byte << 8 | byte; NO_CODE for Chinese characters. */
+#define NO_CODE 0xFFFFFFFFu
+
+static uint32_t text_code(const char *text, int len)
+{
+    const uint8_t *s = (const uint8_t *)text;
+    if (len == 1)
+        return s[0];
+    if (len == 2 && !(gb18030 && s[0] >= 0x81))
+        return (uint32_t)(s[0] << 8 | s[1]);
+    return NO_CODE;
+}
+
 /* How cp looks in font: its glyph (from FONT_EXTRA if the font lacks it,
  * scaled to the font's height), as source and target sizes. */
 typedef struct {
@@ -177,6 +192,9 @@ typedef struct {
     const FontGlyph *g;
     const uint8_t *g8; /* or an 8x8 glyph (Classic), scaled sx x sy */
     int sx, sy;
+    const uint8_t *cg; /* or Casio's glyph (font style Casio), 1:1 */
+    int cstride;
+    bool own_bold;     /* Casio's bold font: not drawn twice */
     int w, h;          /* drawn size */
     int left, adv;     /* proportional placement, drawn pixels */
 } Shape;
@@ -189,10 +207,27 @@ void display_set_font_style(int style)
     font_style = style;
 }
 
-static Shape shape_of(const Font *font, uint32_t cp)
+static Shape shape_of(const Font *font, uint32_t cp, uint32_t code, bool bold)
 {
     Shape sh = {0};
     sh.h = font->h;
+    /* Casio: the OS's own glyphs, from the user's OS dump (casio_font.h);
+     * without one, Spleen */
+    if (font_style == FONT_STYLE_CASIO && code != NO_CODE) {
+        CasioFontId id = font == &FONT_BIG    ? CFONT_BIG
+                         : font == &FONT_MINI ? CFONT_MINI
+                         : bold               ? CFONT_TINY_BOLD
+                                              : CFONT_TINY;
+        CasioGlyph cg;
+        if (casio_glyph(id, (uint16_t)code, &cg)) {
+            sh.cg = cg.bits;
+            sh.cstride = cg.stride;
+            sh.own_bold = id == CFONT_TINY_BOLD;
+            sh.w = sh.adv = cg.w;
+            sh.h = cg.h;
+            return sh;
+        }
+    }
     if (cp == CP_WIDE_BOX) {
         sh.w = font->h;
         sh.adv = font->h + 1;
@@ -241,6 +276,8 @@ static bool shape_pixel(const Shape *sh, int x, int y)
 {
     if (sh->g8)
         return sh->g8[y / sh->sy] & (0x80 >> (x / sh->sx));
+    if (sh->cg)
+        return sh->cg[y * sh->cstride + x / 8] >> (7 - x % 8) & 1;
     if (!sh->g) /* the wide box: an outline */
         return x == 1 || x == sh->w - 2 || y == 2 || y == sh->h - 3;
     int sx = x * sh->src->h / sh->h, sy = y * sh->src->h / sh->h;
@@ -272,7 +309,7 @@ void display_text_big(uint8_t *vram, int x, int y, const char *text, uint16_t fg
 {
     for (int len; (len = text_char_len(text)); text += len) {
         uint32_t cp = text_decode(text, &len);
-        Shape sh = shape_of(&FONT_BIG, cp);
+        Shape sh = shape_of(&FONT_BIG, cp, text_code(text, len), false);
         int cw = cp == CP_WIDE_BOX ? BIG_CELL_H : BIG_CELL_W;
         if (opaque)
             display_rect(vram, x, y, x + cw - 1, y + BIG_CELL_H - 1, bg);
@@ -300,14 +337,17 @@ int display_text_prop(uint8_t *vram, const Font *font, int x, int y, int line_h,
 {
     for (int len; (len = text_char_len(text)); text += len) {
         uint32_t cp = text_decode(text, &len);
-        Shape sh = shape_of(font, cp);
-        int adv = sh.adv + (bold ? 1 : 0);
+        Shape sh = shape_of(font, cp, text_code(text, len), bold);
+        bool twice = bold && !sh.own_bold;
+        int adv = sh.adv + (twice ? 1 : 0);
         if (x + adv > xlimit)
             break;
         if (draw) {
+            /* Casio's glyphs are whole cells: from y, as tall as the font */
+            int top = sh.cg ? y : y + oy, height = sh.cg ? sh.h : line_h;
             if (opaque)
-                display_rect(vram, x, y, x + adv - 1, y + line_h - 1, bg);
-            draw_shape(vram, &sh, x, y + oy, sh.left, adv, fg, bold);
+                display_rect(vram, x, y, x + adv - 1, y + height - 1, bg);
+            draw_shape(vram, &sh, x, top, sh.left, adv, fg, twice);
         }
         x += adv;
     }

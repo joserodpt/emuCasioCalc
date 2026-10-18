@@ -2,6 +2,7 @@
 #define EMU_PLATFORM_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "g3a.h"
@@ -81,6 +82,9 @@ void platform_set_battery(int centivolts);
 /* View > Font: FONT_STYLE_* (display.h) for the OS text. */
 int platform_font(void);
 void platform_set_font(int style);
+/* The OS dump File > Load OS dump keeps for the next runs (its first 8 MB,
+ * the OS, in the emulator's data folder): its path, if there is one. */
+bool platform_kept_os_dump(char *path, size_t cap);
 /* The UI's scaling (--ui-scale): 2 for a desktop at 200%; by default the
  * desktop's, as SDL reports it. */
 void platform_set_ui_scale(float scale);

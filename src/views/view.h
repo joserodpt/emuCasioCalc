@@ -32,6 +32,9 @@ extern int view_language;       /* LANG_* */
 extern bool view_auto_reload;   /* File > Reload when the file changes */
 extern bool view_show_keypad;   /* View > Keyboard: the on-screen keys */
 extern int view_font;           /* View > Font: FONT_STYLE_* */
+/* Copies an OS dump's OS part where the next runs load it from
+ * (platform_kept_os_dump). */
+bool view_keep_os_dump(const char *src);
 
 void view_redraw(void);
 /* View > Zoom: sizes the window for the screen at exactly scale x. */

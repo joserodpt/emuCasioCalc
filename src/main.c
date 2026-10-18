@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "casio_font.h"
 #include "display.h"
 #include "emu.h"
 #include "g3a.h"
@@ -43,7 +44,12 @@ static void usage(const char *argv0)
             "  --timing T         realistic (default: OS calls, memory and DMA take\n"
             "                     the time they would on the calculator) or fast\n"
             "  --battery B        battery: full (default), half, low, empty, or volts (4.6)\n"
-            "  --font F           font of the OS text: classic (default), spleen or unifont\n"
+            "  --font F           font of the OS text: classic (default), spleen, unifont,\n"
+            "                     or casio (the OS's own, from an OS dump; the default\n"
+            "                     once one is loaded)\n"
+            "  --os-dump F        read Casio's fonts from F, a dump of the calculator's OS\n"
+            "                     (FirmDump); without it the window uses the one File >\n"
+            "                     Load OS dump kept\n"
             "  --keyboard         show the on-screen keyboard (View > Keyboard)\n"
             "  --ui-scale S       size of the menus and texts: 1, 1.5, 2... (default: the\n"
             "                     desktop's scaling)\n"
@@ -235,6 +241,7 @@ int main(int argc, char **argv)
     const char *path = NULL, *screenshot = NULL, *window_shot = NULL, *icon = NULL;
     bool show_info = false;
     const char *model = "auto", *timing = "realistic", *speed = NULL, *battery = NULL, *language = NULL, *font = NULL;
+    const char *os_dump = NULL;
     bool keyboard = false;
     static Emu emu;
     static G3aInfo info;
@@ -271,6 +278,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--battery") && i + 1 < argc) battery = argv[++i];
         else if (!strcmp(argv[i], "--language") && i + 1 < argc) language = argv[++i];
         else if (!strcmp(argv[i], "--font") && i + 1 < argc) font = argv[++i];
+        else if (!strcmp(argv[i], "--os-dump") && i + 1 < argc) os_dump = argv[++i];
         else if (!strcmp(argv[i], "--keyboard")) keyboard = true;
         else if (!strcmp(argv[i], "--ui-scale") && i + 1 < argc) platform_set_ui_scale((float)atof(argv[++i]));
         else if (argv[i][0] != '-' && !path) path = argv[i];
@@ -297,7 +305,7 @@ int main(int argc, char **argv)
         return 2;
     }
     if (font) {
-        static const char *const FONTS[FONT_STYLE_COUNT] = {"classic", "spleen", "unifont"};
+        static const char *const FONTS[FONT_STYLE_COUNT] = {"classic", "spleen", "unifont", "casio"};
         int style = -1;
         for (int i = 0; i < FONT_STYLE_COUNT; i++)
             if (!strcmp(font, FONTS[i]))
@@ -307,6 +315,24 @@ int main(int argc, char **argv)
             return 2;
         }
         platform_set_font(style);
+    }
+    /* Casio's fonts: from --os-dump, else (in the window) the dump File >
+     * Load OS dump kept. Headless runs only use --os-dump, so tests don't
+     * depend on what the user loaded. */
+    char kept[1024];
+    if (!os_dump && !opt.headless && platform_kept_os_dump(kept, sizeof kept))
+        os_dump = kept;
+    if (os_dump) {
+        char err[256];
+        if (casio_fonts_load_file(os_dump, err, sizeof err)) {
+            printf("Casio fonts from OS %s (%s)\n", casio_fonts_os_version(), os_dump);
+            if (!font)
+                platform_set_font(FONT_STYLE_CASIO);
+        } else {
+            fprintf(stderr, "OS dump %s: %s\n", os_dump, err);
+            if (os_dump != kept)
+                return 1;
+        }
     }
     if (keyboard)
         platform_set_keyboard(true);

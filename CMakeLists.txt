@@ -48,7 +48,7 @@ add_executable(emucasiofxcg
   src/engine/emu.c
   src/engine/os/syscalls.c src/engine/os/syscalls_text.c src/engine/os/syscalls_keys.c
   src/engine/os/syscalls_mcs.c src/engine/os/syscalls_bfile.c src/engine/os/syscalls_dialogs.c src/engine/os/syscalls_draw.c src/engine/os/syscalls_status.c src/engine/os/syscalls_time.c src/engine/os/messages.c src/engine/os/syscalls_system.c src/engine/os/font_data.c
-  src/engine/os/display.c
+  src/engine/os/display.c src/engine/os/casio_font.c
   src/views/window.c src/views/menubar.c src/views/info_window.c src/views/send_addin.c src/views/keypad.c src/views/about_window.c src/views/desktop.c src/views/font.c
   src/views/app_icon.c
   src/utils/g3a.c src/utils/keys.c src/utils/png.c)

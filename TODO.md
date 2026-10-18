@@ -33,10 +33,13 @@ MMPrint, 5x8 for PrintMiniMini) or Unifont (8x16, scaled); symbols missing
 from them come from Unifont. None is Casio's, which differ in shape. Strings stay in the OS character set:
 2-byte characters count and edit as one.
 
-Guessed or partial: only the symbols whose codes are known (the GetKey
+With an OS dump (File > Load OS dump, `--os-dump`), Font: Casio draws
+with the OS's own fonts (big, mini, mini-mini and its bold), so every
+character the OS has comes out right. Without one, guessed or partial:
+only the symbols whose codes are known (the GetKey
 character codes: pi, theta, r, square root, squared, ->, <=, ...) are
-drawn; other Casio characters draw as U+FFFD (Casio's character table
-isn't documented); Chinese (GB 18030) is decoded but drawn as empty boxes
+drawn; other Casio characters draw as U+FFFD (the table from codes to
+Unicode could now be read off the dump's glyphs); Chinese (GB 18030) is decoded but drawn as empty boxes
 (no CJK font embedded); `PrintGlyph` and `PrintMiniGlyph` only understand
 `GetMiniGlyphPtr`'s pointers (add-ins' own glyphs leave a blank cell);
 `EditMBStringCtrl3` / `4` act like `Ctrl2`; `DispInt` does nothing;
@@ -165,8 +168,9 @@ Casio's own apps are not emulated: `APP_RUNMAT` (1A03), `APP_Program` (1945),
   fx-CG10/20 clock (58.98 MHz) is from memory, not measured.
 - **Model detection** is a guess (build date, then memory addresses);
   Emulation > Model overrides it.
-- **Fonts**: Casio's character table (codes above 0x80 and the 2-byte
-  characters) and a CJK font for Chinese text.
+- **Fonts**: without an OS dump, Casio's character table (codes above 0x80
+  and the 2-byte characters) for the open fonts; a CJK font for Chinese
+  text (the OS's Chinese glyphs aren't read from the dump yet).
 - **Main menu**: there is no OS main menu to show. In OS add-ins GetKey
   drops MENU (unless the add-in turned the return to the menu off); gint
   add-ins' `gint_osmenu()` returns at once.

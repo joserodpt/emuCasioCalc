@@ -65,8 +65,9 @@ void display_set_gb18030(bool on);
 bool display_gb18030(void);
 
 /* View > Font: Classic (the 8x8 font scaled, the default), Spleen (bitmap
- * fonts of the OS's sizes) or Unifont (its 8x16 glyphs, scaled). */
-enum { FONT_STYLE_CLASSIC, FONT_STYLE_SPLEEN, FONT_STYLE_UNIFONT, FONT_STYLE_COUNT };
+ * fonts of the OS's sizes), Unifont (its 8x16 glyphs, scaled) or Casio (the
+ * OS's own fonts, from an OS dump: casio_font.h; Spleen without one). */
+enum { FONT_STYLE_CLASSIC, FONT_STYLE_SPLEEN, FONT_STYLE_UNIFONT, FONT_STYLE_CASIO, FONT_STYLE_COUNT };
 void display_set_font_style(int style);
 
 #endif
