@@ -175,9 +175,19 @@ const FontGlyph *font_glyph(const Font *font, uint32_t cp)
 typedef struct {
     const Font *src;
     const FontGlyph *g;
+    const uint8_t *g8; /* or an 8x8 glyph (Classic), scaled sx x sy */
+    int sx, sy;
     int w, h;          /* drawn size */
     int left, adv;     /* proportional placement, drawn pixels */
 } Shape;
+
+/* View > Font: which glyphs the three text sizes use. */
+static int font_style = FONT_STYLE_CLASSIC;
+
+void display_set_font_style(int style)
+{
+    font_style = style;
+}
 
 static Shape shape_of(const Font *font, uint32_t cp)
 {
@@ -188,8 +198,29 @@ static Shape shape_of(const Font *font, uint32_t cp)
         sh.adv = font->h + 1;
         return sh;
     }
-    const FontGlyph *g = font_glyph(font, cp);
+    /* Classic: the emulator's first look, the 8x8 font scaled (2x3 in the
+     * big cells, 1x2 in PrintMini's fixed 10 px cells, 1x1 in 8 px ones) */
+    if (font_style == FONT_STYLE_CLASSIC && cp >= 0x20 && cp < 0x7F) {
+        sh.g8 = platform_glyph((char)cp);
+        sh.sx = font == &FONT_BIG ? 2 : 1;
+        sh.sy = font == &FONT_BIG ? 3 : font == &FONT_MINI ? 2 : 1;
+        sh.w = 8 * sh.sx;
+        sh.h = 8 * sh.sy;
+        sh.left = font == &FONT_MINI ? -1 : 0;
+        sh.adv = font == &FONT_MINI ? MINI_CELL_W : 8 * sh.sx;
+        return sh;
+    }
+    const FontGlyph *g = NULL;
     const Font *src = font;
+    /* Unifont: its 8x16 glyphs, scaled to the big and mini sizes */
+    if (font_style == FONT_STYLE_UNIFONT && font != &FONT_TINY) {
+        src = &FONT_EXTRA;
+        g = font_glyph(src, cp);
+        if (!g)
+            src = font;
+    }
+    if (!g)
+        g = font_glyph(font, cp);
     if (!g) {
         src = &FONT_EXTRA;
         g = font_glyph(src, cp);
@@ -208,6 +239,8 @@ static Shape shape_of(const Font *font, uint32_t cp)
 
 static bool shape_pixel(const Shape *sh, int x, int y)
 {
+    if (sh->g8)
+        return sh->g8[y / sh->sy] & (0x80 >> (x / sh->sx));
     if (!sh->g) /* the wide box: an outline */
         return x == 1 || x == sh->w - 2 || y == 2 || y == sh->h - 3;
     int sx = x * sh->src->h / sh->h, sy = y * sh->src->h / sh->h;

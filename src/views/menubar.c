@@ -9,6 +9,7 @@
 typedef enum {
     A_NONE, A_SEPARATOR, A_OPEN, A_INFO, A_SCREENSHOT, A_SAVE_ICON, A_QUIT, A_PAUSE, A_RESET,
     A_SEND, A_AUTO_RELOAD, A_KEYPAD,
+    A_FONT_CLASSIC, A_FONT_SPLEEN, A_FONT_UNIFONT, /* consecutive, as FONT_STYLE_* */
     A_ZOOM1, A_ZOOM2, A_ZOOM3, A_ZOOM4, A_ZOOM5, A_ZOOM6, /* consecutive */
     A_KEYS, A_ABOUT,
     A_MODEL_AUTO, A_MODEL_CG20, A_MODEL_CG50, A_TIMING_REAL, A_TIMING_FAST,
@@ -57,6 +58,10 @@ static const Item EMU_ITEMS[] = {
 };
 static const Item VIEW_ITEMS[] = {
     {"Keyboard", "Ctrl+K", A_KEYPAD},
+    {"", "", A_SEPARATOR},
+    {"Font: Classic", "", A_FONT_CLASSIC},
+    {"Font: Spleen", "", A_FONT_SPLEEN},
+    {"Font: Unifont", "", A_FONT_UNIFONT},
     {"", "", A_SEPARATOR},
     {"Zoom 1x", "Ctrl+1", A_ZOOM1},
     {"Zoom 2x", "Ctrl+2", A_ZOOM2},
@@ -183,6 +188,8 @@ static bool checked(Action a)
         return view_auto_reload;
     if (a == A_KEYPAD)
         return view_show_keypad;
+    if (a >= A_FONT_CLASSIC && a <= A_FONT_UNIFONT)
+        return view_font == (int)(a - A_FONT_CLASSIC);
     if (a >= A_LANG_EN && a <= A_LANG_ZH)
         return view_language == (int)(a - A_LANG_EN);
     if (a >= A_BATTERY_FULL && a <= A_BATTERY_EMPTY)
@@ -568,6 +575,10 @@ static void run_action(Action a)
         break;
     case A_KEYPAD:
         view_show_keypad_panel(!view_show_keypad);
+        break;
+    case A_FONT_CLASSIC: case A_FONT_SPLEEN: case A_FONT_UNIFONT:
+        view_font = (int)(a - A_FONT_CLASSIC);
+        view_flash_status("Font changed: the add-in's next text uses it");
         break;
     case A_SCREENSHOT:
         timestamped(path, sizeof path, "screenshot");

@@ -69,6 +69,12 @@ void platform_set_language(int lang);
 int platform_battery(void);
 void platform_set_battery(int centivolts);
 
+/* View > Font: FONT_STYLE_* (display.h) for the OS text. */
+int platform_font(void);
+void platform_set_font(int style);
+/* Shows the on-screen keyboard from the start (--keyboard). */
+void platform_set_keyboard(bool show);
+
 /* Keys held as the emulator sees them (host keys and the key script): the
  * on-screen keyboard lights them up. */
 void platform_show_keys(const bool *down);

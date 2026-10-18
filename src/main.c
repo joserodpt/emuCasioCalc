@@ -39,6 +39,8 @@ static void usage(const char *argv0)
             "  --timing T         realistic (default: OS calls, memory and DMA take\n"
             "                     the time they would on the calculator) or fast\n"
             "  --battery B        battery: full (default), half, low, empty, or volts (4.6)\n"
+            "  --font F           font of the OS text: classic (default), spleen or unifont\n"
+            "  --keyboard         show the on-screen keyboard (View > Keyboard)\n"
             "  --language L       the calculator's message language: en (default), es, de,\n"
             "                     fr, pt or zh\n",
             argv0);
@@ -154,6 +156,7 @@ static bool load(Emu *emu, const Options *opt, const char *path, G3aInfo *info, 
     platform_set_app(info, path, model);
     emu->battery_cv = platform_battery();
     emu->language = platform_language();
+    display_set_font_style(platform_font());
     emu_start(emu);
     platform_status(NULL);
     return true;
@@ -179,6 +182,7 @@ static bool run(Emu *emu, bool headless)
             emu_set_realistic(emu, platform_realistic());
         emu->battery_cv = platform_battery();
         emu->language = platform_language();
+        display_set_font_style(platform_font());
         emu_run(emu, (uint64_t)hz / 1000 * SLICE_MS);
         if (!platform_poll(down))
             return true;
@@ -224,7 +228,8 @@ int main(int argc, char **argv)
     Options opt = {0};
     const char *path = NULL, *screenshot = NULL, *window_shot = NULL, *icon = NULL;
     bool show_info = false;
-    const char *model = "auto", *timing = "realistic", *speed = NULL, *battery = NULL, *language = NULL;
+    const char *model = "auto", *timing = "realistic", *speed = NULL, *battery = NULL, *language = NULL, *font = NULL;
+    bool keyboard = false;
     static Emu emu;
     static G3aInfo info;
 
@@ -243,6 +248,8 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--speed") && i + 1 < argc) speed = argv[++i];
         else if (!strcmp(argv[i], "--battery") && i + 1 < argc) battery = argv[++i];
         else if (!strcmp(argv[i], "--language") && i + 1 < argc) language = argv[++i];
+        else if (!strcmp(argv[i], "--font") && i + 1 < argc) font = argv[++i];
+        else if (!strcmp(argv[i], "--keyboard")) keyboard = true;
         else if (argv[i][0] != '-' && !path) path = argv[i];
         else { usage(argv[0]); return 2; }
     }
@@ -266,6 +273,20 @@ int main(int argc, char **argv)
         usage(argv[0]);
         return 2;
     }
+    if (font) {
+        static const char *const FONTS[FONT_STYLE_COUNT] = {"classic", "spleen", "unifont"};
+        int style = -1;
+        for (int i = 0; i < FONT_STYLE_COUNT; i++)
+            if (!strcmp(font, FONTS[i]))
+                style = i;
+        if (style < 0) {
+            usage(argv[0]);
+            return 2;
+        }
+        platform_set_font(style);
+    }
+    if (keyboard)
+        platform_set_keyboard(true);
     if (language) {
         int lang = -1;
         for (int i = 0; i < LANG_COUNT; i++)

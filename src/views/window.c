@@ -33,7 +33,8 @@ int view_battery_cv = BATTERY_CENTIVOLTS;
 char view_os_status[64];
 int view_language = LANG_EN;
 bool view_auto_reload = true;
-bool view_show_keypad = true;
+bool view_show_keypad = false;
+int view_font = 0; /* FONT_STYLE_CLASSIC */
 
 static SDL_Texture *screen;    /* the panel, 396 x 224 */
 static SDL_Texture *upscaled;  /* the panel at a whole scale, see draw_screen() */
@@ -211,6 +212,21 @@ void view_flash_status(const char *msg)
 {
     snprintf(status, sizeof status, "%s", msg);
     status_until = SDL_GetTicks() + STATUS_MS;
+}
+
+int platform_font(void)
+{
+    return view_font;
+}
+
+void platform_set_font(int style)
+{
+    view_font = style;
+}
+
+void platform_set_keyboard(bool show)
+{
+    view_show_keypad = show; /* before the window exists: it is created with it */
 }
 
 void platform_show_keys(const bool *down)

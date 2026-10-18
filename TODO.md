@@ -26,10 +26,11 @@ ones; `Bdisp_AreaClr` and `Bdisp_WriteGraph*` take VRAM coordinates (no
 status bar offset).
 
 ### Text and fonts
-Done (test add-in `tests/os-apps/src/text-syscalls.c`). Text is drawn with open fonts of the
-OS's sizes (Spleen 12x24 in PrintXY's 18x24 cells, 8x16 proportional for
-PrintMini and MMPrint, 5x8 for PrintMiniMini, Unifont for symbols), not
-Casio's, which differ in shape. Strings stay in the OS character set:
+Done (test add-in `tests/os-apps/src/text-syscalls.c`). View > Font picks
+the glyphs: Classic (default: the 8x8 font scaled, 2x3 in PrintXY's 18x24
+cells, fixed widths), Spleen (12x24, 8x16 proportional for PrintMini and
+MMPrint, 5x8 for PrintMiniMini) or Unifont (8x16, scaled); symbols missing
+from them come from Unifont. None is Casio's, which differ in shape. Strings stay in the OS character set:
 2-byte characters count and edit as one.
 
 Guessed or partial: only the symbols whose codes are known (the GetKey

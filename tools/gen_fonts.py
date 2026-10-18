@@ -5,8 +5,9 @@
 
 SPLEEN_DIR holds spleen-5x8.bdf, spleen-8x16.bdf and spleen-12x24.bdf
 (Spleen 2.1.0, https://github.com/fcambus/spleen, BSD 2-clause); UNIFONT_HEX
-is GNU Unifont 15.1.05's .hex file (SIL OFL 1.1), from which a subset of
-symbols (Greek, arrows, maths...) is taken for characters Spleen lacks.
+is GNU Unifont 15.1.05's .hex file (SIL OFL 1.1), from which ASCII and a
+subset of symbols (Greek, arrows, maths...) are taken: the Unifont font
+style, and the characters Spleen lacks.
 Licences: assets/fonts/.
 
 Each glyph is stored at the font's full cell size, rows of (w + 7) / 8
@@ -18,6 +19,7 @@ import sys
 # Unifont ranges kept: symbols that Casio text uses or that show up in
 # add-ins' strings. CJK is left out (too big to embed).
 UNIFONT_RANGES = [
+    (0x0020, 0x007E),  # ASCII: the whole text for View > Font > Unifont
     (0x00A0, 0x024F), (0x0370, 0x03FF), (0x0400, 0x04FF), (0x1D00, 0x1DBF),
     (0x2000, 0x23FF), (0x2460, 0x24FF), (0x2500, 0x27BF), (0x2900, 0x2BFF),
     (0xFFFD, 0xFFFD),

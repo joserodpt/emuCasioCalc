@@ -86,11 +86,16 @@ echo 'ACTION=="add|change", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", ATTRS{idVe
 sudo udevadm control --reload
 ```
 
-**On-screen keyboard** (View > Keyboard, Ctrl+K): the fx-CG50's keys right
-of the screen, with each key's SHIFT function (yellow) and ALPHA letter
+**On-screen keyboard** (View > Keyboard, Ctrl+K, or `--keyboard`; hidden
+at first): the fx-CG50's keys right of the screen, with each key's SHIFT function (yellow) and ALPHA letter
 (red) above it. Click a key to press it (held while the mouse button is);
 keys light up while pressed, from the mouse, the PC keyboard or `--keys`.
 `--window-shot F` saves the whole window (with the keyboard) as a .bmp.
+
+**Font** (View > Font, or `--font`): the OS text (PrintXY, PrintMini...) is
+drawn with Classic (the default: an 8x8 font scaled to the OS's sizes),
+Spleen (bitmap fonts of the OS's sizes) or Unifont. Casio's own fonts are
+not included.
 
 Keyboard (all 50 calculator keys): arrows, Enter = EXE, Esc = EXIT,
 Backspace = DEL, Delete = AC, Home = MENU, Tab = SHIFT, Left Alt = ALPHA,

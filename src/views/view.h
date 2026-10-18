@@ -30,6 +30,7 @@ extern char view_os_status[64]; /* the add-in's status message */
 extern int view_language;       /* LANG_* */
 extern bool view_auto_reload;   /* File > Reload when the file changes */
 extern bool view_show_keypad;   /* View > Keyboard: the on-screen keys */
+extern int view_font;           /* View > Font: FONT_STYLE_* */
 
 void view_redraw(void);
 /* View > Zoom: sizes the window for the screen at exactly scale x. */
