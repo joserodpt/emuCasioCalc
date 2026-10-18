@@ -8,7 +8,7 @@
  * Syscall numbers and signatures: WikiPrizm (prizm.cemetech.net) and the
  * syscall stubs in libfxcg (github.com/Jonimoose/libfxcg). This file has
  * the table and the system calls; drawing, keyboard and storage are in
- * syscalls_draw.c, syscalls_status.c, syscalls_time.c, syscalls_text.c, syscalls_keys.c, syscalls_bfile.c and syscalls_mcs.c.
+ * syscalls_draw.c, syscalls_status.c, syscalls_time.c, syscalls_system.c, syscalls_text.c, syscalls_keys.c, syscalls_bfile.c and syscalls_mcs.c.
  */
 #include "syscalls.h"
 
@@ -428,11 +428,14 @@ static const Syscall SYSCALLS[] = {
     {0x002B, "GlibGetOSVersionInfo", sc_os_version},
     {0x0031, "GetSetupSetting", sc_get_setup_setting},
     {0x0032, "SetSetupSetting", sc_set_setup_setting},
+    {0x0034, "Alpha_GetData", sc_alpha_get},
+    {0x0035, "Alpha_SetData", sc_alpha_set},
     {0x0111, "Bkey_ClrAllFlags", sc_bkey_clr_all_flags},
     {0x0112, "Bkey_SetFlag", sc_bkey_set_flag},
     {0x0129, "Set_FKeys2", sc_nothing},
     {0x012B, "Set_FKeys1", sc_nothing},
     {0x0131, "FKey_Display", sc_fkey_display},
+    {0x0160, "BCDtoInternal", sc_bcd_to_internal},
     {0x01DF, "DisableGB18030", sc_disable_gb18030},
     {0x01E0, "EnableGB18030", sc_enable_gb18030},
     {0x01E6, "GetVRAMAddress", sc_get_vram_address},
@@ -469,6 +472,7 @@ static const Syscall SYSCALLS[] = {
     {0x02C2, "RTC_Elapsed_ms", sc_rtc_elapsed_ms},
     {0x02C7, "HourGlass", sc_nothing},       /* status bar busy icon: no status bar */
     {0x07A2, "CharacterSelectDialog", sc_character_select},
+    {0x07E5, "CLIP_Store", sc_clip_store},
     {0x08C7, "Cursor_SetFlashOn", sc_nothing}, /* we don't draw the text cursor */
     {0x08C8, "Cursor_SetFlashOff", sc_nothing},
     {0x08CA, "Keyboard_CursorFlash", sc_nothing}, /* function unknown; no text cursor drawn */
@@ -481,9 +485,12 @@ static const Syscall SYSCALLS[] = {
     {0x0924, "Bdisp_Rectangle", sc_rectangle},
     {0x0925, "Bdisp_FilledRectangle", sc_filled_rectangle},
     {0x0926, "Bdisp_FilledRectangleFullColor", sc_filled_rectangle_full},
+    {0x0C2C, "SMEM_MapIconToExt", sc_smem_map_icon},
     {0x0D08, "Bdisp_MMPrintRef", sc_mmprint_ref},
     {0x0D09, "Bdisp_MMPrint", sc_mmprint},
     {0x0D39, "PRGM_GetKey_OS", sc_prgm_get_key_os},
+    {0x0D79, "App_InitDlgDescriptor", sc_app_init_dlg_descriptor},
+    {0x0DDF, "SMEM_maint", sc_nothing}, /* storage maintenance: nothing to do */
     {0x0EA0, "Bkey_GetAllFlags", sc_bkey_get_all_flags},
     {0x0EA1, "Bkey_SetAllFlags", sc_bkey_set_all_flags},
     {0x0EAB, "GetKey", sc_get_key},
@@ -491,6 +498,7 @@ static const Syscall SYSCALLS[] = {
     {0x1163, "MB_ElementCount", sc_mb_element_count},
     {0x1170, "itoa", sc_itoa},
     {0x1186, "GetMainBatteryVoltage", sc_battery_voltage},
+    {0x1187, "Restart", sc_restart},
     {0x11D6, "CMT_Delay_micros", sc_delay_micros},
     {0x11D7, "CMT_Delay_100micros", sc_delay_100micros},
     {0x11DE, "RTC_SetDateTime", sc_rtc_set_date_time},
@@ -520,13 +528,21 @@ static const Syscall SYSCALLS[] = {
     {0x1348, "WordToHex", sc_word_to_hex},
     {0x1349, "strlen", sc_strlen},
     {0x1511, "memset", sc_memset},
+    {0x1516, "MCS_DeleteDirectory", sc_mcs_delete_dir},
+    {0x151A, "MCS_WriteItem", sc_mcs_write_item},
+    {0x1529, "MCS_GetState", sc_mcs_get_state},
+    {0x1532, "MCS_GetCapa", sc_mcs_get_capa},
+    {0x1543, "MCS_GetMainMemoryStart", sc_mcs_get_main_memory_start},
     {0x154B, "MCS_CreateDirectory", sc_mcs_create_dir},
     {0x154D, "MCSPutVar2", sc_mcs_put_var2},
     {0x1552, "MCSOvwDat2", sc_mcs_ovw_dat2},
     {0x1558, "MCSDelVar2", sc_mcs_del_var2},
+    {0x1560, "MCSGetOpenItem", sc_mcs_get_open_item},
     {0x1562, "MCSGetDlen2", sc_mcs_get_dlen2},
     {0x1563, "MCSGetData1", sc_mcs_get_data1},
     {0x1630, "App_Optimize", sc_nothing},     /* storage optimisation: nothing to do */
+    {0x17E6, "TakeScreenshot", sc_take_screenshot},
+    {0x17E7, "TakeScreenshot2", sc_take_screenshot},
     {0x17F7, "MsgBoxPush", sc_msgbox_push},
     {0x17F9, "MsgBoxPop", sc_msgbox_pop},
     {0x17FB, "BoxYLimits", sc_box_y_limits},

@@ -42,6 +42,7 @@ static const Layout LAYOUTS[] = {
         .vram2 = P2(0x0C030000u),
         .stack_top = P1(0x0C180000u),
         .heap_base = P1(0x0C400000u), .heap_size = 0x00400000u,
+        .mcs = P1(0x0C300000u),
         .frqcr = 0x0F011112u,
     },
     [MODEL_CG20] = {
@@ -51,6 +52,7 @@ static const Layout LAYOUTS[] = {
         .vram2 = P2(0x08030000u),
         .stack_top = P1(0x08170000u),
         .heap_base = P1(0x08060000u), .heap_size = 0x00090000u,
+        .mcs = P1(0x08180000u),
         .frqcr = 0x0F102203u,
     },
 };

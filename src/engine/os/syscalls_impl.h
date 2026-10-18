@@ -166,5 +166,21 @@ SC(sc_mcs_ovw_dat2);
 SC(sc_mcs_del_var2);
 SC(sc_mcs_get_dlen2);
 SC(sc_mcs_get_data1);
+SC(sc_mcs_write_item);
+SC(sc_mcs_delete_dir);
+SC(sc_mcs_get_state);
+SC(sc_mcs_get_capa);
+SC(sc_mcs_get_main_memory_start);
+SC(sc_mcs_get_open_item);
+SC(sc_clip_store);
+SC(sc_alpha_get);
+SC(sc_alpha_set);
+
+/* syscalls_system.c: restart, screenshots, icons, BCD */
+SC(sc_restart);
+SC(sc_take_screenshot);
+SC(sc_smem_map_icon);
+SC(sc_app_init_dlg_descriptor);
+SC(sc_bcd_to_internal);
 
 #endif

@@ -51,6 +51,7 @@ typedef struct {
     uint32_t vram2;                /* GetSecondaryVRAMAddress (SaveVRAM_1), after it */
     uint32_t stack_top;            /* r15 when the add-in starts */
     uint32_t heap_base, heap_size; /* our sys_malloc arena */
+    uint32_t mcs;                  /* MCS_GetMainMemoryStart: unused RAM (no MCS image there) */
     uint32_t frqcr;                /* clock setup the OS leaves (CPG FRQCR) */
 } Layout;
 

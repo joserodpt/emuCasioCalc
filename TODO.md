@@ -1,15 +1,15 @@
 # TODO
 
 What emuCasioFxCG still lacks. The syscall list is measured against
-[libfxcg](https://github.com/Jonimoose/libfxcg)'s stubs: 177 of its 273 syscalls
-are implemented, 96 are left. Add-ins only use a small part of them, so the
+[libfxcg](https://github.com/Jonimoose/libfxcg)'s stubs: 193 of its 273 syscalls
+are implemented, 80 are left. Add-ins only use a small part of them, so the
 groups are ordered by how likely real add-ins are to need them.
 
 Approach that has worked so far: run an add-in, implement what it stops at,
 check it on screen. For calls no add-in at hand uses, write a test app in
 `~/VSCode/casioPrizmApps` (see `apps/os-syscalls`, which tests the system-info
 and dialog calls; also `draw-syscalls`, `key-modifiers`, `status-bar`,
-`file-syscalls`, `time-keys`, `language` and `text-syscalls`). Semantics come from WikiPrizm (prizm.cemetech.net),
+`file-syscalls`, `time-keys`, `language`, `text-syscalls` and `mcs-system`). Semantics come from WikiPrizm (prizm.cemetech.net),
 libfxcg's headers, and the add-in's source when it has one.
 
 ## Syscalls, likely to be needed
@@ -88,8 +88,8 @@ from the add-in's start, not from midnight.
 
 ### Memory and strings
 `memcmp3` (115E), `strcmp_ignore_case` (1635), `ItoA_10digit` (1633): their
-exact results are not documented. `BCDtoInternal` (0160): needs the OS's
-BCD number format.
+exact results are not documented. `BCDtoInternal` (0160) is done (sign 1 for
+negative numbers, the unknown field 0: guessed).
 
 Guessed: the `*ToHex` calls write uppercase digits without a NUL; `HexTo*`
 return 1 on a non-hex character.
@@ -117,15 +117,19 @@ g3p file dialogs, return values unknown. `ConfirmFileOverwriteDialog` (1802),
 `AUX_DisplayErrorMessage` (0C01), `Bdisp_WriteSystemMessage` (1906).
 
 ### Main memory (MCS)
-`MCS_WriteItem` (151A), `MCS_DeleteDirectory` (1516), `MCS_GetState` (1529),
-`MCS_GetCapa` (1532), `MCS_GetMainMemoryStart` (1543), `MCSGetOpenItem` (1560),
-`Alpha_GetData` / `Alpha_SetData` (0034, 0035: alpha variables, value format
-to check), `CLIP_Store` (07E5).
+Done (test app `apps/mcs-system`). Guessed: main memory holds 61 KB,
+counted as the items' sizes; `MCS_GetMainMemoryStart` points at unused RAM
+(the MCS isn't laid out in memory); items' type flags (read-only...) aren't
+kept; the alpha variables are BCD values in the item @REV2/ALPHAMEM;
+`CLIP_Store` returns 0.
 
 ### System
-`App_InitDlgDescriptor` (0D79, parameters unknown), `Restart` (1187),
-`TakeScreenshot` / `TakeScreenshot2` (17E6, 17E7), `SMEM_MapIconToExt`
-(0C2C), `SMEM_maint` (0DDF).
+Done (test app `apps/mcs-system`): `Restart` ends the add-in;
+`TakeScreenshot` / `TakeScreenshot2` save VRAM as `\\fls0\CAPTnnnn.bmp`
+at once (no dialog); `SMEM_MapIconToExt` draws its own icons (a page with
+the extension, coloured by kind, or a folder) and gives message number 0;
+`App_InitDlgDescriptor` writes what WikiPrizm describes; `SMEM_maint`
+does nothing.
 
 ## Syscalls, unlikely
 
