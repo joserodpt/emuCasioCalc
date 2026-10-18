@@ -81,6 +81,11 @@ void info_window_refresh(void);
 /* Returns true if the event belonged to the info window. */
 bool info_window_event(const SDL_Event *e);
 
+/* send_addin.c: File > Copy add-in to calculator */
+void send_addin_start(void);
+/* Finishes the copy once the folder dialog has answered. */
+void send_addin_poll(void);
+
 /* font.c */
 bool font_init(void);
 

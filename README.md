@@ -56,6 +56,13 @@ copied into the emulated flash, where they live on the calculator: some
 add-ins read them from there directly (CGDoom finds `doom.wad` that way, so
 put it in `storage/fls0/doom.wad`).
 
+**Copy add-in to calculator** (File menu): plug the calculator in by USB and
+choose "USB Flash" (F1) on it; it shows up as a drive. The folder dialog
+opens on that drive when one with an `@MainMem` folder is mounted; pick it
+and the running .g3a is copied to its root (asking before replacing a file
+of the same name or writing to a folder that isn't a calculator). Eject the
+drive before unplugging; the add-in then appears in the main menu.
+
 Keyboard (all 50 calculator keys): arrows, Enter = EXE, Esc = EXIT,
 Backspace = DEL, Delete = AC, Home = MENU, Tab = SHIFT, Left Alt = ALPHA,
 O = OPTN, V = VARS, F1–F6, digits, `. + - * / ( ) ,`, E = ×10^x, U = (-),
@@ -113,6 +120,7 @@ GiteaPC puts it), the CMake build compiles them and CTest runs them.
 | `window.c` | Main window, keyboard, the `platform.h` interface |
 | `menubar.c` | Menu bar: menus, Info button, shortcuts, actions |
 | `info_window.c` | Add-in information window |
+| `send_addin.c` | File > Copy add-in to calculator |
 | `app_icon.c`, `font.c` | The emulator's icon (drawn in code), the 8x8 font |
 | **`src/utils/`** | **Helpers** |
 | `g3a.c` | Reads a .g3a: header (name, icons...) and code, mapped at `0x00300000` |

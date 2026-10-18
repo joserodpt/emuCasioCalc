@@ -29,7 +29,7 @@ add_executable(emucasiofxcg
   src/engine/os/syscalls.c src/engine/os/syscalls_text.c src/engine/os/syscalls_keys.c
   src/engine/os/syscalls_mcs.c src/engine/os/syscalls_bfile.c src/engine/os/syscalls_dialogs.c src/engine/os/syscalls_draw.c src/engine/os/syscalls_status.c
   src/engine/os/display.c
-  src/views/window.c src/views/menubar.c src/views/info_window.c src/views/font.c
+  src/views/window.c src/views/menubar.c src/views/info_window.c src/views/send_addin.c src/views/font.c
   src/views/app_icon.c
   src/utils/g3a.c src/utils/keys.c)
 target_include_directories(emucasiofxcg PRIVATE src/engine/os src/views src/utils)

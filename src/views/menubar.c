@@ -8,6 +8,7 @@
 
 typedef enum {
     A_NONE, A_SEPARATOR, A_OPEN, A_INFO, A_SCREENSHOT, A_SAVE_ICON, A_QUIT, A_PAUSE, A_RESET,
+    A_SEND,
     A_ZOOM1, A_ZOOM2, A_ZOOM3, A_ZOOM4, A_ZOOM5, A_ZOOM6, /* consecutive */
     A_KEYS, A_ABOUT,
     A_MODEL_AUTO, A_MODEL_CG20, A_MODEL_CG50, A_TIMING_REAL, A_TIMING_FAST,
@@ -26,6 +27,8 @@ static const Item FILE_ITEMS[] = {
     {"", "", A_SEPARATOR},
     {"Save screenshot", "Ctrl+S", A_SCREENSHOT},
     {"Save icon", "", A_SAVE_ICON},
+    {"", "", A_SEPARATOR},
+    {"Copy add-in to calculator...", "", A_SEND},
     {"", "", A_SEPARATOR},
     {"Quit", "Ctrl+Q", A_QUIT},
 };
@@ -473,14 +476,17 @@ static void timestamped(char *out, size_t cap, const char *stem)
 static void SDLCALL open_done(void *user, const char *const *files, int filter)
 {
     (void)user; (void)filter;
-    if (!files || !files[0])
-        return; /* cancelled or no dialog available */
+    /* NULL: no dialog available; no entry or an empty one (some dialog
+     * backends): cancelled */
+    if (!files || !files[0] || !files[0][0])
+        return;
     snprintf(open_path, sizeof open_path, "%s", files[0]);
     SDL_SetAtomicInt(&open_ready, 1);
 }
 
 void menubar_poll(void)
 {
+    send_addin_poll();
     if (SDL_GetAtomicInt(&open_ready)) {
         SDL_SetAtomicInt(&open_ready, 0);
         view_pending = CMD_OPEN;
@@ -523,6 +529,9 @@ static void run_action(Action a)
         break;
     case A_INFO:
         info_window_open();
+        break;
+    case A_SEND:
+        send_addin_start();
         break;
     case A_SCREENSHOT:
         timestamped(path, sizeof path, "screenshot");
