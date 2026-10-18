@@ -1,34 +1,42 @@
 /*
  * HLE syscalls: VRAM drawing and text.
  *
- * The OS fonts are approximated with an 8x8 font (see display.c), and
- * multi-byte characters show as '?'. Where WikiPrizm doesn't pin down a
- * detail (message box geometry, PrintCXY's origin), the choice is noted.
+ * Text is drawn with open fonts close to the OS's sizes (font.h), from
+ * strings in the OS character set (display.h decodes them). Where WikiPrizm
+ * doesn't pin down a detail (message box geometry, PrintCXY's origin), the
+ * choice is noted.
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "display.h"
+#include "font.h"
 #include "syscalls_impl.h"
 
-/* Fake addresses for GetMiniGlyphPtr / GetFKeyPtr: unused ROM, reads as 0. */
+/* Fake addresses for GetMiniGlyphPtr / GetFKeyPtr: unused ROM, reads as 0.
+ * A glyph pointer encodes the character code: base + 4 * code. */
 #define MINI_GLYPH_BASE 0x81F00000u
+#define MINI_GLYPH_END  (MINI_GLYPH_BASE + 4 * 0x10000u)
 #define FKEY_BITMAP     0x81F80000u
 
-/* Reads an OS (multi-byte) string; 2-byte characters become '?'. */
+/* Reads an OS string (kept in the OS character set). */
 static void read_text(Emu *emu, uint32_t addr, char *out, size_t cap)
 {
-    char raw[256];
-    sc_string(emu, addr, raw, sizeof raw);
-    size_t n = 0;
-    for (const unsigned char *s = (const unsigned char *)raw; *s && n + 1 < cap; s++) {
-        bool lead = *s == 0x7F || *s == 0xE5 || *s == 0xE6 || *s == 0xE7 || *s == 0xF7 || *s == 0xF9;
-        out[n++] = lead || *s >= 0x80 ? '?' : (char)*s;
-        if (lead && s[1])
-            s++;
+    sc_string(emu, addr, out, cap);
+}
+
+/* A character code (1 or 2 bytes) as a string. */
+static void code_text(uint32_t code, char out[3])
+{
+    if (code > 0xFF) {
+        out[0] = (char)(code >> 8);
+        out[1] = (char)code;
+        out[2] = '\0';
+    } else {
+        out[0] = (char)code;
+        out[1] = '\0';
     }
-    out[n] = '\0';
 }
 
 SC(sc_get_vram_address)
@@ -91,7 +99,16 @@ SC(sc_print_xy)
 {
     char text[128];
     read_text(emu, a[2] + 2, text, sizeof text);
+    /* The two bytes go to ProcessPrintChars: 03 A8 selects GB 18030 for
+     * this string; the setting is back as it was afterwards. */
+    uint16_t charset = (uint16_t)(mem_read8(&emu->mem, a[2]) << 8 | mem_read8(&emu->mem, a[2] + 1));
+    bool before = display_gb18030();
+    if (charset == 0x03A8)
+        display_set_gb18030(true);
+    else if (charset == 0x0000)
+        display_set_gb18030(false);
     display_print_xy(emu->vram, (int32_t)a[0], (int32_t)a[1], text, (int32_t)a[3], (int32_t)a[4]);
+    display_set_gb18030(before);
     return 0;
 }
 
@@ -111,8 +128,25 @@ SC(sc_print_os)
     read_text(emu, a[0], text, sizeof text);
     display_print_xy(emu->vram, emu->cursor_x, emu->cursor_y, text,
                      a[1] ? TEXT_MODE_INVERT : TEXT_MODE_NORMAL, 0);
-    emu->cursor_x += (int)strlen(text);
+    emu->cursor_x += text_length(text);
     return 0;
+}
+
+/* At the cursor: at most imax characters of text, the cells after it up to
+ * imax cleared (PrintLine, PrintLine2). */
+static void print_padded(Emu *emu, const char *text, int imax, uint16_t fg, uint16_t bg)
+{
+    char shown[128];
+    size_t n = 0;
+    int chars = 0;
+    for (int len; chars < imax && (len = text_char_len(text + n)) && n + (size_t)len < sizeof shown; chars++)
+        n += (size_t)len;
+    memcpy(shown, text, n);
+    for (; chars < imax && n + 1 < sizeof shown; chars++)
+        shown[n++] = ' ';
+    shown[n] = '\0';
+    int x = (emu->cursor_x - 1) * BIG_CELL_W, y = emu->cursor_y * BIG_CELL_H;
+    display_text_big(emu->vram, x, y, shown, fg, bg, true);
 }
 
 /* PrintLine(msg, imax): the message at the cursor, at most imax characters,
@@ -124,9 +158,7 @@ SC(sc_print_line)
     int imax = (int32_t)a[1];
     if (imax < 0 || imax >= (int)sizeof text)
         imax = (int)sizeof text - 1;
-    char line[128];
-    snprintf(line, sizeof line, "%-*.*s", imax, imax, text);
-    display_print_xy(emu->vram, emu->cursor_x, emu->cursor_y, line, TEXT_MODE_NORMAL, 0);
+    print_padded(emu, text, imax, 0x0000, 0xFFFF);
     return 0;
 }
 
@@ -172,11 +204,10 @@ SC(sc_print_mini)
     return 0;
 }
 
-/* PrintMiniMini(int *x, int *y, string, mode, color, P6): the 10 px font
- * (approximated by the 8x8 one), y under the status bar unless mode bit 6.
- * Mode bits (WikiPrizm): 0 white text on `color`, 2 black background, 4
- * bold (not shown), 7 leaves the background (our reading of "whether the
- * background is cleared"). Advances *x. */
+/* PrintMiniMini(int *x, int *y, string, mode, color, P6): the 10 px font,
+ * y under the status bar unless mode bit 6. Mode bits (WikiPrizm): 0 white
+ * text on `color`, 2 black background, 4 bold, 7 leaves the background
+ * (our reading of "whether the background is cleared"). Advances *x. */
 SC(sc_print_mini_mini)
 {
     Memory *mem = &emu->mem;
@@ -192,11 +223,9 @@ SC(sc_print_mini_mini)
     if (mode & 0x04)
         bg = 0x0000;
     int py = y + ((mode & 0x40) ? 0 : STATUS_HEIGHT);
-    int w = (int)strlen(text) * SMALL_CELL_W;
-    if (!(mode & 0x80))
-        display_rect(emu->vram, x, py, x + w - 1, py + SMALL_CELL_H - 1, bg);
-    display_text_small(emu->vram, x, py, text, fg);
-    mem_write32(mem, a[0], (uint32_t)(x + w));
+    x = display_text_prop(emu->vram, &FONT_TINY, x, py, SMALL_CELL_H, 1, text, fg, bg, !(mode & 0x80),
+                          (mode & 0x10) != 0, LCD_WIDTH, true);
+    mem_write32(mem, a[0], (uint32_t)x);
     return 0;
 }
 
@@ -206,30 +235,37 @@ SC(sc_print_mini_mini)
 SC(sc_get_mini_glyph_ptr)
 {
     uint16_t glyph = (uint16_t)a[0];
+    char text[3];
+    code_text(glyph, text);
     if (a[1])
-        mem_write16(&emu->mem, a[1], MINI_CELL_W);
-    return MINI_GLYPH_BASE + (glyph < 0x80 ? glyph : '?') * 4u;
+        mem_write16(&emu->mem, a[1], (uint16_t)display_text_mini(emu->vram, 0, 0, text, 0, 0, false, 1 << 20, false));
+    return MINI_GLYPH_BASE + glyph * 4u;
 }
 
 /* PrintMiniGlyph(x, y, glyph, mode_flags, glyph_width, P6..P9, color,
- * back_color, P12): one mini-font character (mode bits as PrintMini). */
+ * back_color, P12): one mini-font character (mode bits as PrintMini), from
+ * a GetMiniGlyphPtr pointer; other glyphs (the add-in's own bitmaps, whose
+ * format isn't documented) leave a blank cell. */
 SC(sc_print_mini_glyph)
 {
     uint32_t mode = a[3];
-    char text[2] = {'?', 0};
-    if (a[2] >= MINI_GLYPH_BASE && a[2] < MINI_GLYPH_BASE + 0x400) {
-        int c = (int)(a[2] - MINI_GLYPH_BASE) / 4;
-        if (c >= 0x20 && c < 0x7F)
-            text[0] = (char)c;
-    }
     uint16_t fg = (uint16_t)a[9], bg = (uint16_t)a[10];
     if (mode & 0x04) {
         uint16_t t = fg;
         fg = bg;
         bg = t;
     }
-    int py = (int32_t)a[1] + ((mode & 0x40) ? 0 : STATUS_HEIGHT);
-    display_text_mini(emu->vram, (int32_t)a[0], py, text, fg, bg, !(mode & 0x02), LCD_WIDTH, true);
+    int x = (int32_t)a[0], py = (int32_t)a[1] + ((mode & 0x40) ? 0 : STATUS_HEIGHT);
+    if (a[2] >= MINI_GLYPH_BASE && a[2] < MINI_GLYPH_END) {
+        char text[3];
+        code_text((a[2] - MINI_GLYPH_BASE) / 4, text);
+        display_text_mini(emu->vram, x, py, text, fg, bg, !(mode & 0x02), LCD_WIDTH, true);
+    } else if (!(mode & 0x02)) {
+        /* the add-in's own glyph, in a format we don't know: its cell,
+         * blank (glyph_width wide) */
+        int w = (int32_t)a[4] > 0 && (int32_t)a[4] < 64 ? (int32_t)a[4] : MINI_CELL_W;
+        display_rect(emu->vram, x, py, x + w - 1, py + MINI_CELL_H - 1, bg);
+    }
     return 0;
 }
 
@@ -313,30 +349,188 @@ SC(sc_msgbox_pop)
     return 0;
 }
 
+/* An edited line: the text from byte `start` in `cells` big-font cells at
+ * pixel (px, py), the rest cleared, and the cursor (byte `cursor`) as a
+ * bar at the left of its cell. */
+static void edit_line(Emu *emu, const char *text, int start, int cursor, int px, int py, int cells)
+{
+    int len = (int)strlen(text);
+    if (start < 0 || start > len)
+        start = 0;
+    display_rect(emu->vram, px, py, px + cells * BIG_CELL_W - 1, py + BIG_CELL_H - 1, 0xFFFF);
+    char visible[128];
+    size_t n = 0;
+    int shown = 0, cursor_cell = -1;
+    for (int i = start, l; shown <= cells; i += l, shown++) {
+        if (i == cursor)
+            cursor_cell = shown;
+        l = text_char_len(text + i);
+        if (!l || shown == cells || n + (size_t)l >= sizeof visible)
+            break;
+        memcpy(visible + n, text + i, (size_t)l);
+        n += (size_t)l;
+    }
+    visible[n] = '\0';
+    display_text_big(emu->vram, px, py, visible, 0x0000, 0xFFFF, true);
+    if (cursor_cell >= 0 && cursor_cell <= cells) {
+        int cx = px + cursor_cell * BIG_CELL_W;
+        display_rect(emu->vram, cx, py + 2, cx + 1, py + BIG_CELL_H - 3, 0x0000);
+    }
+}
+
 /* DisplayMBString2(select, string, start, xpos, sel_start, x, y,
- * pos_to_clear, right_margin, key): shows the line being edited from
- * character `start`, at pixel (x, y) under the status bar, clearing
- * pos_to_clear cells, with the cursor at xpos drawn inverted. */
+ * pos_to_clear, right_margin, key): the line being edited from byte
+ * `start`, at pixel (x, y) under the status bar, over pos_to_clear cells,
+ * the cursor at byte xpos. */
 SC(sc_display_mbstring2)
 {
     char text[256];
     read_text(emu, a[1], text, sizeof text);
-    int start = (int32_t)a[2], xpos = (int32_t)a[3];
-    int x = (int32_t)a[5], y = (int32_t)a[6] + STATUS_HEIGHT, cells = (int32_t)a[7];
+    int x = (int32_t)a[5], cells = (int32_t)a[7];
     if (cells <= 0 || cells > 21)
         cells = 21 - x / BIG_CELL_W;
-    int len = (int)strlen(text);
-    if (start < 0 || start > len)
-        start = 0;
-
-    display_rect(emu->vram, x, y, x + cells * BIG_CELL_W - 1, y + BIG_CELL_H - 1, 0xFFFF);
-    char visible[64];
-    snprintf(visible, sizeof visible, "%.*s", cells, text + start);
-    display_text_big(emu->vram, x, y, visible, 0x0000, 0xFFFF, true);
-    int cursor = xpos - start;
-    if (cursor >= 0 && cursor < cells) {
-        char c[2] = {xpos < len ? text[xpos] : ' ', 0};
-        display_text_big(emu->vram, x + cursor * BIG_CELL_W, y, c, 0xFFFF, 0x0000, true);
-    }
+    edit_line(emu, text, (int32_t)a[2], (int32_t)a[3], x, (int32_t)a[6] + STATUS_HEIGHT, cells);
     return 0;
+}
+
+/* DisplayMBString(string, start, cursor, x, y): the same at PrintXY's
+ * homescreen position (x 1-21, y row), up to the end of the line. */
+SC(sc_display_mbstring)
+{
+    char text[256];
+    read_text(emu, a[0], text, sizeof text);
+    int x = (int32_t)a[3], y = (int32_t)a[4];
+    if (x < 1 || x > 21)
+        x = 1;
+    edit_line(emu, text, (int32_t)a[1], (int32_t)a[2], (x - 1) * BIG_CELL_W, y * BIG_CELL_H, 22 - x);
+    return 0;
+}
+
+/* Bdisp_MMPrint(x, y, string, mode, xlimit, P6, P7, color, back_color,
+ * writeflag, P11) and Bdisp_MMPrintRef(int *x, int *y, ...): the 16 px
+ * font (as PrintMini's, in 16 px lines). y under the status bar unless mode
+ * 0x40; mode 1 swaps the colours, 2 leaves the background, 4 inverts them.
+ * The Ref version advances *x (writeflag 0: only measures). */
+static int mm_print(Emu *emu, int x, int y, const uint32_t *a)
+{
+    char text[256];
+    read_text(emu, a[2], text, sizeof text);
+    uint32_t mode = a[3];
+    uint16_t fg = (uint16_t)a[7], bg = (uint16_t)a[8];
+    if (mode & 0x01) {
+        uint16_t t = fg;
+        fg = bg;
+        bg = t;
+    }
+    if (mode & 0x04) {
+        fg = (uint16_t)~fg;
+        bg = (uint16_t)~bg;
+    }
+    int xlimit = (int32_t)a[4] < 0 || a[4] > LCD_WIDTH ? LCD_WIDTH : (int)a[4];
+    int py = y + ((mode & 0x40) ? 0 : STATUS_HEIGHT);
+    return display_text_prop(emu->vram, &FONT_MINI, x, py, FONT_MINI.h, 0, text, fg, bg, !(mode & 0x02), false,
+                             xlimit, a[9] != 0);
+}
+
+SC(sc_mmprint)
+{
+    mm_print(emu, (int32_t)a[0], (int32_t)a[1], a);
+    return 0;
+}
+
+SC(sc_mmprint_ref)
+{
+    Memory *mem = &emu->mem;
+    int x = mm_print(emu, (int32_t)mem_read32(mem, a[0]), (int32_t)mem_read32(mem, a[1]), a);
+    mem_write32(mem, a[0], (uint32_t)x);
+    return 0;
+}
+
+/* PrintGlyph(x, y, glyph, mode, color, back_color, P7): one big-font
+ * character at pixel (x, y), y under the status bar unless mode 0x40;
+ * mode as PrintXY (0x01 inverse, 0x20 no background). The glyph format
+ * isn't documented: the pointers GetMiniGlyphPtr gives are understood,
+ * others draw U+FFFD. */
+SC(sc_print_glyph)
+{
+    uint32_t mode = a[3];
+    char text[3] = "\xFF";
+    if (a[2] >= MINI_GLYPH_BASE && a[2] < MINI_GLYPH_END)
+        code_text((a[2] - MINI_GLYPH_BASE) / 4, text);
+    uint16_t fg = (uint16_t)a[4], bg = (uint16_t)a[5];
+    if (mode & TEXT_MODE_INVERT) {
+        uint16_t t = fg;
+        fg = bg;
+        bg = t;
+    }
+    int py = (int32_t)a[1] + ((mode & 0x40) ? 0 : STATUS_HEIGHT);
+    display_text_big(emu->vram, (int32_t)a[0], py, text, fg, bg, !(mode & TEXT_MODE_TRANSPARENT_BACKGROUND));
+    return 0;
+}
+
+/* PrintLine2(P1, mode, msg, P4, P5, imax, color1, color2): PrintLine with
+ * colours (PrintXY indices). Mode bit 0: the whole line up to imax (else
+ * only the message); bits 7 and 5: color2 on color1, else color1 on
+ * color2. imax is zero-based. */
+SC(sc_print_line2)
+{
+    char text[128];
+    read_text(emu, a[2], text, sizeof text);
+    uint32_t mode = a[1];
+    int imax = (int32_t)a[5] + 1;
+    if (imax < 0 || imax > 64)
+        imax = 64;
+    uint16_t c1 = display_text_color((int)(a[6] & 7)), c2 = display_text_color((int)(a[7] & 7));
+    bool swap = (mode & 0xA0) == 0xA0;
+    if (!(mode & 1)) {
+        int n = text_length(text);
+        if (n < imax)
+            imax = n;
+    }
+    print_padded(emu, text, imax, swap ? c2 : c1, swap ? c1 : c2);
+    return 0;
+}
+
+/* ProcessPrintChars(code): the character set of the text that follows,
+ * 0x0000 Latin, 0x03A8 GB 18030. Returns 1 if known. */
+SC(sc_process_print_chars)
+{
+    uint16_t code = (uint16_t)a[0];
+    if (code == 0x0000)
+        display_set_gb18030(false);
+    else if (code == 0x03A8)
+        display_set_gb18030(true);
+    else
+        return 0;
+    (void)emu;
+    return 1;
+}
+
+SC(sc_enable_gb18030)
+{
+    (void)emu; (void)a;
+    display_set_gb18030(true);
+    return 0;
+}
+
+SC(sc_disable_gb18030)
+{
+    (void)emu; (void)a;
+    display_set_gb18030(false);
+    return 0;
+}
+
+/* MB_IsLead(c): 1 if c starts a 2-byte character. */
+SC(sc_mb_is_lead)
+{
+    (void)emu;
+    return text_is_lead((uint8_t)a[0]);
+}
+
+/* MB_ElementCount(string): characters as printed, 2-byte ones counting one. */
+SC(sc_mb_element_count)
+{
+    char text[512];
+    read_text(emu, a[0], text, sizeof text);
+    return (uint32_t)text_length(text);
 }

@@ -54,6 +54,16 @@ SC(sc_print_mini_mini);
 SC(sc_locate);
 SC(sc_print_line);
 SC(sc_print_os);
+SC(sc_display_mbstring);
+SC(sc_mmprint);
+SC(sc_mmprint_ref);
+SC(sc_print_glyph);
+SC(sc_print_line2);
+SC(sc_process_print_chars);
+SC(sc_enable_gb18030);
+SC(sc_disable_gb18030);
+SC(sc_mb_is_lead);
+SC(sc_mb_element_count);
 
 /* syscalls_draw.c: shapes, points, bitmaps, the display (_DD) */
 SC(sc_fill_vram);
@@ -110,12 +120,14 @@ SC(sc_progress_bar2);
 SC(sc_scrollbar);
 SC(sc_box_inner_clear);
 SC(sc_box_y_limits);
+SC(sc_character_select);
 
 /* syscalls_keys.c: keyboard and text input */
 SC(sc_get_key);
 SC(sc_get_key_wait_os);
 SC(sc_prgm_get_key_os);
 SC(sc_edit_mbstring_char);
+SC(sc_edit_mbstring_ctrl);
 SC(sc_edit_mbstring_ctrl2);
 SC(sc_put_keycode);
 SC(sc_spy_matrix_code);

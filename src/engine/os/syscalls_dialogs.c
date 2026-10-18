@@ -13,15 +13,10 @@
 #include "keys.h"
 #include "syscalls_impl.h"
 
-/* Reads an OS string for display; 2-byte characters become '?'. */
+/* Reads an OS string (kept in the OS character set). */
 static void read_line(Emu *emu, uint32_t addr, char *out, size_t cap)
 {
-    char raw[256];
-    sc_string(emu, addr, raw, sizeof raw);
-    size_t n = 0;
-    for (const unsigned char *s = (const unsigned char *)raw; *s && n + 1 < cap; s++)
-        out[n++] = *s >= 0x20 && *s < 0x7F ? (char)*s : (*s == '\n' ? '\n' : '?');
-    out[n] = '\0';
+    sc_string(emu, addr, out, cap);
 }
 
 /* DisplayMessageBox(message): a message box with the text (split at
@@ -29,14 +24,16 @@ static void read_line(Emu *emu, uint32_t addr, char *out, size_t cap)
  * right cursor keys are pressed. The caller adds any "Press:[EXIT]". */
 SC(sc_display_message_box)
 {
-    char text[256], lines[6][20];
+    char text[256], lines[6][64];
     read_line(emu, a[0], text, sizeof text);
     int n = 0;
     for (const char *s = text; *s && n < 6;) {
-        int len = (int)strcspn(s, "\n");
-        int take = len < 18 ? len : 18;
-        snprintf(lines[n++], sizeof lines[0], "%.*s", take, s);
-        s += take;
+        /* up to 18 characters, or to the newline */
+        int bytes = 0, chars = 0;
+        for (int l; chars < 18 && s[bytes] != '\n' && (l = text_char_len(s + bytes)); chars++)
+            bytes += l;
+        snprintf(lines[n++], sizeof lines[0], "%.*s", bytes, s);
+        s += bytes;
         if (*s == '\n')
             s++;
     }
@@ -193,4 +190,54 @@ SC(sc_box_y_limits)
     if (a[2])
         mem_write32(&emu->mem, a[2], (uint32_t)(r.y1 - 2));
     return 0;
+}
+
+/* CharacterSelectDialog(): picks a character in a box: the OS's symbols we
+ * know the codes of, then ASCII punctuation. Arrows move, EXE chooses (its
+ * code: 1 byte, or 2 for 2-byte characters), EXIT / AC give 0. The real
+ * dialog's pages and layout aren't documented. */
+SC(sc_character_select)
+{
+    (void)a;
+    static const uint16_t CHARS[] = {
+        0xD0, 0xCE, 0xCD, 0x7F50, 0x7F54, 0x86, 0x96, 0x8B, 0xA9, 0xB9, 0x99, 0x87, 0x0E, 0x10, 0x11, 0x12,
+        0x13, 0xBB, 0x0F, '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-',
+        '.', '/', ':', ';', '<', '=', '>', '?', '@', '[', '\\', ']', '^', '_', '`', '{',
+        '|', '}', '~',
+    };
+    const int count = (int)(sizeof CHARS / sizeof CHARS[0]), per_row = 16, rows = (count + 15) / 16;
+    int sel = 0;
+    msgbox_open(emu, rows + 1);
+    BoxRect r = msgbox_rect(rows + 1);
+    uint32_t ret = 0;
+    for (;;) {
+        display_rect(emu->vram, r.x0 + 2, r.y0 + 2, r.x1 - 2, r.y1 - 2, 0xFFFF);
+        display_print_xy(emu->vram, 2, 2, "Character", TEXT_MODE_NORMAL, 0);
+        for (int i = 0; i < count; i++) {
+            char c[3];
+            if (CHARS[i] > 0xFF) {
+                c[0] = (char)(CHARS[i] >> 8);
+                c[1] = (char)CHARS[i];
+                c[2] = '\0';
+            } else {
+                c[0] = (char)CHARS[i];
+                c[1] = '\0';
+            }
+            display_print_xy(emu->vram, 3 + i % per_row, 3 + i / per_row, c,
+                             i == sel ? TEXT_MODE_INVERT : TEXT_MODE_NORMAL, 0);
+        }
+        int key = sc_wait_key(emu);
+        if (key < 0 || key == KEY_CTRL_EXIT || key == KEY_CTRL_AC)
+            break;
+        if (key == KEY_CTRL_EXE) {
+            ret = CHARS[sel];
+            break;
+        }
+        int step = key == KEY_CTRL_RIGHT ? 1 : key == KEY_CTRL_LEFT ? -1 : key == KEY_CTRL_DOWN ? per_row :
+                   key == KEY_CTRL_UP ? -per_row : 0;
+        if (sel + step >= 0 && sel + step < count)
+            sel += step;
+    }
+    msgbox_close(emu);
+    return ret;
 }

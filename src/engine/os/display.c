@@ -1,5 +1,6 @@
 #include "display.h"
 
+#include "font.h"
 #include "mem.h"
 #include "platform.h"
 
@@ -43,57 +44,245 @@ void display_rect(uint8_t *vram, int x0, int y0, int x1, int y1, uint16_t color)
             display_set_pixel(vram, x, y, color);
 }
 
-/* One character of the 8x8 font scaled sx x sy in a cw x ch cell, with the
- * glyph offset by (ox, oy) inside the cell. */
-static void draw_char(uint8_t *vram, int px, int py, char c, int cw, int ch, int sx, int sy, int ox, int oy,
-                      uint16_t fg, uint16_t bg, bool opaque)
+/* The 8x8 font, unscaled: the emulator's own small labels (status bar). */
+static void draw_char8(uint8_t *vram, int px, int py, char c, uint16_t fg)
 {
     const uint8_t *g = platform_glyph(c);
-    for (int cy = 0; cy < ch; cy++) {
-        for (int cx = 0; cx < cw; cx++) {
-            int gx = (cx - ox) / sx, gy = (cy - oy) / sy;
-            bool on = cx >= ox && cy >= oy && gx < 8 && gy < 8 && (g[gy] & (0x80 >> gx));
-            if (on)
-                display_set_pixel(vram, px + cx, py + cy, fg);
-            else if (opaque)
-                display_set_pixel(vram, px + cx, py + cy, bg);
-        }
-    }
-}
-
-void display_text_big(uint8_t *vram, int x, int y, const char *text, uint16_t fg, uint16_t bg, bool opaque)
-{
-    for (const char *c = text; *c; c++, x += BIG_CELL_W)
-        draw_char(vram, x, y, *c, BIG_CELL_W, BIG_CELL_H, 2, 3, 1, 0, fg, bg, opaque);
-}
-
-void display_print_xy(uint8_t *vram, int x, int y, const char *text, int mode, int color)
-{
-    uint16_t fg = display_text_color(color), bg = 0xFFFF;
-    if (mode == TEXT_MODE_INVERT) {
-        uint16_t t = fg;
-        fg = bg;
-        bg = t;
-    }
-    bool opaque = mode == TEXT_MODE_NORMAL || mode == TEXT_MODE_INVERT;
-    display_text_big(vram, (x - 1) * BIG_CELL_W, y * BIG_CELL_H, text, fg, bg, opaque);
+    for (int y = 0; y < 8; y++)
+        for (int x = 0; x < 8; x++)
+            if (g[y] & (0x80 >> x))
+                display_set_pixel(vram, px + x, py + y, fg);
 }
 
 void display_text_small(uint8_t *vram, int x, int y, const char *text, uint16_t fg)
 {
     for (const char *c = text; *c; c++, x += SMALL_CELL_W)
-        draw_char(vram, x, y, *c, SMALL_CELL_W, SMALL_CELL_H, 1, 1, 0, 1, fg, 0, false);
+        draw_char8(vram, x, y + 1, *c, fg);
+}
+
+/*
+ * Casio text. Strings are bytes in the OS's character set: ASCII, a few
+ * symbols above 0x80, and 2-byte characters after the lead bytes 0x7F,
+ * 0xE5, 0xE6, 0xE7, 0xF7, 0xF9 (MB_ElementCount's list). With GB 18030 on,
+ * 0x81-0xFE start 2-byte (or, before 0x30-0x39, 4-byte) Chinese
+ * characters. The symbols mapped are those whose codes are known (the
+ * GetKey character codes); other characters draw as U+FFFD, Chinese ones as
+ * an empty wide box (no CJK font is embedded).
+ */
+#define CP_WIDE_BOX 0x110000u /* not Unicode: an empty box of a wide cell */
+
+static bool gb18030;
+
+void display_set_gb18030(bool on)
+{
+    gb18030 = on;
+}
+
+bool display_gb18030(void)
+{
+    return gb18030;
+}
+
+bool text_is_lead(uint8_t c)
+{
+    if (gb18030 && c >= 0x81 && c <= 0xFE)
+        return true;
+    return c == 0x7F || c == 0xE5 || c == 0xE6 || c == 0xE7 || c == 0xF7 || c == 0xF9;
+}
+
+int text_char_len(const char *text)
+{
+    const uint8_t *s = (const uint8_t *)text;
+    if (!s[0])
+        return 0;
+    if (!text_is_lead(s[0]) || !s[1])
+        return 1;
+    if (gb18030 && s[0] >= 0x81 && s[1] >= 0x30 && s[1] <= 0x39 && s[2] && s[3])
+        return 4;
+    return 2;
+}
+
+int text_length(const char *text)
+{
+    int n = 0;
+    for (int len; (len = text_char_len(text)); text += len)
+        n++;
+    return n;
+}
+
+static uint32_t single_byte(uint8_t c)
+{
+    if (c >= 0x20 && c < 0x7F)
+        return c;
+    switch (c) {
+    case 0x0A: return 0x21B5; /* line feed, shown as a symbol */
+    case 0x0E: return 0x2192; /* -> (store) */
+    case 0x0F: return 0x1D07; /* small E of x10^x */
+    case 0x10: return 0x2264; /* <= */
+    case 0x11: return 0x2260; /* not equal */
+    case 0x12: return 0x2265; /* >= */
+    case 0x13: return 0x21D2; /* => */
+    case 0x86: return 0x221A; /* square root */
+    case 0x87: return 0x207B; /* (-), raised minus */
+    case 0x89: return '+';
+    case 0x8B: return 0x00B2; /* squared */
+    case 0x96: return 0x221B; /* cube root */
+    case 0x99: return 0x2212; /* minus */
+    case 0xA8: return '^';
+    case 0xA9: return 0x00D7; /* times */
+    case 0xB9: return 0x00F7; /* divided by */
+    case 0xBB: return 0x231F; /* fraction mark */
+    case 0xCD: return 'r';
+    case 0xCE: return 0x03B8; /* theta */
+    case 0xD0: return 0x03C0; /* pi */
+    }
+    return 0xFFFD;
+}
+
+uint32_t text_decode(const char *text, int *len)
+{
+    const uint8_t *s = (const uint8_t *)text;
+    *len = text_char_len(text);
+    if (*len == 1)
+        return single_byte(s[0]);
+    if (gb18030 && s[0] >= 0x81)
+        return CP_WIDE_BOX;
+    uint16_t code = (uint16_t)(s[0] << 8 | s[1]);
+    switch (code) {
+    case 0x7F50: return 'i';    /* imaginary unit */
+    case 0x7F54: return 0x2220; /* angle */
+    }
+    return 0xFFFD;
+}
+
+const FontGlyph *font_glyph(const Font *font, uint32_t cp)
+{
+    int lo = 0, hi = font->count - 1;
+    while (lo <= hi) {
+        int mid = (lo + hi) / 2;
+        if (font->glyphs[mid].cp == cp)
+            return &font->glyphs[mid];
+        if (font->glyphs[mid].cp < cp)
+            lo = mid + 1;
+        else
+            hi = mid - 1;
+    }
+    return NULL;
+}
+
+/* How cp looks in font: its glyph (from FONT_EXTRA if the font lacks it,
+ * scaled to the font's height), as source and target sizes. */
+typedef struct {
+    const Font *src;
+    const FontGlyph *g;
+    int w, h;          /* drawn size */
+    int left, adv;     /* proportional placement, drawn pixels */
+} Shape;
+
+static Shape shape_of(const Font *font, uint32_t cp)
+{
+    Shape sh = {0};
+    sh.h = font->h;
+    if (cp == CP_WIDE_BOX) {
+        sh.w = font->h;
+        sh.adv = font->h + 1;
+        return sh;
+    }
+    const FontGlyph *g = font_glyph(font, cp);
+    const Font *src = font;
+    if (!g) {
+        src = &FONT_EXTRA;
+        g = font_glyph(src, cp);
+        if (!g)
+            g = font_glyph(src, 0xFFFD);
+    }
+    sh.src = src;
+    sh.g = g;
+    sh.w = g->w * font->h / src->h;
+    sh.left = g->left * font->h / src->h;
+    sh.adv = g->adv * font->h / src->h;
+    if (sh.adv < 2)
+        sh.adv = 2;
+    return sh;
+}
+
+static bool shape_pixel(const Shape *sh, int x, int y)
+{
+    if (!sh->g) /* the wide box: an outline */
+        return x == 1 || x == sh->w - 2 || y == 2 || y == sh->h - 3;
+    int sx = x * sh->src->h / sh->h, sy = y * sh->src->h / sh->h;
+    int nb = (sh->g->w + 7) / 8;
+    uint8_t byte = sh->src->bits[sh->g->offset + (uint32_t)(sy * nb + sx / 8)];
+    return byte >> (7 - sx % 8) & 1;
+}
+
+/* Draws a shape's columns from x0 (drawn pixels) at (px, py); bold draws
+ * each lit pixel twice, the second one pixel right. */
+static void draw_shape(uint8_t *vram, const Shape *sh, int px, int py, int x0, int width, uint16_t fg,
+                       bool bold)
+{
+    for (int y = 0; y < sh->h; y++) {
+        for (int x = 0; x < width; x++) {
+            int gx = x0 + x;
+            if (gx >= 0 && gx < sh->w && shape_pixel(sh, gx, y)) {
+                display_set_pixel(vram, px + x, py + y, fg);
+                if (bold)
+                    display_set_pixel(vram, px + x + 1, py + y, fg);
+            }
+        }
+    }
+}
+
+/* Fixed cells (PrintXY, PrintCXY): BIG_CELL_W x BIG_CELL_H, glyph centred;
+ * Chinese characters take a wider cell. */
+void display_text_big(uint8_t *vram, int x, int y, const char *text, uint16_t fg, uint16_t bg, bool opaque)
+{
+    for (int len; (len = text_char_len(text)); text += len) {
+        uint32_t cp = text_decode(text, &len);
+        Shape sh = shape_of(&FONT_BIG, cp);
+        int cw = cp == CP_WIDE_BOX ? BIG_CELL_H : BIG_CELL_W;
+        if (opaque)
+            display_rect(vram, x, y, x + cw - 1, y + BIG_CELL_H - 1, bg);
+        draw_shape(vram, &sh, x + (cw - sh.w) / 2, y, 0, sh.w, fg, false);
+        x += cw;
+    }
+}
+
+void display_print_xy(uint8_t *vram, int x, int y, const char *text, int mode, int color)
+{
+    uint16_t fg = display_text_color(color), bg = 0xFFFF;
+    if (mode & TEXT_MODE_INVERT) {
+        uint16_t t = fg;
+        fg = bg;
+        bg = t;
+    }
+    bool opaque = !(mode & TEXT_MODE_TRANSPARENT_BACKGROUND);
+    display_text_big(vram, (x - 1) * BIG_CELL_W, y * BIG_CELL_H, text, fg, bg, opaque);
+}
+
+/* Proportional text in `font`, glyphs top at y + oy in lines of line_h;
+ * stops before xlimit; draws only if draw. Returns the x after it. */
+int display_text_prop(uint8_t *vram, const Font *font, int x, int y, int line_h, int oy, const char *text,
+                      uint16_t fg, uint16_t bg, bool opaque, bool bold, int xlimit, bool draw)
+{
+    for (int len; (len = text_char_len(text)); text += len) {
+        uint32_t cp = text_decode(text, &len);
+        Shape sh = shape_of(font, cp);
+        int adv = sh.adv + (bold ? 1 : 0);
+        if (x + adv > xlimit)
+            break;
+        if (draw) {
+            if (opaque)
+                display_rect(vram, x, y, x + adv - 1, y + line_h - 1, bg);
+            draw_shape(vram, &sh, x, y + oy, sh.left, adv, fg, bold);
+        }
+        x += adv;
+    }
+    return x;
 }
 
 int display_text_mini(uint8_t *vram, int x, int y, const char *text, uint16_t fg, uint16_t bg,
                       bool opaque, int xlimit, bool draw)
 {
-    for (const char *c = text; *c; c++) {
-        if (x + MINI_CELL_W > xlimit)
-            break;
-        if (draw)
-            draw_char(vram, x, y, *c, MINI_CELL_W, MINI_CELL_H, 1, 2, 1, 1, fg, bg, opaque);
-        x += MINI_CELL_W;
-    }
-    return x;
+    return display_text_prop(vram, &FONT_MINI, x, y, MINI_CELL_H, 1, text, fg, bg, opaque, false, xlimit, draw);
 }

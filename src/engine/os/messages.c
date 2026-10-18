@@ -89,7 +89,10 @@ SC(sc_print_xy_2)
 {
     char text[MESSAGE_MAX];
     os_message(emu->language, (int32_t)a[3], text, sizeof text);
+    bool before = display_gb18030();
+    display_set_gb18030(emu->language == LANG_ZH); /* Chinese messages are GB 18030 */
     display_print_xy(emu->vram, (int32_t)a[1], (int32_t)a[2], text, (int32_t)a[0], (int32_t)a[4]);
+    display_set_gb18030(before);
     return 0;
 }
 

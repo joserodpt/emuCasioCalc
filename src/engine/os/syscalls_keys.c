@@ -7,6 +7,7 @@
  */
 #include <string.h>
 
+#include "display.h"
 #include "keys.h"
 #include "platform.h"
 #include "syscalls.h"
@@ -257,40 +258,84 @@ SC(sc_edit_mbstring_char)
     return (uint32_t)(xpos + width);
 }
 
-/* EditMBStringCtrl2(string, xposmax, int *start, int *xpos, int *key, x, y,
- * enable_pos_to_clear, pos_to_clear): applies a control key (cursor
- * movement, DEL, AC) to the line and clears *key once handled. */
-SC(sc_edit_mbstring_ctrl2)
+/* The control keys of the line editors: LEFT / RIGHT move over whole
+ * characters, DEL removes the one before the cursor, AC clears the line;
+ * *key is cleared once handled. Positions are byte offsets, as
+ * EditMBStringChar returns. *start (if given) scrolls so the cursor stays
+ * within `cells` cells. */
+static void edit_ctrl(Emu *emu, uint32_t str, uint32_t start_p, uint32_t xpos_p, uint32_t key_p, int cells)
 {
     Memory *mem = &emu->mem;
     char s[256];
-    sc_string(emu, a[0], s, sizeof s);
+    sc_string(emu, str, s, sizeof s);
     int len = (int)strlen(s);
-    int xpos = (int32_t)mem_read32(mem, a[3]);
-    int key = (int32_t)mem_read32(mem, a[4]);
+    int xpos = (int32_t)mem_read32(mem, xpos_p);
+    int key = (int32_t)mem_read32(mem, key_p);
+    if (xpos < 0 || xpos > len)
+        xpos = len;
+    /* the character before xpos starts at prev */
+    int prev = 0;
+    for (int i = 0, l; i < xpos && (l = text_char_len(s + i)); i += l)
+        prev = i;
     bool handled = true;
-
     switch (key) {
-    case KEY_CTRL_LEFT: if (xpos > 0) xpos--; break;
-    case KEY_CTRL_RIGHT: if (xpos < len) xpos++; break;
+    case KEY_CTRL_LEFT: xpos = xpos > 0 ? prev : 0; break;
+    case KEY_CTRL_RIGHT: if (xpos < len) xpos += text_char_len(s + xpos); break;
     case KEY_CTRL_DEL:
         if (xpos > 0) {
-            memmove(s + xpos - 1, s + xpos, (size_t)(len - xpos + 1));
-            xpos--;
+            memmove(s + prev, s + xpos, (size_t)(len - xpos + 1));
+            xpos = prev;
         }
         break;
     case KEY_CTRL_AC: s[0] = '\0'; xpos = 0; break;
     default: handled = false;
     }
-    if (xpos > len)
-        xpos = len;
+    len = (int)strlen(s);
     for (int i = 0; i <= len; i++)
-        mem_write8(mem, a[0] + (uint32_t)i, (uint8_t)s[i]);
-    mem_write32(mem, a[3], (uint32_t)xpos);
-    if (a[2])
-        mem_write32(mem, a[2], 0); /* lines are short: always show from the start */
+        mem_write8(mem, str + (uint32_t)i, (uint8_t)s[i]);
+    mem_write32(mem, xpos_p, (uint32_t)xpos);
+    if (start_p) {
+        int start = (int32_t)mem_read32(mem, start_p);
+        if (start < 0 || start > xpos)
+            start = xpos;
+        if (cells < 1)
+            cells = 1;
+        /* the cursor needs a cell of its own after the text before it */
+        for (;;) {
+            int n = 0;
+            for (int i = start, l; i < xpos && (l = text_char_len(s + i)); i += l)
+                n++;
+            if (n < cells || start >= xpos)
+                break;
+            start += text_char_len(s + start);
+        }
+        mem_write32(mem, start_p, (uint32_t)start);
+    }
     if (handled)
-        mem_write32(mem, a[4], 0);
+        mem_write32(mem, key_p, 0);
+}
+
+/* Cells from homescreen column x (1-21) to the end of the line. */
+static int cells_from(int32_t x)
+{
+    return x >= 1 && x <= 21 ? 22 - x : 21;
+}
+
+/* EditMBStringCtrl(string, posmax, int *start, int *xpos, int *key, x, y) */
+SC(sc_edit_mbstring_ctrl)
+{
+    edit_ctrl(emu, a[0], a[2], a[3], a[4], cells_from((int32_t)a[5]));
+    return 0;
+}
+
+/* EditMBStringCtrl2(string, xposmax, int *start, int *xpos, int *key, x, y,
+ * enable_pos_to_clear, pos_to_clear); Ctrl3 and Ctrl4 take more parameters
+ * of unknown meaning after the same ones (libfxcg's prototypes), and are
+ * handled the same way. */
+SC(sc_edit_mbstring_ctrl2)
+{
+    int cells = a[7] && (int32_t)a[8] > 0 ? (int32_t)a[8] : cells_from((int32_t)a[5]);
+    edit_ctrl(emu, a[0], a[2], a[3], a[4], cells);
     return 0;
 }
 

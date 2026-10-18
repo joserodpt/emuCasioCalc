@@ -1,15 +1,15 @@
 # TODO
 
 What emuCasioFxCG still lacks. The syscall list is measured against
-[libfxcg](https://github.com/Jonimoose/libfxcg)'s stubs: 162 of its 273 syscalls
-are implemented, 111 are left. Add-ins only use a small part of them, so the
+[libfxcg](https://github.com/Jonimoose/libfxcg)'s stubs: 177 of its 273 syscalls
+are implemented, 96 are left. Add-ins only use a small part of them, so the
 groups are ordered by how likely real add-ins are to need them.
 
 Approach that has worked so far: run an add-in, implement what it stops at,
 check it on screen. For calls no add-in at hand uses, write a test app in
 `~/VSCode/casioPrizmApps` (see `apps/os-syscalls`, which tests the system-info
 and dialog calls; also `draw-syscalls`, `key-modifiers`, `status-bar`,
-`file-syscalls`, `time-keys` and `language`). Semantics come from WikiPrizm (prizm.cemetech.net),
+`file-syscalls`, `time-keys`, `language` and `text-syscalls`). Semantics come from WikiPrizm (prizm.cemetech.net),
 libfxcg's headers, and the add-in's source when it has one.
 
 ## Syscalls, likely to be needed
@@ -25,14 +25,21 @@ ones; `Bdisp_AreaClr` and `Bdisp_WriteGraph*` take VRAM coordinates (no
 status bar offset).
 
 ### Text and fonts
-`Bdisp_MMPrint` (0D09), `Bdisp_MMPrintRef` (0D08), `PrintGlyph` (0238),
-`PrintLine2` (1865), `DisplayMBString` (121D), `EditMBStringCtrl` (120E),
-`EditMBStringCtrl3` (120B), `EditMBStringCtrl4` (120C), `ProcessPrintChars`
-(1300), `CharacterSelectDialog` (07A2), `DispInt` (0259), `MB_IsLead` (1161), `MB_ElementCount` (1163), `EnableGB18030` /
-`DisableGB18030` (01E0, 01DF).
+Done (test app `apps/text-syscalls`). Text is drawn with open fonts of the
+OS's sizes (Spleen 12x24 in PrintXY's 18x24 cells, 8x16 proportional for
+PrintMini and MMPrint, 5x8 for PrintMiniMini, Unifont for symbols), not
+Casio's, which differ in shape. Strings stay in the OS character set:
+2-byte characters count and edit as one.
 
-Also: the OS fonts are approximated by an 8x8 font (PrintXY 18x24, PrintMini,
-PrintMiniMini); multi-byte characters show as `?`; bold is not drawn.
+Guessed or partial: only the symbols whose codes are known (the GetKey
+character codes: pi, theta, r, square root, squared, ->, <=, ...) are
+drawn; other Casio characters draw as U+FFFD (Casio's character table
+isn't documented); Chinese (GB 18030) is decoded but drawn as empty boxes
+(no CJK font embedded); `PrintGlyph` and `PrintMiniGlyph` only understand
+`GetMiniGlyphPtr`'s pointers (add-ins' own glyphs leave a blank cell);
+`EditMBStringCtrl3` / `4` act like `Ctrl2`; `DispInt` does nothing;
+`CharacterSelectDialog` offers the known symbols and ASCII punctuation in
+one page.
 
 ### Language
 Done (test app `apps/language`): Language menu / `--language`,
@@ -156,7 +163,8 @@ Casio's own apps are not emulated: `APP_RUNMAT` (1A03), `APP_Program` (1945),
   fx-CG10/20 clock (58.98 MHz) is from memory, not measured.
 - **Model detection** is a guess (build date, then memory addresses);
   Emulation > Model overrides it.
-- **Fonts**: real Casio fonts instead of the 8x8 approximation.
+- **Fonts**: Casio's character table (codes above 0x80 and the 2-byte
+  characters) and a CJK font for Chinese text.
 - **Main menu**: there is no OS main menu to show. In OS add-ins GetKey
   drops MENU (unless the add-in turned the return to the menu off); gint
   add-ins' `gint_osmenu()` returns at once.

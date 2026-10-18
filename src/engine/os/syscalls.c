@@ -16,6 +16,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "display.h"
 #include "syscalls_impl.h"
 
 typedef uint32_t (*SyscallFn)(Emu *emu, const uint32_t *args);
@@ -432,13 +433,17 @@ static const Syscall SYSCALLS[] = {
     {0x0129, "Set_FKeys2", sc_nothing},
     {0x012B, "Set_FKeys1", sc_nothing},
     {0x0131, "FKey_Display", sc_fkey_display},
+    {0x01DF, "DisableGB18030", sc_disable_gb18030},
+    {0x01E0, "EnableGB18030", sc_enable_gb18030},
     {0x01E6, "GetVRAMAddress", sc_get_vram_address},
     {0x01E9, "GetMiniGlyphPtr", sc_get_mini_glyph_ptr},
     {0x01F9, "Print_OS", sc_print_os},
     {0x021B, "PrintMiniMini", sc_print_mini_mini},
+    {0x0238, "PrintGlyph", sc_print_glyph},
     {0x0239, "PrintCXY", sc_print_cxy},
     {0x023B, "PrintMiniGlyph", sc_print_mini_glyph},
     {0x023C, "PrintMini", sc_print_mini},
+    {0x0259, "DispInt", sc_nothing},   /* function unknown */
     {0x025F, "Bdisp_PutDisp_DD", sc_bdisp_putdisp_dd},
     {0x0260, "Bdisp_PutDisp_DD_stripe", sc_putdisp_stripe},
     {0x0262, "Bdisp_SetPointWB_VRAM", sc_bdisp_setpoint_vram},
@@ -463,6 +468,7 @@ static const Syscall SYSCALLS[] = {
     {0x02C1, "RTC_GetTicks", sc_rtc_get_ticks},
     {0x02C2, "RTC_Elapsed_ms", sc_rtc_elapsed_ms},
     {0x02C7, "HourGlass", sc_nothing},       /* status bar busy icon: no status bar */
+    {0x07A2, "CharacterSelectDialog", sc_character_select},
     {0x08C7, "Cursor_SetFlashOn", sc_nothing}, /* we don't draw the text cursor */
     {0x08C8, "Cursor_SetFlashOff", sc_nothing},
     {0x08CA, "Keyboard_CursorFlash", sc_nothing}, /* function unknown; no text cursor drawn */
@@ -475,17 +481,25 @@ static const Syscall SYSCALLS[] = {
     {0x0924, "Bdisp_Rectangle", sc_rectangle},
     {0x0925, "Bdisp_FilledRectangle", sc_filled_rectangle},
     {0x0926, "Bdisp_FilledRectangleFullColor", sc_filled_rectangle_full},
+    {0x0D08, "Bdisp_MMPrintRef", sc_mmprint_ref},
+    {0x0D09, "Bdisp_MMPrint", sc_mmprint},
     {0x0D39, "PRGM_GetKey_OS", sc_prgm_get_key_os},
     {0x0EA0, "Bkey_GetAllFlags", sc_bkey_get_all_flags},
     {0x0EA1, "Bkey_SetAllFlags", sc_bkey_set_all_flags},
     {0x0EAB, "GetKey", sc_get_key},
+    {0x1161, "MB_IsLead", sc_mb_is_lead},
+    {0x1163, "MB_ElementCount", sc_mb_element_count},
     {0x1170, "itoa", sc_itoa},
     {0x1186, "GetMainBatteryVoltage", sc_battery_voltage},
     {0x11D6, "CMT_Delay_micros", sc_delay_micros},
     {0x11D7, "CMT_Delay_100micros", sc_delay_100micros},
     {0x11DE, "RTC_SetDateTime", sc_rtc_set_date_time},
     {0x120A, "EditMBStringCtrl2", sc_edit_mbstring_ctrl2},
+    {0x120B, "EditMBStringCtrl3", sc_edit_mbstring_ctrl2},
+    {0x120C, "EditMBStringCtrl4", sc_edit_mbstring_ctrl2},
+    {0x120E, "EditMBStringCtrl", sc_edit_mbstring_ctrl},
     {0x1218, "DisplayMBString2", sc_display_mbstring2},
+    {0x121D, "DisplayMBString", sc_display_mbstring},
     {0x1224, "EditMBStringChar", sc_edit_mbstring_char},
     {0x12BF, "GetKeyWait_OS", sc_get_key_wait_os},
     {0x12C6, "Keyboard_PutKeycode", sc_put_keycode},
@@ -497,6 +511,7 @@ static const Syscall SYSCALLS[] = {
     {0x12D9, "GetBacklightDuration", sc_get_backlight},
     {0x12F3, "GetFKeyPtr", sc_get_fkey_ptr},
     {0x12FC, "LocalizeMessage1", sc_localize_message1},
+    {0x1300, "ProcessPrintChars", sc_process_print_chars},
     {0x1343, "HexToNibble", sc_hex_to_nibble},
     {0x1344, "HexToByte", sc_hex_to_byte},
     {0x1345, "HexToWord", sc_hex_to_word},
@@ -523,6 +538,7 @@ static const Syscall SYSCALLS[] = {
     {0x1839, "PowerOff", sc_nothing},         /* off and on again at once */
     {0x1841, "LongToAscHex", sc_long_to_asc_hex},
     {0x1863, "locate_OS", sc_locate},
+    {0x1865, "PrintLine2", sc_print_line2},
     {0x1883, "PrintLine", sc_print_line},
     {0x18EC, "PrintXY_2", sc_print_xy_2},
     {0x18F9, "PrintXY", sc_print_xy},
@@ -631,6 +647,7 @@ static void dispatch(Cpu *cpu, void *user)
 
 void syscalls_install(Emu *emu)
 {
+    display_set_gb18030(false); /* the default Latin character set */
     emu->cpu.syscall = dispatch;
     emu->cpu.syscall_user = emu;
 }

@@ -177,12 +177,7 @@ SC(sc_define_status_area_flags)
 /* DefineStatusMessage(msg, P2, colour, P4): P2 and P4 unknown. */
 SC(sc_define_status_message)
 {
-    char raw[sizeof emu->status_msg];
-    sc_string(emu, a[0], raw, sizeof raw);
-    size_t n = 0;
-    for (const unsigned char *s = (const unsigned char *)raw; *s && n + 1 < sizeof raw; s++)
-        emu->status_msg[n++] = *s >= 0x20 && *s < 0x7F ? (char)*s : '?';
-    emu->status_msg[n] = '\0';
+    sc_string(emu, a[0], emu->status_msg, sizeof emu->status_msg);
     emu->status_msg_color = (uint8_t)(a[2] & 0xFF);
     platform_set_os_status(emu->status_msg);
     return 0;
