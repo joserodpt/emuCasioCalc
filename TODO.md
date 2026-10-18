@@ -135,14 +135,11 @@ does nothing.
 
 ## Syscalls, unlikely
 
-### Link cable and USB
+### Link cable
 Serial: `Serial_Close` (1BB8), `Serial_ReadSingle` (1BB9), `Serial_Peek`
 (1BBB), `Serial_WriteSingle` (1BBC), `Serial_WriteUnbuffered` (1BBD),
 `Serial_ClearRX` / `ClearTX` (1BC1, 1BC2); the implemented ones behave as if
-nothing is plugged in. USB: `USB_Open` / `Close` / `IsOpen` (134E, 1350,
-1ED9), `USB_Read` / `ReadSingle` / `Write` / `WriteSingle` / `Peek` (1EDE,
-1EDD, 1EDB, 1EDA, 1EDF), `USB_PollRX` / `PollTX` (1EE0, 1EE1), `USB_ClearRX` /
-`ClearTX` (1EE2, 1EE3). Protocol: `Comm_Open` / `Close` / `Terminate` /
+nothing is plugged in. USB syscalls: not planned (see below). Protocol: `Comm_Open` / `Close` / `Terminate` /
 `TryCheckPacket` (1353, 1354, 13F1, 1396), `App_LINK_*` (1397-1399, 13A6,
 13A7, 1409, 140A), `APP_LINK_transmit_select_dialog` (1384).
 
@@ -162,9 +159,8 @@ Casio's own apps are not emulated: `APP_RUNMAT` (1A03), `APP_Program` (1945),
 
 ## Beyond syscalls
 
-- **gint add-ins**: USB (fxlink), the SPU (sound), DSP arithmetic
-  instructions, the FPU-less soft-float paths are fine; overclocking tools
-  that reprogram the CPG mostly work but are untested.
+- **gint add-ins**: the SPU (sound); overclocking tools that reprogram the
+  CPG mostly work but are untested.
 - **Timing**: syscall, uncached-memory and DMA costs are estimates; the
   fx-CG10/20 clock (58.98 MHz) is from memory, not measured.
 - **Model detection** is a guess (build date, then memory addresses);
@@ -174,3 +170,16 @@ Casio's own apps are not emulated: `APP_RUNMAT` (1A03), `APP_Program` (1945),
 - **Main menu**: there is no OS main menu to show. In OS add-ins GetKey
   drops MENU (unless the add-in turned the return to the menu off); gint
   add-ins' `gint_osmenu()` returns at once.
+
+## Not planned
+
+- **FPU**: the SH7305 has none; add-ins are built with soft-float
+  (`-m4a-nofpu`), so there is nothing to emulate.
+- **DSP arithmetic instructions** (`MOVX`/`MOVY`/`MOVS`, the parallel
+  `P*` instructions, DSR): gcc never emits them and gint only uses the
+  repeat loops, which are done. The `0xFxxx` opcodes stay illegal.
+- **USB**: neither the controller (gint's fxlink) nor the OS syscalls
+  `USB_Open` / `Close` / `IsOpen` (134E, 1350, 1ED9), `USB_Read` /
+  `ReadSingle` / `Write` / `WriteSingle` / `Peek` (1EDE, 1EDD, 1EDB, 1EDA,
+  1EDF), `USB_PollRX` / `PollTX` (1EE0, 1EE1), `USB_ClearRX` / `ClearTX`
+  (1EE2, 1EE3).

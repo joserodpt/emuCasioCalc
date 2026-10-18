@@ -156,7 +156,7 @@ CTest runs them all (`ctest`, 20 tests).
 |---|---|
 | `src/main.c` | Command line, main loop (runs the add-in, handles Open/Reset/Quit) |
 | **`src/engine/`** | **The emulated machine** |
-| `cpu.c` | SH4AL-DSP integer interpreter: privileged mode, register banks, exceptions and interrupts through VBR, SLEEP, DSP repeat loops (no DSP arithmetic, no FPU) |
+| `cpu.c` | SH4AL-DSP integer interpreter: privileged mode, register banks, exceptions and interrupts through VBR, SLEEP, DSP repeat loops (DSP arithmetic not planned; the chip has no FPU) |
 | `mem.c` | 4 kB page table over the 32-bit address space, MMIO devices, faults |
 | `sh7305.c` | On-chip peripherals: INTC, TMU/ETMU, RTC, DMA, KEYSC, CPG, MMU registers, UTLB arrays |
 | `r61524.c` | Display controller (396x224 panel) |
@@ -274,14 +274,16 @@ gint sources (`include/gint/mpu/*.h`, `src/*/`) document each register.
 
 Next steps:
 1. **More HLE syscalls** (see `TODO.md`): what is left is mostly the link
-   cable, USB, Casio's built-in apps and undocumented calls.
+   cable, Casio's built-in apps and undocumented calls.
 2. **Text**: lowercase alpha, Casio's character table, a CJK font.
-3. **USB** (fxlink), the SPU, and overclocking tools if add-ins need them.
+3. **The SPU** (sound) and overclocking tools if add-ins need them.
 
 ### Known limits
 
 - MENU in a gint add-in returns to the add-in at once (there is no OS menu).
-- No DSP arithmetic instructions, FPU, USB or sound.
+- No sound.
+- Not planned: DSP arithmetic instructions, USB, and an FPU (the SH7305 has
+  none; add-ins use soft-float).
 - Built-in apps (Run-Matrix, Graph...) are part of the OS and can't run here.
 
 ## Legal
