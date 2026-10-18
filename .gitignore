@@ -1,0 +1,9 @@
+build/
+build-*/
+tests/*/build-cg/
+storage/
+*.bmp
+*.g3a
+!tests/*.g3a
+.DS_Store
+._*

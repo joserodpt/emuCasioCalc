@@ -1,0 +1,3 @@
+sprite.png:
+  type: bopti-image
+  name: img_sprite
