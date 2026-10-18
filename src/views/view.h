@@ -11,7 +11,8 @@
 extern SDL_Window *view_window;
 extern SDL_Renderer *view_renderer;
 extern bool view_headless;
-extern int view_text_scale;     /* menu text size: 2x in wide windows, else 1x */
+extern int view_text_scale;     /* UI text size, see TEXT_SCALE */
+extern float view_ui_scale;     /* the desktop's scaling (2 at 200%), from SDL */
 extern SDL_FRect view_screen;   /* where the calculator screen is drawn, in window pixels */
 extern Command view_pending;    /* command waiting for the main loop */
 extern bool view_paused;
@@ -43,18 +44,20 @@ int view_zoom(void);
 /* Shows text on the right of the menu bar for a few seconds. */
 void view_flash_status(const char *msg);
 
-/* Menu text is SDL's 8x8 debug font drawn at 2x, or 1x in narrow windows
- * (the bar doesn't fit at 2x below 600 px). Sizes in window pixels. */
+/* UI sizes, in window pixels. TEXT_SCALE k: text 8k pixels high (8 px
+ * units, from the 8x8 font the UI once used), chosen from the desktop's
+ * scaling and the window's width (window.c); UI(n): n pixels at 100%. */
 #define TEXT_SCALE view_text_scale
+#define UI(n)      ((int)((n) * view_ui_scale + 0.5f))
 #define CHAR_W     (8 * TEXT_SCALE)
 #define GLYPH_H    (8 * TEXT_SCALE)
-#define MENU_H     (GLYPH_H + 16)       /* the menu row */
-#define TOOL_H     (GLYPH_H + 14)       /* the speed row under it, when shown */
+#define MENU_H     (GLYPH_H + UI(16))   /* the menu row */
+#define TOOL_H     (GLYPH_H + UI(14))   /* the speed row under it, when shown */
 #define STATUS_Y   (MENU_H + (view_show_speed ? TOOL_H : 0)) /* the status row, last */
-#define STATUS_H   (GLYPH_H + 14)
+#define STATUS_H   (GLYPH_H + UI(14))
 #define BAR_H      (STATUS_Y + STATUS_H) /* everything above the screen */
-#define ITEM_H     (GLYPH_H + 18)
-#define PAD        (6 + 4 * TEXT_SCALE)
+#define ITEM_H     (GLYPH_H + UI(18))
+#define PAD        (UI(6) + 4 * TEXT_SCALE)
 
 /* The PC key for KEYS[key] ("Enter", "Esc"...), and a short label for the
  * calculator key ("EXE", "AC/ON", "x10^x"...). */

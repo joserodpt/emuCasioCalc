@@ -41,6 +41,8 @@ static void usage(const char *argv0)
             "  --battery B        battery: full (default), half, low, empty, or volts (4.6)\n"
             "  --font F           font of the OS text: classic (default), spleen or unifont\n"
             "  --keyboard         show the on-screen keyboard (View > Keyboard)\n"
+            "  --ui-scale S       size of the menus and texts: 1, 1.5, 2... (default: the\n"
+            "                     desktop's scaling)\n"
             "  --language L       the calculator's message language: en (default), es, de,\n"
             "                     fr, pt or zh\n",
             argv0);
@@ -250,6 +252,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--language") && i + 1 < argc) language = argv[++i];
         else if (!strcmp(argv[i], "--font") && i + 1 < argc) font = argv[++i];
         else if (!strcmp(argv[i], "--keyboard")) keyboard = true;
+        else if (!strcmp(argv[i], "--ui-scale") && i + 1 < argc) platform_set_ui_scale((float)atof(argv[++i]));
         else if (argv[i][0] != '-' && !path) path = argv[i];
         else { usage(argv[0]); return 2; }
     }

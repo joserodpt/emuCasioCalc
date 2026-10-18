@@ -16,6 +16,8 @@ SDL_Window *view_window;
 SDL_Renderer *view_renderer;
 bool view_headless;
 int view_text_scale = 1;
+float view_ui_scale = 1;
+static float ui_scale_forced; /* --ui-scale, 0 = the desktop's */
 SDL_FRect view_screen;
 Command view_pending;
 bool view_paused;
@@ -67,9 +69,25 @@ static const struct { const char *name; SDL_Keycode sdl; } KEYMAP[] = {
 
 
 
+/* UI text: 1.5x the desktop's scaling in windows at least WIDE_TEXT_W
+ * logical pixels wide, 1x in narrower ones (100%: 2 or 1; 200%: 3 or 2). */
 static int text_scale_for(int width)
 {
-    return width >= WIDE_TEXT_W ? 2 : 1;
+    float k = view_ui_scale * (width >= WIDE_TEXT_W * view_ui_scale ? 1.5f : 1.0f);
+    int ts = (int)(k + 0.5f);
+    return ts < 1 ? 1 : ts;
+}
+
+/* The desktop's scaling for the window (or the main display before it
+ * exists): 1 at 100%, 2 at 200%. */
+static void read_ui_scale(void)
+{
+    if (ui_scale_forced > 0) {
+        view_ui_scale = ui_scale_forced;
+        return;
+    }
+    float s = view_window ? SDL_GetWindowDisplayScale(view_window) : SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+    view_ui_scale = s >= 1 && s <= 4 ? s : 1;
 }
 
 /* Fits the screen under the menu bar, keeping its shape, centred. */
@@ -183,8 +201,10 @@ void view_redraw(void)
 void view_set_scale(int scale)
 {
     int w = PANEL_WIDTH * scale + keypad_width(PANEL_HEIGHT * scale);
-    int ts = text_scale_for(w);
-    int bar = (8 * ts + 16) + (view_show_speed ? 8 * ts + 14 : 0) + (8 * ts + 14); /* BAR_H at that width */
+    int before = view_text_scale;
+    view_text_scale = text_scale_for(w);
+    int bar = BAR_H; /* at that width */
+    view_text_scale = before;
     SDL_SetWindowSize(view_window, w, bar + PANEL_HEIGHT * scale);
     SDL_SyncWindow(view_window);
     update_layout();
@@ -216,6 +236,11 @@ int platform_font(void)
 void platform_set_font(int style)
 {
     view_font = style;
+}
+
+void platform_set_ui_scale(float scale)
+{
+    ui_scale_forced = scale;
 }
 
 void platform_set_keyboard(bool show)
@@ -337,6 +362,11 @@ static int handle_event(const SDL_Event *e)
             return k;
         }
         break;
+    case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED: /* another monitor, or the desktop's scaling changed */
+        read_ui_scale();
+        update_layout();
+        view_redraw();
+        break;
     case SDL_EVENT_WINDOW_RESIZED:
     case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
         update_layout();
@@ -420,6 +450,7 @@ bool platform_init(int scale, bool headless)
     }
     if (headless)
         return true;
+    read_ui_scale();
     int w = PANEL_WIDTH * scale + keypad_width(PANEL_HEIGHT * scale);
     view_text_scale = text_scale_for(w);
     if (!SDL_CreateWindowAndRenderer("emuCasioFxCG", w, BAR_H + PANEL_HEIGHT * scale, SDL_WINDOW_RESIZABLE,

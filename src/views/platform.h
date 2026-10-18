@@ -72,6 +72,10 @@ void platform_set_battery(int centivolts);
 /* View > Font: FONT_STYLE_* (display.h) for the OS text. */
 int platform_font(void);
 void platform_set_font(int style);
+/* The UI's scaling (--ui-scale): 2 for a desktop at 200%; by default the
+ * desktop's, as SDL reports it. */
+void platform_set_ui_scale(float scale);
+
 /* Shows the on-screen keyboard from the start (--keyboard). */
 void platform_set_keyboard(bool show);
 

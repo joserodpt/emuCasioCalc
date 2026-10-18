@@ -143,7 +143,14 @@ float view_text_w_px(const char *s, float px)
 
 void view_text_px(SDL_Renderer *r, float x, float cy, const char *s, float size)
 {
-    int px = size_px(size);
+    /* Under a render scale (the info window at 200%), the glyphs are baked
+     * at the size they'll show on screen and drawn back in its units, so
+     * they stay sharp. */
+    float rs = 1, rs_y = 1;
+    SDL_GetRenderScale(r, &rs, &rs_y);
+    if (rs <= 0)
+        rs = 1;
+    int px = size_px(size * rs);
     Atlas *a = atlas_for(r, px);
     if (!a) { /* fallback: SDL's 8x8 debug font */
         SDL_RenderDebugText(r, x, cy - 4, s);
@@ -154,12 +161,12 @@ void view_text_px(SDL_Renderer *r, float x, float cy, const char *s, float size)
     SDL_SetTextureColorMod(a->tex, cr, cg, cb);
     SDL_SetTextureAlphaMod(a->tex, ca);
     float scale = stbtt_ScaleForPixelHeight(&font, (float)px);
-    float bx = roundf(x), by = roundf(cy + cap_per_px * (float)px / 2); /* baseline */
+    float bx = roundf(x * rs), by = roundf(cy * rs + cap_per_px * (float)px / 2); /* baseline, screen pixels */
     for (const unsigned char *c = (const unsigned char *)s; *c; c++) {
         stbtt_aligned_quad q;
         stbtt_GetPackedQuad(a->chars, ATLAS, ATLAS, glyph_index(*c), &bx, &by, &q, 0);
         SDL_FRect src = {q.s0 * ATLAS, q.t0 * ATLAS, (q.s1 - q.s0) * ATLAS, (q.t1 - q.t0) * ATLAS};
-        SDL_FRect dst = {q.x0, q.y0, q.x1 - q.x0, q.y1 - q.y0};
+        SDL_FRect dst = {q.x0 / rs, q.y0 / rs, (q.x1 - q.x0) / rs, (q.y1 - q.y0) / rs};
         SDL_RenderTexture(r, a->tex, &src, &dst);
         if (c[1])
             bx += (float)stbtt_GetCodepointKernAdvance(&font, c[0], c[1]) * scale;

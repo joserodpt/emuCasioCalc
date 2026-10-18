@@ -92,6 +92,11 @@ at first): the fx-CG50's keys right of the screen, with each key's SHIFT functio
 keys light up while pressed, from the mouse, the PC keyboard or `--keys`.
 `--window-shot F` saves the whole window (with the keyboard) as a .bmp.
 
+**Display scaling**: the menus, status row and Add-in info window follow
+the desktop's scaling (200% on a 4K screen gives twice the size), as SDL
+reports it; `--ui-scale 2` sets it by hand. The calculator screen keeps
+whole-pixel zoom levels (View > Zoom).
+
 **Font** (View > Font, or `--font`): the OS text (PrintXY, PrintMini...) is
 drawn with Classic (the default: an 8x8 font scaled to the OS's sizes),
 Spleen (bitmap fonts of the OS's sizes) or Unifont. Casio's own fonts are

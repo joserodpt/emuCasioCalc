@@ -16,6 +16,7 @@
 #define ROW         26
 
 static SDL_Window *win;
+static float scale = 1; /* the desktop's scaling: the layout below is at 100% */
 static SDL_Renderer *ren;
 static SDL_Texture *icons[2]; /* unselected, selected */
 static bool hover;            /* mouse over the icon: show the selected one */
@@ -197,10 +198,13 @@ void info_window_open(void)
     if (view_headless)
         return;
     if (!win) {
-        if (!SDL_CreateWindowAndRenderer("Add-in information", INFO_W, window_height(), 0, &win, &ren)) {
+        scale = view_ui_scale;
+        if (!SDL_CreateWindowAndRenderer("Add-in information", (int)(INFO_W * scale), (int)(window_height() * scale), 0,
+                                         &win, &ren)) {
             fprintf(stderr, "info window: %s\n", SDL_GetError());
             return;
         }
+        SDL_SetRenderScale(ren, scale, scale);
         icons[0] = icon_texture(view_app.icon);
         icons[1] = icon_texture(view_app.icon_sel);
         if (view_have_app && view_app.has_icon) {
@@ -249,7 +253,7 @@ bool info_window_event(const SDL_Event *e)
     case SDL_EVENT_MOUSE_MOTION:
         if (e->motion.windowID != id)
             return false;
-        if (over_icon(e->motion.x, e->motion.y) != hover) {
+        if (over_icon(e->motion.x / scale, e->motion.y / scale) != hover) {
             hover = !hover;
             redraw();
         }
