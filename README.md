@@ -28,13 +28,21 @@ ctest --test-dir build --output-on-failure
 ./build/emucasiofxcg --trace-hw some-addin.g3a  # log exceptions, DMA, unmodelled I/O
 ./build/emucasiofxcg --headless --keys EXE,EXIT --screenshot out.bmp some-addin.g3a
 ./build/emucasiofxcg --icon icon.bmp some-addin.g3a     # also save the add-in's menu icon
+./build/emucasiofxcg --info some-addin.g3a              # open the add-in info window at start
 
-./run.sh some-addin.g3a   # rebuilds if the sources changed, then runs (quote paths with spaces)
+./run.sh                  # rebuilds if the sources changed, opens an empty window (File > Open)
+./run.sh some-addin.g3a   # same, starting that add-in (quote paths with spaces)
 ```
 
-The window shows the add-in's name and uses its menu icon as the window
-icon. Saved data (main memory, `MCS*` syscalls) goes to a `storage` folder in
-the directory you run the emulator from.
+The window has a menu bar: **File** (open another add-in, add-in info, save a
+screenshot or the add-in's icon), **Emulation** (pause, reset), **View**
+(zoom 1x-4x) and **Help**, plus an **Info** button that opens a window with the
+add-in's name, header fields and icon (hover the icon to see its selected
+version). Shortcuts: Ctrl+O, Ctrl+I, Ctrl+S, Ctrl+P, Ctrl+R, Ctrl+1..4, Ctrl+Q.
+When the add-in exits, the window stays open so you can reset or open another.
+
+Saved data (main memory, `MCS*` syscalls) goes to a `storage` folder in the
+directory you run the emulator from.
 
 Keyboard: arrows, Enter = EXE, Esc = EXIT, Backspace = DEL, Delete = AC,
 Home = MENU, Tab = SHIFT, F1–F6, digits, `. + - * / ( )`.
@@ -53,21 +61,29 @@ GiteaPC puts it), the CMake build compiles them and CTest runs them.
 
 ## Layout
 
-| File | What it does |
+| Folder / file | What it does |
 |---|---|
-| `src/cpu.c` | SH4AL-DSP integer interpreter: privileged mode, register banks, exceptions and interrupts through VBR, SLEEP, DSP repeat loops (no DSP arithmetic, no FPU) |
-| `src/mem.c` | 4 kB page table over the 32-bit address space, MMIO devices, faults |
-| `src/sh7305.c` | On-chip peripherals: INTC, TMU/ETMU, RTC, DMA, KEYSC, CPG, MMU registers, UTLB arrays |
-| `src/r61524.c` | Display controller (396x224 panel) |
-| `src/emu.c` | Builds the machine (memory map, devices), key script |
-| `src/g3a.c` | Loads the code after the 0x7000-byte header into ROM, maps it at `0x00300000` |
-| `src/syscalls.c` | OS syscall table (HLE) and system calls |
-| `src/syscalls_text.c` | HLE drawing and text: PrintXY/PrintMini/PrintCXY, message boxes |
-| `src/syscalls_keys.c` | HLE keyboard: GetKey, GetKeyWait_OS, PRGM_GetKey_OS, line editing |
-| `src/syscalls_mcs.c` | HLE main memory (MCS) items, stored as files in `./storage` |
-| `src/display.c` | VRAM drawing for the HLE syscalls (fill, pixels, PrintXY text) |
-| `src/keys.c` | Calculator keys: names, GetKey codes, key matrix positions |
-| `src/platform_sdl.c` | Window, keyboard, timer, font (SDL3) |
+| `src/main.c` | Command line, main loop (runs the add-in, handles Open/Reset/Quit) |
+| **`src/engine/`** | **The emulated machine** |
+| `cpu.c` | SH4AL-DSP integer interpreter: privileged mode, register banks, exceptions and interrupts through VBR, SLEEP, DSP repeat loops (no DSP arithmetic, no FPU) |
+| `mem.c` | 4 kB page table over the 32-bit address space, MMIO devices, faults |
+| `sh7305.c` | On-chip peripherals: INTC, TMU/ETMU, RTC, DMA, KEYSC, CPG, MMU registers, UTLB arrays |
+| `r61524.c` | Display controller (396x224 panel) |
+| `emu.c` | Builds the machine (memory map, devices), key script |
+| **`src/engine/os/`** | **High-level emulation of the Casio OS** |
+| `syscalls.c` | Syscall table and system calls (memory, time, settings) |
+| `syscalls_text.c` | Drawing and text: PrintXY/PrintMini/PrintCXY, message boxes |
+| `syscalls_keys.c` | Keyboard: GetKey, GetKeyWait_OS, PRGM_GetKey_OS, line editing |
+| `syscalls_mcs.c` | Main memory (MCS) items, stored as files in `./storage` |
+| `display.c` | VRAM drawing used by the syscalls |
+| **`src/views/`** | **Windows (SDL3)** |
+| `window.c` | Main window, keyboard, the `platform.h` interface |
+| `menubar.c` | Menu bar: menus, Info button, shortcuts, actions |
+| `info_window.c` | Add-in information window |
+| `app_icon.c`, `font.c` | The emulator's icon (drawn in code), the 8x8 font |
+| **`src/utils/`** | **Helpers** |
+| `g3a.c` | Reads a .g3a: header (name, icons...) and code, mapped at `0x00300000` |
+| `keys.c` | Calculator keys: names, GetKey codes, key matrix positions |
 | `tests/test_cpu.c` | CPU tests (division, delay slots, carries, shifts, repeat loops, TRAPA/RTE/banks) |
 | `tests/gint-*` | gint add-ins used as integration tests |
 | `tools/make_hello_g3a.py` | Hand-assembles the `hello.g3a` smoke test (HLE) |

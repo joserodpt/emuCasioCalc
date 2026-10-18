@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "display.h"
 #include "emu.h"
 #include "g3a.h"
 #include "keys.h"
@@ -21,15 +22,36 @@ typedef struct {
 static void usage(const char *argv0)
 {
     fprintf(stderr,
-            "usage: %s [options] addin.g3a\n"
+            "usage: %s [options] [addin.g3a]\n"
+            "  (without an add-in, the window opens empty: use File > Open)\n"
             "  --scale N          window scale (default 2)\n"
             "  --trace            log every syscall\n"
             "  --trace-hw         log exceptions, DMA transfers and unmodelled I/O registers\n"
             "  --keys K1,K2,...   keys to press first (EXE, EXIT, UP, F1, 0-9...)\n"
             "  --headless         no window; input only comes from --keys\n"
             "  --screenshot F     save the last frame to F (.bmp) on exit\n"
-            "  --icon F           save the add-in's menu icon to F (.bmp)\n",
+            "  --icon F           save the add-in's menu icon to F (.bmp)\n"
+            "  --info             open the add-in information window at start\n",
             argv0);
+}
+
+/* What the screen shows before an add-in is loaded. */
+static void show_welcome(void)
+{
+    static uint8_t vram[VRAM_SIZE];
+    static R61524 lcd;
+    display_fill(vram, 0xFFFF);
+    display_rect(vram, 0, 0, LCD_WIDTH - 1, STATUS_HEIGHT - 1, 0x2A69);
+    display_text_mini(vram, 8, 3, "emuCasioFxCG", 0xFFFF, 0x2A69, true, LCD_WIDTH, true);
+    display_text_big(vram, 4 * BIG_CELL_W, 3 * BIG_CELL_H, "No add-in", 0x0000, 0xFFFF, true);
+    display_text_mini(vram, 4 * BIG_CELL_W, 5 * BIG_CELL_H, "File > Open (Ctrl+O)", 0x0000, 0xFFFF, true,
+                      LCD_WIDTH, true);
+    display_text_mini(vram, 4 * BIG_CELL_W, 5 * BIG_CELL_H + MINI_CELL_H + 4, "to load a .g3a", 0x0000, 0xFFFF,
+                      true, LCD_WIDTH, true);
+    r61524_reset(&lcd);
+    r61524_blit_vram(&lcd, vram);
+    platform_present(lcd.fb);
+    platform_status("No add-in");
 }
 
 /* (Re)builds the machine and loads the add-in, ready to run. */
@@ -106,6 +128,7 @@ int main(int argc, char **argv)
     int scale = 2;
     Options opt = {0};
     const char *path = NULL, *screenshot = NULL, *icon = NULL;
+    bool show_info = false;
     static Emu emu;
     static G3aInfo info;
 
@@ -117,23 +140,32 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--headless")) opt.headless = true;
         else if (!strcmp(argv[i], "--screenshot") && i + 1 < argc) screenshot = argv[++i];
         else if (!strcmp(argv[i], "--icon") && i + 1 < argc) icon = argv[++i];
+        else if (!strcmp(argv[i], "--info")) show_info = true;
         else if (argv[i][0] != '-' && !path) path = argv[i];
         else { usage(argv[0]); return 2; }
     }
-    if (!path) {
+    if (!path && opt.headless) {
         usage(argv[0]);
         return 2;
     }
     if (!platform_init(scale > 0 ? scale : 2, opt.headless))
         return 1;
-    if (!load(&emu, &opt, path, &info, true))
-        return 1;
-    if (icon && !platform_save_bmp(icon, info.icon, G3A_ICON_W, G3A_ICON_H))
-        return 1;
+    static char current[1024]; /* the add-in Reset reloads, "" if none yet */
+    bool loaded = false, first = true;
+    if (path) {
+        if (!load(&emu, &opt, path, &info, true))
+            return 1;
+        if (icon && !platform_save_bmp(icon, info.icon, G3A_ICON_W, G3A_ICON_H))
+            return 1;
+        snprintf(current, sizeof current, "%s", path);
+        loaded = true;
+        first = false;
+    } else {
+        show_welcome();
+    }
+    if (show_info)
+        platform_show_info();
 
-    static char current[1024];
-    snprintf(current, sizeof current, "%s", path);
-    bool loaded = true;
     int status = 0;
     for (;;) {
         if (loaded && !run(&emu, opt.headless)) {
@@ -158,7 +190,12 @@ int main(int argc, char **argv)
             break;
         if (cmd == CMD_OPEN)
             snprintf(current, sizeof current, "%s", platform_open_path());
-        loaded = load(&emu, &opt, current, &info, false);
+        if (!current[0]) { /* Reset with nothing loaded */
+            show_welcome();
+            continue;
+        }
+        loaded = load(&emu, &opt, current, &info, first);
+        first = false;
         if (!loaded)
             platform_status("Could not load that file");
     }

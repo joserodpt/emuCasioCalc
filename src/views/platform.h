@@ -32,6 +32,9 @@ bool platform_save_bmp(const char *path, const uint16_t *pixels, int w, int h);
  * shows its header and icons (File > Save icon saves the icon). */
 void platform_set_app(const G3aInfo *info, const char *path);
 
+/* Opens the Add-in information window (as the Info button does). */
+void platform_show_info(void);
+
 /* Text on the right of the menu bar until replaced (NULL clears it). */
 void platform_status(const char *text);
 

@@ -12,13 +12,26 @@ add_compile_options(-Wall -Wextra)
 find_package(SDL3 REQUIRED CONFIG)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
-# CPU + memory: no SDL, so the tests stay headless.
-add_library(emucore STATIC src/cpu.c src/mem.c src/sh7305.c src/r61524.c)
-target_include_directories(emucore PUBLIC src)
+# Source layout:
+#   src/engine     the emulated machine (CPU, memory, SH7305, display controller)
+#   src/engine/os  high-level emulation of the Casio OS (syscalls)
+#   src/views      SDL window, menu bar, add-in info window
+#   src/utils      g3a loader, calculator key table
+
+# The hardware core has no SDL, so the CPU tests stay headless.
+add_library(emucore STATIC
+  src/engine/cpu.c src/engine/mem.c src/engine/sh7305.c src/engine/r61524.c)
+target_include_directories(emucore PUBLIC src/engine)
 
 add_executable(emucasiofxcg
-  src/main.c src/emu.c src/g3a.c src/keys.c src/syscalls.c src/syscalls_text.c
-  src/syscalls_keys.c src/syscalls_mcs.c src/display.c src/platform_sdl.c src/app_icon.c)
+  src/main.c
+  src/engine/emu.c
+  src/engine/os/syscalls.c src/engine/os/syscalls_text.c src/engine/os/syscalls_keys.c
+  src/engine/os/syscalls_mcs.c src/engine/os/display.c
+  src/views/window.c src/views/menubar.c src/views/info_window.c src/views/font.c
+  src/views/app_icon.c
+  src/utils/g3a.c src/utils/keys.c)
+target_include_directories(emucasiofxcg PRIVATE src/engine/os src/views src/utils)
 target_link_libraries(emucasiofxcg PRIVATE emucore SDL3::SDL3 m)
 
 # Hand-assembled smoke-test add-in.

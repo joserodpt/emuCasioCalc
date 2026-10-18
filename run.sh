@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Rebuilds emucasiofxcg if the sources changed, then runs it.
-#   ./run.sh [emucasiofxcg options] addin.g3a
+#   ./run.sh [emucasiofxcg options] [addin.g3a]
+# Without an add-in the window opens empty (File > Open loads one).
 # e.g. ./run.sh --scale 3 build-linux/gint-hello/GintHello.g3a
 set -euo pipefail
 
@@ -11,11 +12,6 @@ else
   BUILD="$ROOT/build-linux"
 fi
 DEPS="$HOME/.local/casio-deps"  # SDL3 built from source (Linux machine without sudo)
-
-if [[ $# -eq 0 ]]; then
-  echo "usage: $0 [emucasiofxcg options] addin.g3a" >&2
-  exit 2
-fi
 
 if [[ ! -f "$BUILD/CMakeCache.txt" ]]; then
   cmake -S "$ROOT" -B "$BUILD" ${DEPS:+-DCMAKE_PREFIX_PATH="$DEPS"} >/dev/null
