@@ -22,10 +22,14 @@ extern Model view_model;        /* the model being emulated */
 extern ModelChoice view_model_choice;
 extern bool view_realistic;
 extern int view_speed;          /* index into the speed steps, see menubar.c */
+extern bool view_show_speed;    /* Emulation > Speed: custom shows the slider row */
 
 void view_redraw(void);
 /* View > Zoom: sizes the window for the screen at exactly scale x. */
 void view_set_scale(int scale);
+/* Shows or hides the speed row, growing or shrinking the window by its
+ * height so the screen keeps its size. */
+void view_show_speed_row(bool show);
 /* The zoom the screen is exactly at, or 0 if in between. */
 int view_zoom(void);
 /* Shows text on the right of the menu bar for a few seconds. */
@@ -37,8 +41,8 @@ void view_flash_status(const char *msg);
 #define CHAR_W     (8 * TEXT_SCALE)
 #define GLYPH_H    (8 * TEXT_SCALE)
 #define MENU_H     (GLYPH_H + 16)       /* the menu row */
-#define TOOL_H     (GLYPH_H + 14)       /* the toolbar row under it (speed, status) */
-#define BAR_H      (MENU_H + TOOL_H)    /* everything above the screen */
+#define TOOL_H     (GLYPH_H + 14)       /* the speed row under it, when shown */
+#define BAR_H      (MENU_H + (view_show_speed ? TOOL_H : 0)) /* everything above the screen */
 #define ITEM_H     (GLYPH_H + 18)
 #define PAD        (6 + 4 * TEXT_SCALE)
 

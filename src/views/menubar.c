@@ -10,7 +10,7 @@ typedef enum {
     A_NONE, A_SEPARATOR, A_OPEN, A_INFO, A_SCREENSHOT, A_SAVE_ICON, A_QUIT, A_PAUSE, A_RESET,
     A_ZOOM1, A_ZOOM2, A_ZOOM3, A_ZOOM4, A_KEYS, A_ABOUT,
     A_MODEL_AUTO, A_MODEL_CG20, A_MODEL_CG50, A_TIMING_REAL, A_TIMING_FAST,
-    A_FASTER, A_SLOWER, A_NORMAL_SPEED,
+    A_FASTER, A_SLOWER, A_NORMAL_SPEED, A_CUSTOM_SPEED,
 } Action;
 
 typedef struct {
@@ -38,9 +38,8 @@ static const Item EMU_ITEMS[] = {
     {"Timing: realistic", "", A_TIMING_REAL},
     {"Timing: fast", "", A_TIMING_FAST},
     {"", "", A_SEPARATOR},
-    {"Speed: faster", "Ctrl+=", A_FASTER},
-    {"Speed: slower", "Ctrl+-", A_SLOWER},
-    {"Speed: 100%", "Ctrl+0", A_NORMAL_SPEED},
+    {"Speed: normal (100%)", "Ctrl+0", A_NORMAL_SPEED},
+    {"Speed: custom...", "", A_CUSTOM_SPEED},
 };
 static const Item VIEW_ITEMS[] = {
     {"Zoom 1x", "Ctrl+1", A_ZOOM1},
@@ -148,6 +147,8 @@ static bool checked(Action a)
         return view_zoom() == (int)(a - A_ZOOM1) + 1;
     if (a >= A_MODEL_AUTO && a <= A_MODEL_CG50)
         return view_model_choice == (ModelChoice)(a - A_MODEL_AUTO);
+    if (a == A_NORMAL_SPEED || a == A_CUSTOM_SPEED)
+        return view_show_speed == (a == A_CUSTOM_SPEED);
     if (a == A_TIMING_REAL || a == A_TIMING_FAST)
         return view_realistic == (a == A_TIMING_REAL);
     return a == A_PAUSE && view_paused;
@@ -173,11 +174,14 @@ static void text(float x, float y, const char *s)
     view_text(view_renderer, x, y, s, TEXT_SCALE);
 }
 
-/* Status on the right of the toolbar: smaller text, then cut, if it doesn't
- * fit next to the speed slider. */
+/* Status on the right: in the speed row next to the slider when it is
+ * shown, else in the menu row after the titles. Smaller text, then cut, if
+ * it doesn't fit. */
 static void draw_status(int width, const char *right)
 {
-    int room = width - VALUE_X - 5 * CHAR_W - 2 * PAD;
+    int room = view_show_speed ? width - VALUE_X - 5 * CHAR_W - 2 * PAD
+                               : width - title_x(MENU_COUNT - 1) - title_w(MENU_COUNT - 1) - 2 * PAD;
+    float row = view_show_speed ? MENU_H : 0, row_h = view_show_speed ? TOOL_H : MENU_H;
     int k = (int)strlen(right) * CHAR_W <= room ? TEXT_SCALE : 1;
     int fit = room / (8 * k);
     if (fit <= 3)
@@ -189,7 +193,7 @@ static void draw_status(int width, const char *right)
         shown = cut;
     }
     color(view_paused ? 170 : 60, view_paused ? 0 : 60, 0);
-    view_text(view_renderer, (float)(width - PAD - (int)strlen(shown) * 8 * k), MENU_H + (TOOL_H - 8.0f * k) / 2,
+    view_text(view_renderer, (float)(width - PAD - (int)strlen(shown) * 8 * k), row + (row_h - 8.0f * k) / 2,
               shown, k);
 }
 
@@ -240,6 +244,7 @@ void menubar_set_speed(double speed)
             best = i;
     }
     view_speed = best;
+    view_show_speed = best != SPEED_NORMAL; /* before the window exists: it is created with the row */
 }
 
 static void speed_label(char *out, size_t cap)
@@ -264,11 +269,13 @@ static int speed_at(float x)
 
 static bool on_slider(float x, float y)
 {
-    return y >= MENU_H && y < BAR_H && x >= TRACK_X - 2 * PAD && x <= TRACK_X + TRACK_W + 2 * PAD;
+    return view_show_speed && y >= MENU_H && y < BAR_H && x >= TRACK_X - 2 * PAD &&
+           x <= TRACK_X + TRACK_W + 2 * PAD;
 }
 
-/* The row under the menus: speed slider on the left, status on the right. */
-static void draw_toolbar(int width, const char *status)
+/* The speed row under the menus (Emulation > Speed: custom): slider on
+ * the left; the status goes on its right. */
+static void draw_toolbar(int width)
 {
     float mid = MENU_H + TOOL_H / 2.0f;
     color(232, 232, 232);
@@ -296,11 +303,6 @@ static void draw_toolbar(int width, const char *status)
     color(0, 0, 0);
     text(VALUE_X, mid - GLYPH_H / 2.0f, value);
 
-    char right[400];
-    snprintf(right, sizeof right, "%s%s%s", view_paused ? "PAUSED" : "", view_paused && status[0] ? "  " : "",
-             status);
-    if (right[0])
-        draw_status(width, right);
 }
 
 void menubar_draw(int width, const char *status)
@@ -324,7 +326,13 @@ void menubar_draw(int width, const char *status)
         color(0, 0, 0);
         text((float)(title_x(m) + PAD), (MENU_H - GLYPH_H) / 2.0f, MENUS[m].title);
     }
-    draw_toolbar(width, status);
+    if (view_show_speed)
+        draw_toolbar(width);
+    char right[400];
+    snprintf(right, sizeof right, "%s%s%s", view_paused ? "PAUSED" : "", view_paused && status[0] ? "  " : "",
+             status);
+    if (right[0])
+        draw_status(width, right);
     if (open_menu >= 0)
         draw_dropdown();
 }
@@ -438,9 +446,21 @@ static void run_action(Action a)
         }
         break;
     }
-    case A_FASTER: if (view_speed < SPEED_COUNT - 1) view_speed++; break;
-    case A_SLOWER: if (view_speed > 0) view_speed--; break;
-    case A_NORMAL_SPEED: view_speed = SPEED_NORMAL; break;
+    case A_FASTER: /* the shortcuts show the slider, so the change is visible */
+        view_show_speed_row(true);
+        if (view_speed < SPEED_COUNT - 1)
+            view_speed++;
+        break;
+    case A_SLOWER:
+        view_show_speed_row(true);
+        if (view_speed > 0)
+            view_speed--;
+        break;
+    case A_NORMAL_SPEED:
+        view_speed = SPEED_NORMAL;
+        view_show_speed_row(false);
+        break;
+    case A_CUSTOM_SPEED: view_show_speed_row(true); break;
     case A_TIMING_REAL: view_realistic = true; break;
     case A_TIMING_FAST: view_realistic = false; break;
     case A_NONE: case A_SEPARATOR: break;

@@ -159,9 +159,12 @@ Two timing modes (Emulation > Timing, or `--timing`):
 - **Fast**: all of the above takes no time; add-ins run as fast as the
   interpreter allows.
 
-Independently of the mode, the **speed slider** in the toolbar (also
-Ctrl+= / Ctrl+- / Ctrl+0, or `--speed`) sets how fast emulated time runs
-compared with real time: 10% to 400%, or Max (no limit).
+Independently of the mode, the speed sets how fast emulated time runs
+compared with real time. It is 100% unless you pick Emulation > Speed:
+custom, which shows a slider under the menus (10% to 400%, or Max for no
+limit); Speed: normal hides it again. Ctrl+= / Ctrl+- also open the slider
+and change the speed, Ctrl+0 goes back to normal, and `--speed` sets it from
+the command line.
 
 ## How to grow it
 

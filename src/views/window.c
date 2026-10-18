@@ -25,6 +25,7 @@ Model view_model;
 ModelChoice view_model_choice;
 bool view_realistic = true;
 int view_speed = 4; /* the 100% step */
+bool view_show_speed;
 
 static SDL_Texture *screen;    /* the panel, 396 x 224 */
 static SDL_Texture *upscaled;  /* the panel at a whole scale, see draw_screen() */
@@ -139,8 +140,20 @@ void view_set_scale(int scale)
 {
     int w = PANEL_WIDTH * scale;
     int ts = text_scale_for(w);
-    int bar = (8 * ts + 16) + (8 * ts + 14); /* BAR_H at that width */
+    int bar = (8 * ts + 16) + (view_show_speed ? 8 * ts + 14 : 0); /* BAR_H at that width */
     SDL_SetWindowSize(view_window, w, bar + PANEL_HEIGHT * scale);
+    SDL_SyncWindow(view_window);
+    update_layout();
+}
+
+void view_show_speed_row(bool show)
+{
+    if (show == view_show_speed)
+        return;
+    int w, h, before = BAR_H;
+    SDL_GetWindowSize(view_window, &w, &h);
+    view_show_speed = show;
+    SDL_SetWindowSize(view_window, w, h + BAR_H - before);
     SDL_SyncWindow(view_window);
     update_layout();
 }
