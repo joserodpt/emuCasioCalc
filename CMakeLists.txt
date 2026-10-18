@@ -23,8 +23,17 @@ add_library(emucore STATIC
   src/engine/cpu.c src/engine/mem.c src/engine/sh7305.c src/engine/r61524.c)
 target_include_directories(emucore PUBLIC src/engine)
 
+# The emulator's UI font (assets/fonts/Inter-Medium.ttf), embedded as C.
+add_custom_command(
+  OUTPUT ${CMAKE_BINARY_DIR}/ui_font_ttf.c
+  COMMAND ${CMAKE_COMMAND} -DINPUT=${CMAKE_SOURCE_DIR}/assets/fonts/Inter-Medium.ttf
+          -DOUTPUT=${CMAKE_BINARY_DIR}/ui_font_ttf.c -DSYMBOL=UI_FONT_TTF -P ${CMAKE_SOURCE_DIR}/cmake/embed.cmake
+  DEPENDS assets/fonts/Inter-Medium.ttf cmake/embed.cmake
+  COMMENT "Embedding the UI font")
+
 add_executable(emucasiofxcg
   src/main.c
+  src/views/ui_font.c ${CMAKE_BINARY_DIR}/ui_font_ttf.c
   src/engine/emu.c
   src/engine/os/syscalls.c src/engine/os/syscalls_text.c src/engine/os/syscalls_keys.c
   src/engine/os/syscalls_mcs.c src/engine/os/syscalls_bfile.c src/engine/os/syscalls_dialogs.c src/engine/os/syscalls_draw.c src/engine/os/syscalls_status.c src/engine/os/syscalls_time.c src/engine/os/messages.c src/engine/os/syscalls_system.c src/engine/os/font_data.c

@@ -61,8 +61,15 @@ void view_flash_status(const char *msg);
 const char *view_pc_key(int key);
 const char *view_calc_key(int key);
 
-/* Debug-font text at an integer scale k (stays crisp). */
+/* UI text (ui_font.c, Inter) at scale k: in a box 8k pixels high, capitals
+ * centred, in the renderer's draw colour. view_text_w: its width. */
 void view_text(SDL_Renderer *r, float x, float y, const char *s, int k);
+float view_text_w(const char *s, int k);
+/* The same at a font size in pixels, capitals centred on cy. */
+void view_text_px(SDL_Renderer *r, float x, float cy, const char *s, float px);
+float view_text_w_px(const char *s, float px);
+/* Before a renderer is destroyed: drop its glyph atlases. */
+void view_text_forget(SDL_Renderer *r);
 
 /* menubar.c */
 void menubar_draw(int width, const char *status);

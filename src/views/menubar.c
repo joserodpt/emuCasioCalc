@@ -108,11 +108,17 @@ static const double SPEEDS[] = {0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 0};
 #define SPEED_COUNT   ((int)(sizeof SPEEDS / sizeof SPEEDS[0]))
 #define SPEED_NORMAL  4
 #define SPEED_LABEL_X PAD                           /* "Speed" */
-#define TRACK_X       (PAD + 6 * CHAR_W)            /* slider track */
+#define TRACK_X       (PAD + (int)tw("Speed") + 2 * PAD) /* slider track */
 #define TRACK_W       (100 * TEXT_SCALE)
 #define VALUE_X       (TRACK_X + TRACK_W + 2 * PAD) /* "100%" */
 
 static bool dragging;        /* the speed slider's knob */
+
+/* Width of menu-size text. */
+static float tw(const char *s)
+{
+    return view_text_w(s, TEXT_SCALE);
+}
 
 static int open_menu = -1;   /* index of the dropped-down menu, -1 if none */
 static int hover_item = -1;
@@ -131,20 +137,20 @@ static int title_x(int m)
 {
     int x = 0;
     for (int i = 0; i < m; i++)
-        x += (int)strlen(MENUS[i].title) * CHAR_W + 2 * PAD;
+        x += (int)tw(MENUS[i].title) + 2 * PAD;
     return x;
 }
 
 static int title_w(int m)
 {
-    return (int)strlen(MENUS[m].title) * CHAR_W + 2 * PAD;
+    return (int)tw(MENUS[m].title) + 2 * PAD;
 }
 
 static int dropdown_w(int m)
 {
     int w = 0;
     for (int i = 0; i < MENUS[m].count; i++) {
-        int iw = (int)(strlen(MENUS[m].items[i].label) + strlen(MENUS[m].items[i].shortcut)) * CHAR_W;
+        int iw = (int)(tw(MENUS[m].items[i].label) + tw(MENUS[m].items[i].shortcut));
         if (iw > w)
             w = iw;
     }
@@ -227,7 +233,23 @@ static void text(float x, float y, const char *s)
 
 static int badge_w(const char *s)
 {
-    return (int)strlen(s) * CHAR_W + 6 * TEXT_SCALE;
+    return (int)tw(s) + 10 * TEXT_SCALE;
+}
+
+/* text cut at its start ("...end") so it is at most maxw wide */
+static const char *fit_end(const char *text, float maxw, int k, char *buf, size_t cap)
+{
+    if (view_text_w(text, k) <= maxw)
+        return text;
+    for (const char *s = text; *s; s++) {
+        if (strlen(s) + 4 > cap)
+            continue;
+        buf[0] = buf[1] = buf[2] = '.';
+        memcpy(buf + 3, s, strlen(s) + 1);
+        if (view_text_w(buf, k) <= maxw)
+            return buf;
+    }
+    return "";
 }
 
 static void badge(float x, const char *s, bool on, int r, int g, int b, bool light_text)
@@ -243,7 +265,7 @@ static void badge(float x, const char *s, bool on, int r, int g, int b, bool lig
         SDL_RenderRect(view_renderer, &box);
         color(175, 175, 175);
     }
-    text(x + 3 * TEXT_SCALE, STATUS_Y + (STATUS_H - GLYPH_H) / 2.0f, s);
+    text(x + (badge_w(s) - tw(s)) / 2, STATUS_Y + (STATUS_H - GLYPH_H) / 2.0f, s);
 }
 
 static const char *const LEVEL_NAMES[BATTERY_LEVELS] = {"full", "half", "low", "empty"};
@@ -260,14 +282,16 @@ static int battery_level(void)
     return best;
 }
 
+/* The status row, left to right: battery, SHIFT, ALPHA, message language,
+ * the add-in's status message (its title). */
 static float battery_x(void)
 {
-    return (float)(PAD + badge_w("SHIFT") + GAP + badge_w("ALPHA LOCK") + 3 * GAP);
+    return (float)PAD;
 }
 
 static int battery_w(void)
 {
-    return 15 * TEXT_SCALE + GAP + 12 * CHAR_W; /* icon, "5.20V (full)" */
+    return 15 * TEXT_SCALE + GAP + (int)tw("5.20V (empty)"); /* icon, voltage and level */
 }
 
 static bool on_battery(float x, float y)
@@ -281,16 +305,12 @@ static void draw_status_row(int width)
     fill(0, STATUS_Y, (float)width, STATUS_H);
     color(200, 200, 200);
     fill(0, BAR_H - 1, (float)width, 1);
+    float ty = STATUS_Y + (STATUS_H - GLYPH_H) / 2.0f;
 
-    float x = PAD;
-    badge(x, "SHIFT", view_key_shift, 240, 190, 0, false);
-    x += badge_w("SHIFT") + GAP;
-    const char *alpha = view_key_alpha == 2 ? "ALPHA LOCK" : "ALPHA";
-    badge(x, alpha, view_key_alpha != 0, 200, 30, 30, true);
-
-    /* Battery: body, terminal, 3 bars, as on the status bar */
+    /* Battery: body, terminal, 3 bars as on the status bar, then the
+     * voltage and level (click: the next level) */
     int k = TEXT_SCALE;
-    x = battery_x();
+    float x = battery_x();
     float bh = 8.0f * k, by = STATUS_Y + (STATUS_H - bh) / 2;
     bool hot = open_menu < 0 && on_battery(mouse_x, mouse_y);
     color(hot ? 0 : 60, hot ? 90 : 60, hot ? 180 : 60);
@@ -304,29 +324,39 @@ static void draw_status_row(int width)
         color(40, 160, 40);
     for (int i = 0; i < bars; i++)
         fill(x + (1.0f + 4.0f * i) * k, by + 1.0f * k, 3.0f * k, bh - 2.0f * k);
-    x += 15 * k + GAP;
     char volts[32];
     snprintf(volts, sizeof volts, "%d.%02dV (%s)", view_battery_cv / 100, view_battery_cv % 100,
              LEVEL_NAMES[battery_level()]);
     color(0, 0, 0);
-    text(x, STATUS_Y + (STATUS_H - GLYPH_H) / 2.0f, volts);
+    text(x + 15 * k + GAP, ty, volts);
 
-    /* The message language, then the add-in's status message, cut to the
-     * room left */
-    x = battery_x() + battery_w() + 2 * GAP;
+    /* SHIFT and ALPHA */
+    x = battery_x() + battery_w() + 3 * GAP;
+    badge(x, "SHIFT", view_key_shift, 240, 190, 0, false);
+    x += badge_w("SHIFT") + GAP;
+    const char *alpha = view_key_alpha == 2 ? "ALPHA LOCK" : "ALPHA";
+    badge(x, alpha, view_key_alpha != 0, 200, 30, 30, true);
+    x += badge_w("ALPHA LOCK") + 3 * GAP; /* room for the longer one */
+
+    /* The message language */
     char lang[8];
     snprintf(lang, sizeof lang, "%s", LANG_CODES[view_language]);
     lang[0] = (char)(lang[0] - 'a' + 'A');
     lang[1] = (char)(lang[1] - 'a' + 'A');
     color(60, 60, 60);
-    text(x, STATUS_Y + (STATUS_H - GLYPH_H) / 2.0f, lang);
-    x += 2 * CHAR_W + 3 * GAP;
-    int fit = (int)((float)width - PAD - x) / CHAR_W;
-    if (view_os_status[0] && fit > 3) {
+    text(x, ty, lang);
+    x += tw(lang) + 3 * GAP;
+
+    /* The add-in's status message, quoted, cut at its end to the room left */
+    if (view_os_status[0]) {
         char msg[80];
-        snprintf(msg, sizeof msg, "\"%.*s\"", fit - 2, view_os_status);
+        size_t n = strlen(view_os_status);
+        do
+            snprintf(msg, sizeof msg, "\"%.*s%s\"", (int)n, view_os_status, n < strlen(view_os_status) ? "..." : "");
+        while (n > 0 && tw(msg) > (float)width - PAD - x && n--);
         color(70, 70, 70);
-        text(x, STATUS_Y + (STATUS_H - GLYPH_H) / 2.0f, msg);
+        if (n > 0)
+            text(x, ty, msg);
     }
 }
 
@@ -339,18 +369,13 @@ static void draw_status(int width, const char *right)
     int room = view_show_speed ? width - VALUE_X - 5 * CHAR_W - 2 * PAD
                                : right_edge - title_x(MENU_COUNT - 1) - title_w(MENU_COUNT - 1) - 2 * PAD;
     float row = view_show_speed ? MENU_H : 0, row_h = view_show_speed ? TOOL_H : MENU_H;
-    int k = (int)strlen(right) * CHAR_W <= room ? TEXT_SCALE : 1;
-    int fit = room / (8 * k);
-    if (fit <= 3)
-        return;
+    int k = tw(right) <= room ? TEXT_SCALE : 1;
     char cut[400];
-    const char *shown = right;
-    if ((int)strlen(right) > fit) {
-        snprintf(cut, sizeof cut, "...%s", right + strlen(right) - (size_t)(fit - 3));
-        shown = cut;
-    }
+    const char *shown = fit_end(right, (float)room, k, cut, sizeof cut);
+    if (!shown[0])
+        return;
     color(view_paused ? 170 : 60, view_paused ? 0 : 60, 0);
-    view_text(view_renderer, (float)(right_edge - PAD - (int)strlen(shown) * 8 * k), row + (row_h - 8.0f * k) / 2,
+    view_text(view_renderer, (float)right_edge - PAD - view_text_w(shown, k), row + (row_h - 8.0f * k) / 2,
               shown, k);
 }
 
@@ -378,12 +403,17 @@ static void draw_dropdown(void)
             color(0, 0, 0);
         }
         float ty = y + (ITEM_H - GLYPH_H) / 2.0f;
-        if (checked(it->action))
-            text((float)x0 + PAD, ty, "*");
+        if (checked(it->action)) { /* a check mark */
+            float cx = (float)x0 + PAD, cy = y + ITEM_H / 2.0f, u = 2.0f * TEXT_SCALE;
+            for (int t = 0; t < TEXT_SCALE + 1; t++) {
+                SDL_RenderLine(view_renderer, cx + t * 0.5f, cy + t, cx + 2 * u, cy + 2 * u + t);
+                SDL_RenderLine(view_renderer, cx + 2 * u, cy + 2 * u + t, cx + 5 * u, cy - 2.5f * u + t);
+            }
+        }
         text((float)(x0 + PAD + 2 * CHAR_W), ty, it->label);
         if (i != hover_item)
             color(110, 110, 110);
-        text((float)(x0 + dw - PAD - (int)strlen(it->shortcut) * CHAR_W), ty, it->shortcut);
+        text((float)(x0 + dw - PAD) - tw(it->shortcut), ty, it->shortcut);
     }
 }
 

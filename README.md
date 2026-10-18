@@ -169,6 +169,7 @@ CTest runs them all (`ctest`, 20 tests).
 | `info_window.c` | Add-in information window |
 | `send_addin.c` | File > Copy add-in to calculator |
 | `keypad.c` | The on-screen keyboard (View > Keyboard) |
+| `ui_font.c` | The UI's text: Inter through stb_truetype, glyph atlases per size |
 | `app_icon.c`, `font.c` | The emulator's icon (drawn in code), the 8x8 font |
 | **`src/utils/`** | **Helpers** |
 | `g3a.c` | Reads a .g3a: header (name, icons...) and code, mapped at `0x00300000` |
@@ -282,4 +283,9 @@ contains code written for it, and two open fonts for the OS text calls
   License 1.1): symbols Spleen lacks (Greek, arrows, maths).
 
 Their licences are in `assets/fonts/`; `tools/gen_fonts.py` turns them into
-`src/engine/os/font_data.c`.
+`src/engine/os/font_data.c`. The emulator's own menus, status row and
+keyboard use [Inter](https://github.com/rsms/inter) 4.1 Medium (SIL Open
+Font License 1.1, `assets/fonts/Inter-Medium.ttf`, embedded at build time
+by `cmake/embed.cmake`), drawn with
+[stb_truetype](https://github.com/nothings/stb) 1.26 (public domain,
+`third_party/stb_truetype.h`).

@@ -159,13 +159,15 @@ static void set_color(Uint8 r, Uint8 g, Uint8 b)
     SDL_SetRenderDrawColor(view_renderer, r, g, b, 255);
 }
 
-/* Text centred in a box, as large as fits (1x, 2x or 3x the 8x8 font). */
-static void centred(const char *s, float cx, float cy, float maxw, float maxh, int kmax)
+/* Text centred on (cx, cy) at size px, smaller only if wider than maxw. */
+static void centred(const char *s, float cx, float cy, float maxw, float px)
 {
-    int n = (int)strlen(s), k = kmax;
-    while (k > 1 && (n * 8 * k > maxw || 8 * k > maxh))
-        k--;
-    view_text(view_renderer, cx - n * 4.0f * k, cy - 4.0f * k, s, k);
+    float w = view_text_w_px(s, px);
+    if (w > maxw && w > 0) {
+        px *= maxw / w;
+        w = view_text_w_px(s, px);
+    }
+    view_text_px(view_renderer, cx - w / 2, cy, s, px);
 }
 
 static void draw_key(SDL_FRect r, const char *label, bool down, int style)
@@ -184,7 +186,7 @@ static void draw_key(SDL_FRect r, const char *label, bool down, int style)
         set_color(20, 20, 20);
     else
         set_color(250, 250, 250);
-    centred(label, r.x + r.w / 2, r.y + r.h / 2, r.w - 6, r.h - 4, 3);
+    centred(label, r.x + r.w / 2, r.y + r.h / 2, r.w * 0.86f, r.h * 0.42f);
 }
 
 static bool is_down(int k)
@@ -214,14 +216,14 @@ void keypad_draw(void)
         float top = r.y - label / 2;
         if (p->shift) {
             set_color(236, 196, 60);
-            centred(p->shift, r.x + r.w * 0.3f, top, r.w * 0.6f, label, 2);
+            centred(p->shift, r.x + r.w * 0.3f, top, r.w * 0.6f, label * 0.78f);
         }
         if (k >= 0 && KEYS[k].alpha) {
             char a[4];
             int c = KEYS[k].alpha;
             snprintf(a, sizeof a, "%s", c == ' ' ? "SP" : c == 0xCD ? "r" : c == 0xCE ? "th" : (char[]){(char)c, 0});
             set_color(232, 80, 80);
-            centred(a, r.x + r.w * 0.82f, top, r.w * 0.35f, label, 2);
+            centred(a, r.x + r.w * 0.84f, top, r.w * 0.32f, label * 0.86f);
         }
     }
     /* arrow pad: a round base and four keys */

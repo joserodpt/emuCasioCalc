@@ -66,12 +66,6 @@ static const struct { const char *name; SDL_Keycode sdl; } KEYMAP[] = {
 };
 
 
-void view_text(SDL_Renderer *r, float x, float y, const char *s, int k)
-{
-    SDL_SetRenderScale(r, (float)k, (float)k);
-    SDL_RenderDebugText(r, x / k, y / k, s);
-    SDL_SetRenderScale(r, 1, 1);
-}
 
 static int text_scale_for(int width)
 {
@@ -452,6 +446,7 @@ void platform_shutdown(void)
     info_window_close();
     SDL_DestroyTexture(upscaled);
     SDL_DestroyTexture(screen);
+    view_text_forget(view_renderer);
     SDL_DestroyRenderer(view_renderer);
     SDL_DestroyWindow(view_window);
     SDL_Quit();

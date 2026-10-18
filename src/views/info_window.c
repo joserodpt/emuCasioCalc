@@ -43,10 +43,12 @@ static void name_on_icon(const char *name)
     if (!name[0])
         return;
     float w = G3A_ICON_W * ICON_SCALE;
-    int k = (int)strlen(name) * 8 * TEXT + 8 <= w ? TEXT : 1;
+    int k = view_text_w(name, TEXT) + 8 <= w ? TEXT : 1;
     char shown[32];
-    snprintf(shown, sizeof shown, "%.*s", (int)(w - 4) / (8 * k), name);
-    float x = ICON_X + (w - (float)strlen(shown) * 8 * k) / 2;
+    snprintf(shown, sizeof shown, "%.31s", name);
+    for (size_t n = strlen(shown); n > 0 && view_text_w(shown, k) > w - 4; n--)
+        shown[n - 1] = '\0';
+    float x = ICON_X + (w - view_text_w(shown, k)) / 2;
     float y = ICON_Y + G3A_ICON_H * ICON_SCALE - 8 * k - 4;
     SDL_SetRenderDrawColor(ren, 255, 255, 255, 255);
     for (int dy = -1; dy <= 1; dy++)
@@ -115,9 +117,11 @@ static void draw_controls(void)
               1);
     for (int k = 0; k < KEY_COUNT; k++) {
         float x = ICON_X + (k % 3) * 200.0f, y = LIST_Y + 18 + (k / 3) * 12.0f;
-        snprintf(cell, sizeof cell, "%-7s %s", view_calc_key(k), view_pc_key(k));
+        /* two columns: the calculator key, then the PC key */
         SDL_SetRenderDrawColor(ren, 0, 0, 0, 255);
-        view_text(ren, x, y, cell, 1);
+        view_text(ren, x, y, view_calc_key(k), 1);
+        snprintf(cell, sizeof cell, "%s", view_pc_key(k));
+        view_text(ren, x + 70, y, cell, 1);
     }
 }
 
@@ -180,6 +184,7 @@ void info_window_close(void)
         SDL_DestroyTexture(icons[i]);
         icons[i] = NULL;
     }
+    view_text_forget(ren);
     SDL_DestroyRenderer(ren);
     SDL_DestroyWindow(win);
     ren = NULL;
