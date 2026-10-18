@@ -6,7 +6,7 @@
 #include "view.h"
 
 #define INFO_W      640
-#define INFO_H      260
+#define INFO_H      310
 #define ICON_X      20
 #define ICON_Y      64
 #define ICON_SCALE  2   /* icons shown at 2x: 184 x 128 */
@@ -63,7 +63,19 @@ static void redraw(void)
         view_text(ren, ICON_X + 36, ICON_Y + 56, "no icon", TEXT);
     }
     SDL_SetRenderDrawColor(ren, 120, 120, 120, 255);
-    view_text(ren, ICON_X, ICON_Y + 6 * ROW + 12, /* under the icon and the fields */
+    /* Under the icon and the fields: why this model, and the icon hint */
+    char why[160];
+    if (!have)
+        why[0] = '\0';
+    else if (view_model_choice == CHOICE_AUTO)
+        snprintf(why, sizeof why, "Model detected automatically: %s.", app->model_reason);
+    else
+        snprintf(why, sizeof why, "Model chosen in Emulation > Model (detected: %s, %s).",
+                 model_name(app->model), app->model_reason);
+    SDL_SetRenderDrawColor(ren, 60, 60, 60, 255);
+    view_text(ren, ICON_X, ICON_Y + 7 * ROW + 8, why, 1);
+    SDL_SetRenderDrawColor(ren, 120, 120, 120, 255);
+    view_text(ren, ICON_X, ICON_Y + 7 * ROW + 24,
               hover ? "Selected icon" : "Unselected icon (hover it to see the selected one)", 1);
 
     /* Header fields */
@@ -72,7 +84,8 @@ static void redraw(void)
     const char *base = strrchr(view_app_path, '/');
     const char *file = base ? base + 1 : view_app_path;
     float x = ICON_X + G3A_ICON_W * ICON_SCALE + 20, y = ICON_Y;
-    field(x, y, "Internal", have ? app->internal : "");
+    field(x, y, "Model", have ? model_name(view_model) : "");
+    field(x, y += ROW, "Internal", have ? app->internal : "");
     field(x, y += ROW, "Version", have ? app->version : "");
     field(x, y += ROW, "Date", have ? app->date : "");
     field(x, y += ROW, "Size", have ? size : "");

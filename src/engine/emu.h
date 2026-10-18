@@ -9,9 +9,32 @@
 #include "r61524.h"
 #include "sh7305.h"
 
+/* The calculators we can be. Same CPU, display and add-in format; they
+ * differ in where RAM is, how much there is, and the clock. */
+typedef enum {
+    MODEL_CG50,  /* fx-CG50 (2017) */
+    MODEL_CG20,  /* fx-CG10 / fx-CG20 ("Prizm", 2011) */
+} Model;
+
+const char *model_name(Model model);
+
+/* Where things are on a model. Addresses are what the CPU sees. */
+typedef struct {
+    uint32_t ram_phys, ram_size;   /* physical RAM */
+    uint32_t uram_phys;            /* add-in static RAM behind URAM_BASE */
+    uint32_t vram;                 /* GetVRAMAddress, at the start of RAM */
+    uint32_t stack_top;            /* r15 when the add-in starts */
+    uint32_t heap_base, heap_size; /* our sys_malloc arena */
+    uint32_t frqcr;                /* clock setup the OS leaves (CPG FRQCR) */
+} Layout;
+
+const Layout *model_layout(Model model);
+
 /* The whole calculator: CPU, memory, peripherals, display, plus the state
  * of our high-level OS (heap) and of the scripted keys. */
 typedef struct {
+    Model model;
+    const Layout *layout;
     Cpu cpu;
     Memory mem;
     Sh7305 hw;
@@ -40,8 +63,8 @@ typedef struct {
     const char *data_dir; /* host folder for main memory (MCS) files: ./storage */
 } Emu;
 
-/* Builds the memory map and peripherals. */
-bool emu_init(Emu *emu);
+/* Builds the memory map and peripherals of a model. */
+bool emu_init(Emu *emu, Model model);
 void emu_free(Emu *emu);
 /* Resets the CPU to the add-in's entry point, like the OS launching it. */
 void emu_start(Emu *emu);

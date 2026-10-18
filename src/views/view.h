@@ -17,6 +17,8 @@ extern bool view_paused;
 extern G3aInfo view_app;        /* the add-in being run */
 extern bool view_have_app;
 extern char view_app_path[1024];
+extern Model view_model;        /* the model being emulated */
+extern ModelChoice view_model_choice;
 
 void view_redraw(void);
 void view_set_scale(int scale);

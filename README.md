@@ -29,13 +29,14 @@ ctest --test-dir build --output-on-failure
 ./build/emucasiofxcg --headless --keys EXE,EXIT --screenshot out.bmp some-addin.g3a
 ./build/emucasiofxcg --icon icon.bmp some-addin.g3a     # also save the add-in's menu icon
 ./build/emucasiofxcg --info some-addin.g3a              # open the add-in info window at start
+./build/emucasiofxcg --model cg20 some-addin.g3a        # force the fx-CG10/20 (default: detect)
 
 ./run.sh                  # rebuilds if the sources changed, opens an empty window (File > Open)
 ./run.sh some-addin.g3a   # same, starting that add-in (quote paths with spaces)
 ```
 
 The window has a menu bar: **File** (open another add-in, add-in info, save a
-screenshot or the add-in's icon), **Emulation** (pause, reset), **View**
+screenshot or the add-in's icon), **Emulation** (pause, reset, model), **View**
 (zoom 1x-4x) and **Help**, plus an **Info** button that opens a window with the
 add-in's name, header fields and icon (hover the icon to see its selected
 version). Shortcuts: Ctrl+O, Ctrl+I, Ctrl+S, Ctrl+P, Ctrl+R, Ctrl+1..4, Ctrl+Q.
@@ -88,30 +89,50 @@ GiteaPC puts it), the CMake build compiles them and CTest runs them.
 | `tests/gint-*` | gint add-ins used as integration tests |
 | `tools/make_hello_g3a.py` | Hand-assembles the `hello.g3a` smoke test (HLE) |
 
+## Models
+
+The fx-CG10, fx-CG20 and fx-CG50 share the CPU, the display and the add-in
+format, so most add-ins run on all of them. They differ in where RAM is, how
+much there is (2 MB vs 8 MB), where the OS puts VRAM and the stack, and the
+clock (58.98 MHz vs 117.96 MHz CPU). The emulator can be either:
+
+- **Automatic** (default): g3a files have no "made for" field, so the model is
+  guessed from the add-in. Code that refers to fx-CG50 memory (gint add-ins
+  do) runs as an fx-CG50; otherwise an add-in built before 2017, or that
+  draws straight to the fx-CG10/20 VRAM address, runs as an fx-CG10/20;
+  anything else runs as an fx-CG50.
+- **Forced**: Emulation > Model, or `--model cg20` / `--model cg50`.
+
+The model and the reason it was picked appear in the window title, in
+Add-in info and on the terminal.
+
 ## Memory map
 
-Physical memory (`src/mem.h`): ROM at `0x00000000` (32 MB), RAM at
-`0x0C000000` (8 MB), the display at `0x14000000`, reachable through P1
+Physical memory: ROM at `0x00000000` (32 MB), RAM at `0x0C000000` (8 MB, fx-CG50)
+or `0x08000000` (2 MB, fx-CG10/20; see `Layout` in `src/engine/emu.c`), the
+display at `0x14000000`, reachable through P1
 (`0x8xxxxxxx`) and P2 (`0xAxxxxxxx`). The MMU is not emulated: the U0
 mappings the OS would make are fixed, and described in the UTLB arrays for
 gint.
 
+Addresses on the fx-CG50 (fx-CG10/20 in brackets):
+
 | Address | What |
 |---|---|
 | `0x00300000` | add-in code (read-only, ROM) |
-| `0x08100000` | add-in static RAM, 512 kB (= physical `0x0C200000`) |
-| `0x8C000000` | RAM through P1; gint puts its VRAMs at `0x8C0F0000` |
-| `0xAC000000` | OS VRAM (384x216, `GetVRAMAddress`) |
-| `0xA8000000` | same VRAM: the fx-CG10/20 address, still hard-coded by older add-ins |
-| `0x8C180000` | initial stack pointer (gint checks it is above `0x8C000000`) |
-| `0x8C400000` | heap for `sys_malloc` (HLE) |
+| `0x08100000` | add-in static RAM, 512 kB (= physical `0x0C200000` [`0x08180000`]) |
+| `0x8C000000` [`0x88000000`] | RAM through P1; gint borrows `0x8C0F0000` [`0x880F0000`] for its VRAMs |
+| `0xAC000000` [`0xA8000000`] | OS VRAM (384x216, `GetVRAMAddress`); on the fx-CG50 `0xA8000000` is aliased to it for old add-ins |
+| `0x8C180000` [`0x88170000`] | initial stack pointer (gint tells the model from it) |
+| `0x8C400000` [`0x88030000`] | heap for `sys_malloc` (HLE) |
 | `0xE5200000`, `0xE5000000` | on-chip IL and X/Y memory |
 | `0xA4xxxxxx`, `0xFxxxxxxx` | peripheral registers; unknown ones read back what was written |
 
 ## Timing
 
-One instruction counts as one CPU cycle at 117.96 MHz (the CG50's default
-clock, read from the emulated CPG registers). Timers and the RTC run from that
+One instruction counts as one CPU cycle at the model's default clock (117.96
+MHz on the fx-CG50, 58.98 MHz on the fx-CG10/20), read from the emulated CPG
+registers. Timers and the RTC run from that
 count, `SLEEP` skips ahead to the next timer interrupt, and the window keeps
 emulated time in step with real time. DMA transfers move data at once but
 report completion after roughly the time real hardware takes (a full-screen

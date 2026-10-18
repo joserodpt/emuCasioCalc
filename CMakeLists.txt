@@ -48,6 +48,15 @@ add_test(NAME cpu COMMAND test_cpu)
 add_test(NAME hello
   COMMAND emucasiofxcg --headless --keys EXE,EXIT --screenshot hello.bmp hello.g3a
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+# No date, no old addresses: detected as an fx-CG50 add-in; also runs as fx-CG10/20.
+add_test(NAME hello_model
+  COMMAND emucasiofxcg --headless --keys EXIT hello.g3a
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+set_tests_properties(hello_model PROPERTIES PASS_REGULAR_EXPRESSION "running as fx-CG50 \\(no sign")
+add_test(NAME hello_cg20
+  COMMAND emucasiofxcg --headless --model cg20 --keys EXE,EXIT hello.g3a
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+set_tests_properties(hello_cg20 PROPERTIES PASS_REGULAR_EXPRESSION "running as fx-CG10/20.*add-in exited")
 
 # gint add-ins (tests/gint-*), built with the fxSDK when it is installed
 # (fxsdk on the PATH, or -DFXSDK=/path/to/bin/fxsdk).
@@ -77,7 +86,12 @@ if(FXSDK)
   add_test(NAME gint_hello
     COMMAND emucasiofxcg --headless --keys EXE,MENU,7,EXIT --screenshot gint-hello.bmp gint-hello/GintHello.g3a
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-  set_tests_properties(gint_hello PROPERTIES PASS_REGULAR_EXPRESSION "add-in exited")
+  set_tests_properties(gint_hello PROPERTIES PASS_REGULAR_EXPRESSION "running as fx-CG50.*add-in exited")
+  # gint's fx-CG10/20 code path (other RAM layout, half the clock).
+  add_test(NAME gint_hello_cg20
+    COMMAND emucasiofxcg --headless --model cg20 --keys EXE,MENU,7,EXIT gint-hello/GintHello.g3a
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+  set_tests_properties(gint_hello_cg20 PROPERTIES PASS_REGULAR_EXPRESSION "running as fx-CG10/20.*add-in exited")
   add_test(NAME gint_stress
     COMMAND emucasiofxcg --headless --keys EXE --screenshot gint-stress.bmp gint-stress/GintStress.g3a
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})

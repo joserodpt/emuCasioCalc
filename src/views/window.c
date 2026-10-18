@@ -19,6 +19,8 @@ bool view_paused;
 G3aInfo view_app;
 bool view_have_app;
 char view_app_path[1024];
+Model view_model;
+ModelChoice view_model_choice;
 
 static SDL_Texture *screen;
 static uint16_t frame[PANEL_WIDTH * PANEL_HEIGHT]; /* last presented frame, host RGB565 */
@@ -194,17 +196,29 @@ bool platform_save_screenshot(const char *path)
     return platform_save_bmp(path, frame, PANEL_WIDTH, PANEL_HEIGHT);
 }
 
-void platform_set_app(const G3aInfo *info, const char *path)
+void platform_set_app(const G3aInfo *info, const char *path, Model model)
 {
     view_app = *info;
     view_have_app = true;
+    view_model = model;
     snprintf(view_app_path, sizeof view_app_path, "%s", path);
     if (view_headless)
         return;
     char title[64];
-    snprintf(title, sizeof title, "%s - emuCasioFxCG", view_app.name[0] ? view_app.name : "add-in");
+    snprintf(title, sizeof title, "%s - %s - emuCasioFxCG", view_app.name[0] ? view_app.name : "add-in",
+             model_name(model));
     SDL_SetWindowTitle(view_window, title);
     info_window_refresh();
+}
+
+ModelChoice platform_model_choice(void)
+{
+    return view_model_choice;
+}
+
+void platform_set_model_choice(ModelChoice choice)
+{
+    view_model_choice = choice;
 }
 
 void platform_show_info(void)

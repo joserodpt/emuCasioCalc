@@ -9,6 +9,7 @@
 typedef enum {
     A_NONE, A_SEPARATOR, A_OPEN, A_INFO, A_SCREENSHOT, A_SAVE_ICON, A_QUIT, A_PAUSE, A_RESET,
     A_ZOOM1, A_ZOOM2, A_ZOOM3, A_ZOOM4, A_KEYS, A_ABOUT,
+    A_MODEL_AUTO, A_MODEL_CG20, A_MODEL_CG50,
 } Action;
 
 typedef struct {
@@ -28,6 +29,10 @@ static const Item FILE_ITEMS[] = {
 static const Item EMU_ITEMS[] = {
     {"Pause", "Ctrl+P", A_PAUSE},
     {"Reset", "Ctrl+R", A_RESET},
+    {"", "", A_SEPARATOR},
+    {"Model: automatic", "", A_MODEL_AUTO},
+    {"Model: fx-CG10/20", "", A_MODEL_CG20},
+    {"Model: fx-CG50", "", A_MODEL_CG50},
 };
 static const Item VIEW_ITEMS[] = {
     {"Zoom 1x", "Ctrl+1", A_ZOOM1},
@@ -121,6 +126,8 @@ static bool checked(Action a)
 {
     if (a >= A_ZOOM1 && a <= A_ZOOM4)
         return view_scale == (int)(a - A_ZOOM1) + 1;
+    if (a >= A_MODEL_AUTO && a <= A_MODEL_CG50)
+        return view_model_choice == (ModelChoice)(a - A_MODEL_AUTO);
     return a == A_PAUSE && view_paused;
 }
 
@@ -317,6 +324,15 @@ static void run_action(Action a)
                 "OS syscalls are emulated on the host, and gint add-ins\n"
                 "run on an emulated SH7305 and R61524 display.");
         break;
+    case A_MODEL_AUTO: case A_MODEL_CG20: case A_MODEL_CG50: {
+        ModelChoice c = (ModelChoice)(a - A_MODEL_AUTO);
+        if (c != view_model_choice) {
+            view_model_choice = c;
+            if (view_have_app)
+                view_pending = CMD_RESET; /* run it again on the new model */
+        }
+        break;
+    }
     case A_NONE: case A_SEPARATOR: break;
     }
 }

@@ -21,9 +21,8 @@
 
 #define OFF(a) ((a) & (PAGE_SIZE - 1))
 
-/* fx-CG50 default clocks: FLL x450 (32768 Hz -> 14.7 MHz), PLL x16;
- * Iphi = /2 (117.96 MHz), Bphi = /4, Pphi = /8 (29.49 MHz). */
-#define FRQCR_DEFAULT  0x0F011112u
+/* Default PLL setup: FLL x450 (32768 Hz -> 14.7 MHz), PLL x16. FRQCR (the
+ * dividers) depends on the model, see emu.c. */
 #define PLLCR_DEFAULT  0x00005000u
 #define FLLFRQ_DEFAULT 0x00004384u
 #define CPG_FRQCR  0x00
@@ -754,7 +753,7 @@ static void lcd_write(void *ctx, uint32_t addr, uint32_t value, int size)
  * Setup
  *-------------------------------------------------------------------------*/
 
-bool sh7305_init(Sh7305 *hw, Cpu *cpu, Memory *mem, R61524 *lcd, int64_t rtc_base)
+bool sh7305_init(Sh7305 *hw, Cpu *cpu, Memory *mem, R61524 *lcd, int64_t rtc_base, uint32_t frqcr)
 {
     memset(hw, 0, sizeof *hw);
     hw->cpu = cpu;
@@ -766,7 +765,7 @@ bool sh7305_init(Sh7305 *hw, Cpu *cpu, Memory *mem, R61524 *lcd, int64_t rtc_bas
         hw->tmu[i].tcor = hw->tmu[i].tcnt = 0xFFFFFFFFu;
     for (int i = 0; i < 6; i++)
         hw->etmu[i].tcor = hw->etmu[i].tcnt = 0xFFFFFFFFu;
-    wr32(hw->bk_cpg, CPG_FRQCR, FRQCR_DEFAULT);
+    wr32(hw->bk_cpg, CPG_FRQCR, frqcr);
     wr32(hw->bk_cpg, CPG_PLLCR, PLLCR_DEFAULT);
     wr32(hw->bk_cpg, CPG_FLLFRQ, FLLFRQ_DEFAULT);
     wr32(hw->bk_ccn, 0x30, PVR_SH7305);

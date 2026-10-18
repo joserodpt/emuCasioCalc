@@ -13,21 +13,65 @@
 #define KEY_HOLD_MS  100
 #define KEY_GAP_MS   100
 
-bool emu_init(Emu *emu)
+/*
+ * fx-CG50: 8 MB of RAM at 0x0C000000, VRAM at its start (0xAC000000). The
+ * stack is in P1 above 0x8C000000 (gint checks this to tell the model) and
+ * above the 350 kB gint borrows at 0x8C0F0000.
+ *
+ * fx-CG10/20: 2 MB of RAM at 0x08000000, VRAM at its start (0xA8000000);
+ * gint borrows 0x880F0000, the add-in's static RAM is the last 512 kB.
+ *
+ * Clocks: the fx-CG50 runs the CPU at 117.96 MHz (Pphi 29.49 MHz); the
+ * fx-CG10/20 at half that, 58.98 MHz (Pphi 14.75 MHz), from the same PLL
+ * with bigger dividers.
+ */
+static const Layout LAYOUTS[] = {
+    [MODEL_CG50] = {
+        .ram_phys = 0x0C000000u, .ram_size = 0x00800000u,
+        .uram_phys = 0x0C200000u,
+        .vram = P2(0x0C000000u),
+        .stack_top = P1(0x0C180000u),
+        .heap_base = P1(0x0C400000u), .heap_size = 0x00400000u,
+        .frqcr = 0x0F011112u,
+    },
+    [MODEL_CG20] = {
+        .ram_phys = 0x08000000u, .ram_size = 0x00200000u,
+        .uram_phys = 0x08180000u,
+        .vram = P2(0x08000000u),
+        .stack_top = P1(0x08170000u),
+        .heap_base = P1(0x08030000u), .heap_size = 0x000C0000u,
+        .frqcr = 0x0F102203u,
+    },
+};
+
+const char *model_name(Model model)
+{
+    return model == MODEL_CG20 ? "fx-CG10/20" : "fx-CG50";
+}
+
+const Layout *model_layout(Model model)
+{
+    return &LAYOUTS[model];
+}
+
+bool emu_init(Emu *emu, Model model)
 {
     Memory *mem = &emu->mem;
+    const Layout *l = model_layout(model);
+    emu->model = model;
+    emu->layout = l;
     if (!mem_init(mem))
         return false;
     mem->lazy_io = true;
 
     emu->rom = mem_alloc(mem, ROM_SIZE);
-    emu->ram = mem_alloc(mem, RAM_SIZE);
+    emu->ram = mem_alloc(mem, l->ram_size);
     if (!emu->rom || !emu->ram)
         return false;
     mem_map_phys(mem, ROM_PHYS, ROM_SIZE, emu->rom, false);
-    mem_map_phys(mem, RAM_PHYS, RAM_SIZE, emu->ram, true);
+    mem_map_phys(mem, l->ram_phys, l->ram_size, emu->ram, true);
     /* Add-in static RAM: a U0 view of part of the physical RAM. */
-    mem_map(mem, URAM_BASE, URAM_SIZE, emu->ram + (URAM_PHYS - RAM_PHYS), true);
+    mem_map(mem, URAM_BASE, URAM_SIZE, emu->ram + (l->uram_phys - l->ram_phys), true);
     /* On-chip memories: IL RAM, X/Y RAM, RS memory. */
     if (!mem_add_ram(mem, 0xE5200000u, 0x4000, true) ||
         !mem_add_ram(mem, 0xE5000000u, 0x20000, true) ||
@@ -35,15 +79,17 @@ bool emu_init(Emu *emu)
         return false;
 
     r61524_reset(&emu->lcd);
-    if (!sh7305_init(&emu->hw, &emu->cpu, mem, &emu->lcd, (int64_t)time(NULL)))
+    if (!sh7305_init(&emu->hw, &emu->cpu, mem, &emu->lcd, (int64_t)time(NULL), l->frqcr))
         return false;
-    sh7305_add_mapping(&emu->hw, URAM_BASE, URAM_PHYS, URAM_SIZE);
+    sh7305_add_mapping(&emu->hw, URAM_BASE, l->uram_phys, URAM_SIZE);
 
-    emu->vram = emu->ram + (OS_VRAM & 0x1FFFFFFFu) - RAM_PHYS;
-    /* Add-ins written for the fx-CG10/20 hard-code VRAM at 0xA8000000; show
-     * those writes too by aliasing that address to the same VRAM. */
-    mem_map_phys(mem, PRIZM_VRAM_PHYS, (VRAM_SIZE + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1), emu->vram, true);
-    emu->heap_next = HEAP_BASE;
+    emu->vram = emu->ram + ((l->vram & 0x1FFFFFFFu) - l->ram_phys);
+    /* Add-ins written for the fx-CG10/20 hard-code VRAM at 0xA8000000; on
+     * the fx-CG50, show those writes too by aliasing that address. */
+    if (model == MODEL_CG50)
+        mem_map_phys(mem, model_layout(MODEL_CG20)->ram_phys, (VRAM_SIZE + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1),
+                     emu->vram, true);
+    emu->heap_next = l->heap_base;
     emu->data_dir = "storage"; /* main memory files, next to where we run */
     emu->cpu.event = sh7305_event;
     emu->cpu.event_user = &emu->hw;
@@ -60,7 +106,7 @@ void emu_free(Emu *emu)
 
 void emu_start(Emu *emu)
 {
-    cpu_reset(&emu->cpu, &emu->mem, ADDIN_BASE, OS_STACK_TOP);
+    cpu_reset(&emu->cpu, &emu->mem, ADDIN_BASE, emu->layout->stack_top);
     emu->cpu.r[4] = 1; /* isappli: started from the main menu */
     emu->cpu.r[5] = 0; /* optnum */
 }

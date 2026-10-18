@@ -6,12 +6,13 @@
 #include <stdint.h>
 
 /*
- * Address space of the fx-CG50 (SH7305: SH4AL-DSP core + peripherals).
+ * Address space of the fx-CG10/20/50 (SH7305: SH4AL-DSP core + peripherals).
  *
  * Physical memory (29 bits): ROM at 0x00000000 (32 MB), on-chip peripheral
- * registers in area 1 (0x04000000), RAM at 0x0C000000 (8 MB) and the R61524
- * display controller at 0x14000000. P1 (0x80000000) and P2 (0xA0000000) see
- * physical memory directly, which is how gint and the DMA reach it.
+ * registers in area 1 (0x04000000), RAM (where it is and how big depends on
+ * the model: see Layout in emu.h) and the R61524 display controller at
+ * 0x14000000. P1 (0x80000000) and P2 (0xA0000000) see physical memory
+ * directly, which is how gint and the DMA reach it.
  *
  * U0 (below 0x80000000) goes through the MMU. The OS maps the add-in at
  * 0x00300000 and its static RAM at 0x08100000; we install those mappings once
@@ -20,8 +21,6 @@
  */
 #define ROM_PHYS      0x00000000u
 #define ROM_SIZE      0x02000000u
-#define RAM_PHYS      0x0C000000u
-#define RAM_SIZE      0x00800000u
 #define LCD_PHYS      0x14000000u
 
 #define P1(phys)      ((phys) | 0x80000000u)
@@ -32,13 +31,6 @@
 #define ADDIN_PHYS    0x01000000u  /* where we put it in ROM */
 #define URAM_BASE     0x08100000u  /* add-in static RAM: .data, .bss */
 #define URAM_SIZE     0x00080000u
-#define URAM_PHYS     0x0C200000u
-
-#define OS_VRAM       P2(RAM_PHYS)              /* GetVRAMAddress (0xAC000000) */
-#define PRIZM_VRAM_PHYS 0x08000000u             /* fx-CG10/20 VRAM (0xA8000000), aliased */
-#define OS_STACK_TOP  P1(RAM_PHYS + 0x180000u)  /* r15 when the add-in starts */
-#define HEAP_BASE     P1(RAM_PHYS + 0x400000u)  /* our sys_malloc arena */
-#define HEAP_SIZE     0x00400000u
 
 /* Magic addresses the CPU loop intercepts instead of executing. */
 #define SYSCALL_ENTRY 0x80020070u  /* jump here with the syscall number in r0 */

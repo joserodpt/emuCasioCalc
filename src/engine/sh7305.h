@@ -69,7 +69,8 @@ typedef struct {
     uint8_t bk_ccn[PAGE_SIZE], bk_cpuopm[PAGE_SIZE];
 } Sh7305;
 
-bool sh7305_init(Sh7305 *hw, Cpu *cpu, Memory *mem, R61524 *lcd, int64_t rtc_base);
+/* frqcr: the clock setup the OS leaves (it sets the CPU speed). */
+bool sh7305_init(Sh7305 *hw, Cpu *cpu, Memory *mem, R61524 *lcd, int64_t rtc_base, uint32_t frqcr);
 void sh7305_add_mapping(Sh7305 *hw, uint32_t vaddr, uint32_t paddr, uint32_t size);
 
 /* CPU clock, from the CPG registers (117.96 MHz by default). */

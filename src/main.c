@@ -31,7 +31,9 @@ static void usage(const char *argv0)
             "  --headless         no window; input only comes from --keys\n"
             "  --screenshot F     save the last frame to F (.bmp) on exit\n"
             "  --icon F           save the add-in's menu icon to F (.bmp)\n"
-            "  --info             open the add-in information window at start\n",
+            "  --info             open the add-in information window at start\n"
+            "  --model M          calculator to emulate: auto (default, detected from the\n"
+            "                     add-in), cg20 (fx-CG10/20) or cg50 (fx-CG50)\n",
             argv0);
 }
 
@@ -54,26 +56,48 @@ static void show_welcome(void)
     platform_status("No add-in");
 }
 
-/* (Re)builds the machine and loads the add-in, ready to run. */
-static bool load(Emu *emu, const Options *opt, const char *path, G3aInfo *info, bool first)
+/* The model to emulate for an add-in: the detected one unless the user
+ * chose (Emulation > Model, --model). */
+static Model pick_model(const G3aInfo *info)
 {
-    if (!first)
+    switch (platform_model_choice()) {
+    case CHOICE_CG20: return MODEL_CG20;
+    case CHOICE_CG50: return MODEL_CG50;
+    default: return info->model;
+    }
+}
+
+/* (Re)builds the machine for the add-in's model and loads it, ready to run.
+ * fresh: emu has never been initialized. */
+static bool load(Emu *emu, const Options *opt, const char *path, G3aInfo *info, bool fresh)
+{
+    static G3aFile file;
+    if (!g3a_read(path, &file))
+        return false;
+    Model model = pick_model(&file.info);
+    if (!fresh)
         emu_free(emu);
     memset(emu, 0, sizeof *emu);
-    if (!emu_init(emu)) {
+    bool ok = emu_init(emu, model);
+    if (!ok)
         fprintf(stderr, "out of memory\n");
-        return false;
-    }
     emu->trace = opt->trace;
     emu->headless = opt->headless;
     emu->mem.trace_io = opt->trace_hw;
     emu->cpu.trace_exceptions = opt->trace_hw;
     emu->hw.trace = opt->trace_hw;
-    if (first && opt->keys && !emu_parse_keys(emu, opt->keys))
+    if (ok && fresh && opt->keys)
+        ok = emu_parse_keys(emu, opt->keys);
+    if (ok)
+        ok = g3a_map(emu, &file);
+    *info = file.info;
+    g3a_close(&file);
+    if (!ok)
         return false;
-    if (!g3a_load(emu, path, info))
-        return false;
-    platform_set_app(info, path);
+    printf("loaded %s: %u bytes of code, running as %s (%s%s)\n", path, file.size - G3A_HEADER_SIZE,
+           model_name(model), platform_model_choice() == CHOICE_AUTO ? "" : "chosen; detected: ",
+           platform_model_choice() == CHOICE_AUTO ? info->model_reason : model_name(info->model));
+    platform_set_app(info, path, model);
     emu_start(emu);
     platform_status(NULL);
     return true;
@@ -129,6 +153,7 @@ int main(int argc, char **argv)
     Options opt = {0};
     const char *path = NULL, *screenshot = NULL, *icon = NULL;
     bool show_info = false;
+    const char *model = "auto";
     static Emu emu;
     static G3aInfo info;
 
@@ -141,10 +166,19 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--screenshot") && i + 1 < argc) screenshot = argv[++i];
         else if (!strcmp(argv[i], "--icon") && i + 1 < argc) icon = argv[++i];
         else if (!strcmp(argv[i], "--info")) show_info = true;
+        else if (!strcmp(argv[i], "--model") && i + 1 < argc) model = argv[++i];
         else if (argv[i][0] != '-' && !path) path = argv[i];
         else { usage(argv[0]); return 2; }
     }
     if (!path && opt.headless) {
+        usage(argv[0]);
+        return 2;
+    }
+    if (!strcmp(model, "cg20") || !strcmp(model, "cg10")) {
+        platform_set_model_choice(CHOICE_CG20);
+    } else if (!strcmp(model, "cg50")) {
+        platform_set_model_choice(CHOICE_CG50);
+    } else if (strcmp(model, "auto")) {
         usage(argv[0]);
         return 2;
     }

@@ -34,7 +34,7 @@ static void read_text(Emu *emu, uint32_t addr, char *out, size_t cap)
 SC(sc_get_vram_address)
 {
     (void)emu; (void)a;
-    return OS_VRAM;
+    return emu->layout->vram;
 }
 
 SC(sc_bdisp_allclr_vram)

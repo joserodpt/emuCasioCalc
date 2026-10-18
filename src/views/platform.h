@@ -28,9 +28,16 @@ bool platform_save_screenshot(const char *path);
 /* Saves w x h host-endian RGB565 pixels as a .bmp file. */
 bool platform_save_bmp(const char *path, const uint16_t *pixels, int w, int h);
 
-/* The add-in being run: its name goes in the title bar, and Add-in info
- * shows its header and icons (File > Save icon saves the icon). */
-void platform_set_app(const G3aInfo *info, const char *path);
+/* The add-in being run, and the model it runs on: they go in the title
+ * bar, and Add-in info shows the header, icons and model detection
+ * (File > Save icon saves the icon). */
+void platform_set_app(const G3aInfo *info, const char *path, Model model);
+
+/* Emulation > Model: be the model detected for each add-in, or force one.
+ * Changing it reloads the add-in (CMD_RESET). */
+typedef enum { CHOICE_AUTO, CHOICE_CG20, CHOICE_CG50 } ModelChoice;
+ModelChoice platform_model_choice(void);
+void platform_set_model_choice(ModelChoice choice);
 
 /* Opens the Add-in information window (as the Info button does). */
 void platform_show_info(void);

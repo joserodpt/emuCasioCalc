@@ -65,7 +65,7 @@ static SC(sc_wait_ms)
 static SC(sc_malloc)
 {
     uint32_t size = (a[0] + 7) & ~7u;
-    if (emu->heap_next + size > HEAP_BASE + HEAP_SIZE)
+    if (emu->heap_next + size > emu->layout->heap_base + emu->layout->heap_size)
         return 0;
     uint32_t p = emu->heap_next;
     emu->heap_next += size;
