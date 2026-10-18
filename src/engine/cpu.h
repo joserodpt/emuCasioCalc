@@ -82,6 +82,8 @@ struct Cpu {
     SyscallHandler syscall;
     void *syscall_user;
     bool trace_exceptions;
+    /* What went wrong, for the user: the last error lines (cpu_report). */
+    char error[256];
 };
 
 void cpu_reset(Cpu *cpu, Memory *mem, uint32_t entry, uint32_t stack_top);
@@ -92,6 +94,10 @@ void cpu_dump(const Cpu *cpu);
 
 /* Writes SR, switching register banks if MD/RB change. */
 void cpu_set_sr(Cpu *cpu, uint32_t sr);
+/* Prints an error line to stderr and keeps it in cpu->error (the last few
+ * lines are kept, newline-separated). */
+void cpu_report(Cpu *cpu, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+
 /* Updates the pending interrupt request. */
 void cpu_set_irq(Cpu *cpu, int level, uint32_t code);
 

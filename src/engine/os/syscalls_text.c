@@ -37,10 +37,13 @@ SC(sc_get_vram_address)
     return emu->layout->vram;
 }
 
+/* The OS fills VRAM and sends it to the display with the DMA, and waits
+ * for it: same cost as those DMA transfers. */
 SC(sc_bdisp_allclr_vram)
 {
     (void)a;
     display_fill(emu->vram, 0xFFFF);
+    sc_spend(emu, VRAM_SIZE * DMA_RAM_CYCLES_PER_BYTE);
     return 0;
 }
 
@@ -48,6 +51,7 @@ SC(sc_bdisp_putdisp_dd)
 {
     (void)a;
     r61524_blit_vram(&emu->lcd, emu->vram);
+    sc_spend(emu, VRAM_SIZE * DMA_LCD_CYCLES_PER_BYTE);
     return 0;
 }
 

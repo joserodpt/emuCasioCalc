@@ -37,6 +37,10 @@ void platform_set_app(const G3aInfo *info, const char *path, Model model);
  * Changing it reloads the add-in (CMD_RESET). */
 typedef enum { CHOICE_AUTO, CHOICE_CG20, CHOICE_CG50 } ModelChoice;
 ModelChoice platform_model_choice(void);
+
+/* Emulation > Timing: realistic (default) or fast. */
+bool platform_realistic(void);
+void platform_set_realistic(bool realistic);
 void platform_set_model_choice(ModelChoice choice);
 
 /* Opens the Add-in information window (as the Info button does). */

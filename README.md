@@ -30,17 +30,20 @@ ctest --test-dir build --output-on-failure
 ./build/emucasiofxcg --icon icon.bmp some-addin.g3a     # also save the add-in's menu icon
 ./build/emucasiofxcg --info some-addin.g3a              # open the add-in info window at start
 ./build/emucasiofxcg --model cg20 some-addin.g3a        # force the fx-CG10/20 (default: detect)
+./build/emucasiofxcg --timing fast some-addin.g3a       # no OS/memory/DMA delays (default: realistic)
 
 ./run.sh                  # rebuilds if the sources changed, opens an empty window (File > Open)
 ./run.sh some-addin.g3a   # same, starting that add-in (quote paths with spaces)
 ```
 
 The window has a menu bar: **File** (open another add-in, add-in info, save a
-screenshot or the add-in's icon), **Emulation** (pause, reset, model), **View**
+screenshot or the add-in's icon), **Emulation** (pause, reset, model, timing), **View**
 (zoom 1x-4x) and **Help**, plus an **Info** button that opens a window with the
 add-in's name, header fields and icon (hover the icon to see its selected
 version). Shortcuts: Ctrl+O, Ctrl+I, Ctrl+S, Ctrl+P, Ctrl+R, Ctrl+1..4, Ctrl+Q.
 When the add-in exits, the window stays open so you can reset or open another.
+If it stops with an error, the error is printed on the terminal and shown on
+the screen in a red-bordered box.
 
 Saved data goes to a `storage` folder in the directory you run the emulator
 from: files in the storage memory (`Bfile_*` syscalls, paths like
@@ -135,12 +138,23 @@ Addresses on the fx-CG50 (fx-CG10/20 in brackets):
 
 One instruction counts as one CPU cycle at the model's default clock (117.96
 MHz on the fx-CG50, 58.98 MHz on the fx-CG10/20), read from the emulated CPG
-registers. Timers and the RTC run from that
-count, `SLEEP` skips ahead to the next timer interrupt, and the window keeps
-emulated time in step with real time. DMA transfers move data at once but
-report completion after roughly the time real hardware takes (a full-screen
-`dupdate()` is about 11 ms), so frame rates are in the right ballpark, not
-cycle-exact.
+registers. Timers and the RTC run from that count, `SLEEP` skips ahead to the
+next timer interrupt, and the window keeps emulated time in step with real
+time.
+
+Two timing modes (Emulation > Timing, or `--timing`):
+
+- **Realistic** (default): things the calculator spends time on take emulated
+  time too. Each OS syscall costs a few microseconds (key polls about 20 µs),
+  `Bdisp_PutDisp_DD` and `Bdisp_AllClr_VRAM` cost what their DMA transfer
+  does, accesses to uncached memory (the OS's VRAM at `0xAC000000`) stall
+  the CPU, and DMA transfers report completion after roughly the time real
+  hardware takes (a full-screen `dupdate()` is about 11 ms). Add-ins that run
+  "as fast as they can" then run at about their real speed. The figures are
+  estimates (constants in `emu.c`, `sh7305.h`, `syscalls*.c`), not
+  measurements.
+- **Fast**: all of the above takes no time; add-ins run as fast as the
+  interpreter allows.
 
 ## How to grow it
 

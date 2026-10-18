@@ -18,6 +18,8 @@
 #define BIG_CELL_H  24
 #define MINI_CELL_W 10
 #define MINI_CELL_H 18
+#define SMALL_CELL_W 8   /* the 8x8 font unscaled, 10 px lines */
+#define SMALL_CELL_H 10
 
 void display_fill(uint8_t *vram, uint16_t color);
 void display_set_pixel(uint8_t *vram, int x, int y, uint16_t color);
@@ -33,6 +35,9 @@ void display_print_xy(uint8_t *vram, int x, int y, const char *text, int mode, i
 
 /* Big font at pixel coordinates. */
 void display_text_big(uint8_t *vram, int x, int y, const char *text, uint16_t fg, uint16_t bg, bool opaque);
+
+/* 8x8 font at pixel coordinates, transparent background. */
+void display_text_small(uint8_t *vram, int x, int y, const char *text, uint16_t fg);
 
 /* Mini font at pixel coordinates; stops before xlimit. Draws only if draw is
  * set. Returns the x after the text. */

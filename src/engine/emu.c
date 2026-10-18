@@ -25,6 +25,13 @@
  * fx-CG10/20 at half that, 58.98 MHz (Pphi 14.75 MHz), from the same PLL
  * with bigger dividers.
  */
+/* Uncached accesses (P2: the OS's VRAM at 0xAC000000 / 0xA8000000) go to
+ * the RAM bus, which runs at a fraction of the CPU clock: extra cycles per
+ * access. Estimates (no published figures); writes are partly absorbed by
+ * the write buffer, reads stall fully. */
+#define UNCACHED_READ_CYCLES  12
+#define UNCACHED_WRITE_CYCLES 4
+
 static const Layout LAYOUTS[] = {
     [MODEL_CG50] = {
         .ram_phys = 0x0C000000u, .ram_size = 0x00800000u,
@@ -64,6 +71,7 @@ bool emu_init(Emu *emu, Model model)
         return false;
     mem->lazy_io = true;
 
+
     emu->rom = mem_alloc(mem, ROM_SIZE);
     emu->ram = mem_alloc(mem, l->ram_size);
     if (!emu->rom || !emu->ram)
@@ -91,10 +99,19 @@ bool emu_init(Emu *emu, Model model)
                      emu->vram, true);
     emu->heap_next = l->heap_base;
     emu->data_dir = "storage"; /* main memory files, next to where we run */
+    emu_set_realistic(emu, true);
     emu->cpu.event = sh7305_event;
     emu->cpu.event_user = &emu->hw;
     syscalls_install(emu);
     return true;
+}
+
+void emu_set_realistic(Emu *emu, bool realistic)
+{
+    emu->realistic = realistic;
+    emu->mem.uncached_read_cycles = realistic ? UNCACHED_READ_CYCLES : 0;
+    emu->mem.uncached_write_cycles = realistic ? UNCACHED_WRITE_CYCLES : 0;
+    emu->hw.dma_instant = !realistic;
 }
 
 void emu_free(Emu *emu)

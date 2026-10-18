@@ -79,6 +79,12 @@ void display_print_xy(uint8_t *vram, int x, int y, const char *text, int mode, i
     display_text_big(vram, (x - 1) * BIG_CELL_W, y * BIG_CELL_H, text, fg, bg, opaque);
 }
 
+void display_text_small(uint8_t *vram, int x, int y, const char *text, uint16_t fg)
+{
+    for (const char *c = text; *c; c++, x += SMALL_CELL_W)
+        draw_char(vram, x, y, *c, SMALL_CELL_W, SMALL_CELL_H, 1, 1, 0, 1, fg, 0, false);
+}
+
 int display_text_mini(uint8_t *vram, int x, int y, const char *text, uint16_t fg, uint16_t bg,
                       bool opaque, int xlimit, bool draw)
 {

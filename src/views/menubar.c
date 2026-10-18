@@ -9,7 +9,7 @@
 typedef enum {
     A_NONE, A_SEPARATOR, A_OPEN, A_INFO, A_SCREENSHOT, A_SAVE_ICON, A_QUIT, A_PAUSE, A_RESET,
     A_ZOOM1, A_ZOOM2, A_ZOOM3, A_ZOOM4, A_KEYS, A_ABOUT,
-    A_MODEL_AUTO, A_MODEL_CG20, A_MODEL_CG50,
+    A_MODEL_AUTO, A_MODEL_CG20, A_MODEL_CG50, A_TIMING_REAL, A_TIMING_FAST,
 } Action;
 
 typedef struct {
@@ -33,6 +33,9 @@ static const Item EMU_ITEMS[] = {
     {"Model: automatic", "", A_MODEL_AUTO},
     {"Model: fx-CG10/20", "", A_MODEL_CG20},
     {"Model: fx-CG50", "", A_MODEL_CG50},
+    {"", "", A_SEPARATOR},
+    {"Timing: realistic", "", A_TIMING_REAL},
+    {"Timing: fast", "", A_TIMING_FAST},
 };
 static const Item VIEW_ITEMS[] = {
     {"Zoom 1x", "Ctrl+1", A_ZOOM1},
@@ -128,6 +131,8 @@ static bool checked(Action a)
         return view_zoom() == (int)(a - A_ZOOM1) + 1;
     if (a >= A_MODEL_AUTO && a <= A_MODEL_CG50)
         return view_model_choice == (ModelChoice)(a - A_MODEL_AUTO);
+    if (a == A_TIMING_REAL || a == A_TIMING_FAST)
+        return view_realistic == (a == A_TIMING_REAL);
     return a == A_PAUSE && view_paused;
 }
 
@@ -340,6 +345,8 @@ static void run_action(Action a)
         }
         break;
     }
+    case A_TIMING_REAL: view_realistic = true; break;
+    case A_TIMING_FAST: view_realistic = false; break;
     case A_NONE: case A_SEPARATOR: break;
     }
 }

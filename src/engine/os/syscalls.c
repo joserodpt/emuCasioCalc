@@ -20,11 +20,22 @@
 
 typedef uint32_t (*SyscallFn)(Emu *emu, const uint32_t *args);
 
+/* Emulated time a syscall takes: the real OS runs code for each one (a
+ * few microseconds for simple calls); slow calls add their own cost with
+ * sc_spend(). Estimates, there are no published timings. */
+#define SYSCALL_CYCLES 300
+
 typedef struct {
     uint32_t number;
     const char *name;
     SyscallFn fn;
 } Syscall;
+
+void sc_spend(Emu *emu, double cycles)
+{
+    if (emu->realistic)
+        emu->cpu.instructions += (uint64_t)cycles;
+}
 
 void sc_string(Emu *emu, uint32_t addr, char *out, size_t cap)
 {
@@ -223,16 +234,17 @@ static void dispatch(Cpu *cpu, void *user)
             printf("%9.3f ms  syscall %04X %-24s (%08X, %08X, %08X, %08X)\n",
                    (double)cpu->instructions * 1000 / sh7305_iphi_hz(&emu->hw), number, SYSCALLS[i].name,
                    args[0], args[1], args[2], args[3]);
+        sc_spend(emu, SYSCALL_CYCLES);
         cpu->r[0] = SYSCALLS[i].fn(emu, args);
         cpu->pc = cpu->pr;
         if (emu->mem.fault) {
-            fprintf(stderr, "syscall %04X %s: bad address 0x%08X\n", number, SYSCALLS[i].name,
+            cpu_report(cpu, "syscall %04X %s: bad address 0x%08X", number, SYSCALLS[i].name,
                     emu->mem.fault_addr);
             cpu->state = CPU_ERROR;
         }
         return;
     }
-    fprintf(stderr, "unimplemented syscall 0x%04X (r4=%08X r5=%08X r6=%08X r7=%08X), called from 0x%08X\n",
+    cpu_report(cpu, "unimplemented syscall 0x%04X (r4=%08X r5=%08X r6=%08X r7=%08X), called from 0x%08X",
             number, args[0], args[1], args[2], args[3], cpu->pr);
     cpu->state = CPU_ERROR;
 }

@@ -46,10 +46,36 @@ void mem_map(Memory *mem, uint32_t vaddr, uint32_t size, uint8_t *host, bool wri
     }
 }
 
+static void fault(Memory *mem, uint32_t addr, FaultKind kind, bool write);
+
+static uint32_t uncached_read(void *ctx, uint32_t addr, int size)
+{
+    UncachedRegion *r = ctx;
+    r->mem->stall_cycles += r->mem->uncached_read_cycles;
+    return be_read(r->host + (addr - r->base), size);
+}
+
+static void uncached_write(void *ctx, uint32_t addr, uint32_t value, int size)
+{
+    UncachedRegion *r = ctx;
+    if (!r->writable) {
+        fault(r->mem, addr, FAULT_READONLY, true);
+        return;
+    }
+    r->mem->stall_cycles += r->mem->uncached_write_cycles;
+    be_write(r->host + (addr - r->base), value, size);
+}
+
 void mem_map_phys(Memory *mem, uint32_t paddr, uint32_t size, uint8_t *host, bool writable)
 {
     mem_map(mem, P1(paddr), size, host, writable);
-    mem_map(mem, P2(paddr), size, host, writable);
+    if (mem->uncached_count >= (int)(sizeof mem->uncached / sizeof mem->uncached[0])) {
+        mem_map(mem, P2(paddr), size, host, writable); /* out of slots: no cost */
+        return;
+    }
+    UncachedRegion *r = &mem->uncached[mem->uncached_count++];
+    *r = (UncachedRegion){host, P2(paddr), size, writable, mem};
+    mem_add_mmio(mem, P2(paddr), size, uncached_read, uncached_write, r);
 }
 
 uint8_t *mem_add_ram(Memory *mem, uint32_t vaddr, uint32_t size, bool writable)

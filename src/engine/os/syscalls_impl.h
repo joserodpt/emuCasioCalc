@@ -12,6 +12,9 @@
 #define SYSCALL_ARGS 12
 #define SC(name) uint32_t name(Emu *emu, const uint32_t *a)
 
+/* Charges emulated time for work the real OS would do. */
+void sc_spend(Emu *emu, double cycles);
+
 /* Reads a NUL-terminated string from emulated memory. */
 void sc_string(Emu *emu, uint32_t addr, char *out, size_t cap);
 

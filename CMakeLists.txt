@@ -99,7 +99,8 @@ if(FXSDK)
   set_tests_properties(gint_stress PROPERTIES PASS_REGULAR_EXPRESSION "add-in exited")
   # F1 makes a misaligned write: gint must catch it and show its panic screen.
   add_test(NAME gint_panic
-    COMMAND emucasiofxcg --headless --keys F1 --screenshot gint-panic.bmp gint-stress/GintStress.g3a
+    COMMAND emucasiofxcg --headless --keys SHIFT,SHIFT,SHIFT,SHIFT,SHIFT,SHIFT,SHIFT,SHIFT,F1
+            --screenshot gint-panic.bmp gint-stress/GintStress.g3a
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
   # Bfile_* syscalls through gint's world switch; leaves storage/fls0/EMUFILES.txt.
   add_test(NAME gint_files

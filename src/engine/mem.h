@@ -64,7 +64,16 @@ typedef struct {
     void *ctx;
 } MmioDevice;
 
+/* Physical memory seen through P2, the uncached window: same bytes as P1,
+ * but every access goes out to the bus (see mem_map_phys). */
 typedef struct {
+    uint8_t *host;
+    uint32_t base, size;
+    bool writable;
+    struct Memory_ *mem;
+} UncachedRegion;
+
+typedef struct Memory_ {
     uint8_t **rd;        /* per page: host address of the page, NULL if not plain memory */
     uint8_t **wr;        /* same, NULL for read-only pages */
     uint8_t *mmio_of;    /* per page: index + 1 into mmio[], 0 if none */
@@ -76,6 +85,13 @@ typedef struct {
     /* Unknown control registers get a zeroed scratch page on first access
      * (so save/restore of registers we don't model works). Logged once. */
     bool lazy_io;
+
+    UncachedRegion uncached[4];
+    int uncached_count;
+    /* Extra CPU cycles per uncached access (0 = no cost, e.g. in tests), and
+     * the stall accumulated since the CPU last collected it. */
+    uint32_t uncached_read_cycles, uncached_write_cycles;
+    uint32_t stall_cycles;
     bool trace_io;
 
     FaultKind fault;     /* set by the first faulting access, cleared by the CPU */
@@ -91,7 +107,8 @@ uint8_t *mem_alloc(Memory *mem, uint32_t size);
 
 /* Maps [vaddr, vaddr+size) to host memory. Page-aligned. */
 void mem_map(Memory *mem, uint32_t vaddr, uint32_t size, uint8_t *host, bool writable);
-/* Maps physical memory at its P1 and P2 addresses. */
+/* Maps physical memory at its P1 (cached, plain memory) and P2 (uncached:
+ * each access adds uncached_*_cycles to stall_cycles) addresses. */
 void mem_map_phys(Memory *mem, uint32_t paddr, uint32_t size, uint8_t *host, bool writable);
 /* Convenience for tests: allocate and map RAM. */
 uint8_t *mem_add_ram(Memory *mem, uint32_t vaddr, uint32_t size, bool writable);

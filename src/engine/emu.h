@@ -44,6 +44,9 @@ typedef struct {
     uint8_t *vram;        /* OS VRAM (GetVRAMAddress), in RAM */
     uint32_t heap_next;
     bool trace;           /* log every syscall to stdout */
+    /* Realistic timing: syscalls, uncached memory and DMA transfers take the
+     * time they would on the calculator. Off ("fast"): they take none. */
+    bool realistic;
     bool headless;
 
     /* --keys: GetKey pops them; for add-ins that scan the keyboard
@@ -69,6 +72,8 @@ typedef struct {
 /* Builds the memory map and peripherals of a model. */
 bool emu_init(Emu *emu, Model model);
 void emu_free(Emu *emu);
+/* Switches between realistic and fast timing (can change while running). */
+void emu_set_realistic(Emu *emu, bool realistic);
 /* Resets the CPU to the add-in's entry point, like the OS launching it. */
 void emu_start(Emu *emu);
 

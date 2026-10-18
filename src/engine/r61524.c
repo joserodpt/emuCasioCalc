@@ -92,6 +92,18 @@ void r61524_blit_vram(R61524 *lcd, const uint8_t *vram)
     lcd->dirty = true;
 }
 
+void r61524_read_vram(const R61524 *lcd, uint8_t *vram)
+{
+    for (int y = 0; y < LCD_HEIGHT; y++) {
+        const uint16_t *src = lcd->fb + (y + Y_ORIGIN) * PANEL_WIDTH + X_ORIGIN;
+        uint8_t *dst = vram + y * LCD_WIDTH * 2;
+        for (int x = 0; x < LCD_WIDTH; x++) {
+            dst[2 * x] = src[x] >> 8;
+            dst[2 * x + 1] = src[x] & 0xFF;
+        }
+    }
+}
+
 void r61524_set_border(R61524 *lcd, uint16_t color)
 {
     lcd->border = color;

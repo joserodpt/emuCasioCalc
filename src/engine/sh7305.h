@@ -21,6 +21,12 @@
  * cpu->next_event so that SLEEP can skip ahead to it.
  */
 
+/* DMA transfer cost in CPU cycles per byte, roughly matching gint on a real
+ * fx-CG50 at default clocks: a full-screen dupdate() (177 kB to the display)
+ * takes about 11 ms, a DMA dclear() (177 kB to RAM) about 2.5 ms. */
+#define DMA_LCD_CYCLES_PER_BYTE 7.3
+#define DMA_RAM_CYCLES_PER_BYTE 1.7
+
 typedef struct {
     uint32_t tcor, tcnt;
     uint16_t tcr;
@@ -55,6 +61,7 @@ typedef struct {
     int64_t rtc_base;       /* Unix time at cycle 0 */
 
     uint64_t dma_end[6];    /* cycle when a running transfer reports TE, 0 = idle */
+    bool dma_instant;       /* transfers end at once (fast timing) */
 
     uint8_t keys[12];       /* key matrix: keys[row] bit col, as KEYSC reports it */
     bool keysc_used;        /* the add-in scans the keyboard itself (gint) */

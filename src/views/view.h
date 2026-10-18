@@ -20,6 +20,7 @@ extern bool view_have_app;
 extern char view_app_path[1024];
 extern Model view_model;        /* the model being emulated */
 extern ModelChoice view_model_choice;
+extern bool view_realistic;
 
 void view_redraw(void);
 /* View > Zoom: sizes the window for the screen at exactly scale x. */

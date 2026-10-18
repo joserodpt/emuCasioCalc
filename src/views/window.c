@@ -23,6 +23,7 @@ bool view_have_app;
 char view_app_path[1024];
 Model view_model;
 ModelChoice view_model_choice;
+bool view_realistic = true;
 
 static SDL_Texture *screen;    /* the panel, 396 x 224 */
 static SDL_Texture *upscaled;  /* the panel at a whole scale, see draw_screen() */
@@ -285,6 +286,16 @@ void platform_set_app(const G3aInfo *info, const char *path, Model model)
              model_name(model));
     SDL_SetWindowTitle(view_window, title);
     info_window_refresh();
+}
+
+bool platform_realistic(void)
+{
+    return view_realistic;
+}
+
+void platform_set_realistic(bool realistic)
+{
+    view_realistic = realistic;
 }
 
 ModelChoice platform_model_choice(void)

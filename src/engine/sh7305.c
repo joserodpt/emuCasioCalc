@@ -54,11 +54,6 @@
 #define CHCR_DE    0x00000001u
 #define CHCR_TE    0x00000002u
 #define CHCR_IE    0x00000004u
-/* Transfer cost in CPU cycles per byte, roughly matching gint on a real
- * fx-CG50 at default clocks: a full-screen dupdate() (177 kB to the display)
- * takes about 11 ms, a DMA dclear() (177 kB to RAM) about 2.5 ms. */
-#define DMA_LCD_CYCLES_PER_BYTE 7.3
-#define DMA_RAM_CYCLES_PER_BYTE 1.7
 
 static uint32_t rd32(const uint8_t *bk, uint32_t off) { return be_read(bk + off, 4); }
 static void wr32(uint8_t *bk, uint32_t off, uint32_t v) { be_write(bk + off, v, 4); }
@@ -606,10 +601,15 @@ static uint32_t utlb_read(void *ctx, uint32_t addr, int size)
  * DMA controller
  *-------------------------------------------------------------------------*/
 
-/* Physical address -> an address we can access (P2 for the 29-bit space). */
+/* Physical address -> an address we can access: P1 for memory (the DMA
+ * doesn't stall the CPU like uncached accesses do), P2 for the peripheral
+ * areas (1: on-chip registers, 5: the display), which only exist there. */
 static uint32_t dma_vaddr(uint32_t a)
 {
-    return a < 0x20000000u ? P2(a) : a;
+    if (a >= 0x20000000u)
+        return a;
+    uint32_t area = a >> 26;
+    return area == 1 || area == 5 ? P2(a) : P1(a);
 }
 
 static void dma_transfer(Sh7305 *hw, int ch)
@@ -659,7 +659,7 @@ static void dma_transfer(Sh7305 *hw, int ch)
      * hardware would be done. */
     double per_byte = (rd32(bk, base + 4) & 0x1C000000u) == LCD_PHYS ? DMA_LCD_CYCLES_PER_BYTE
                                                                        : DMA_RAM_CYCLES_PER_BYTE;
-    hw->dma_end[ch] = hw->cpu->instructions + 1 + (uint64_t)(per_byte * count * unit);
+    hw->dma_end[ch] = hw->cpu->instructions + 1 + (hw->dma_instant ? 0 : (uint64_t)(per_byte * count * unit));
 }
 
 /* Sets TE on transfers whose time is up; forgets disabled ones. Returns

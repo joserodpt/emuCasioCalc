@@ -9,7 +9,9 @@
  */
 #include "cpu.h"
 
+#include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
 #define RN  cpu->r[n]
 #define RM  cpu->r[m]
@@ -57,13 +59,35 @@ void cpu_set_irq(Cpu *cpu, int level, uint32_t code)
     cpu->irq_code = code;
 }
 
+void cpu_report(Cpu *cpu, const char *fmt, ...)
+{
+    char line[160];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(line, sizeof line, fmt, ap);
+    va_end(ap);
+    fprintf(stderr, "%s\n", line);
+    /* Append, dropping the oldest lines when full. */
+    while (strlen(cpu->error) + strlen(line) + 2 > sizeof cpu->error) {
+        char *nl = strchr(cpu->error, '\n');
+        if (!nl) {
+            cpu->error[0] = '\0';
+            break;
+        }
+        memmove(cpu->error, nl + 1, strlen(nl + 1) + 1);
+    }
+    if (cpu->error[0])
+        strcat(cpu->error, "\n");
+    strcat(cpu->error, line);
+}
+
 static void exec(Cpu *cpu, uint32_t pc);
 
 static void take_exception(Cpu *cpu, uint32_t code, uint32_t offset, uint32_t spc)
 {
     cpu->exception = true;
     if (!cpu->vbr || (cpu->sr & SR_BL)) {
-        fprintf(stderr, "cpu: exception 0x%03X at 0x%08X with no handler%s\n", code, spc,
+        cpu_report(cpu, "cpu: exception 0x%03X at 0x%08X with no handler%s", code, spc,
                 cpu->vbr ? " (SR.BL is set)" : " (VBR is 0)");
         cpu->state = CPU_ERROR;
         return;
@@ -94,7 +118,7 @@ static void accept_interrupt(Cpu *cpu)
 
 static void illegal(Cpu *cpu, uint16_t op, uint32_t pc)
 {
-    fprintf(stderr, "cpu: illegal or unimplemented instruction 0x%04X at 0x%08X\n", op, pc);
+    cpu_report(cpu, "cpu: illegal or unimplemented instruction 0x%04X at 0x%08X", op, pc);
     if (cpu->in_delay_slot)
         take_exception(cpu, EXC_ILLEGAL_SLOT, 0x100, pc - 2);
     else
@@ -595,7 +619,7 @@ static void memory_exception(Cpu *cpu)
     FaultKind kind = mem->fault;
     mem->fault = FAULT_NONE;
 
-    fprintf(stderr, "cpu: %s %s at 0x%08X by instruction at 0x%08X\n", fault_name(kind),
+    cpu_report(cpu, "cpu: %s %s at 0x%08X by instruction at 0x%08X", fault_name(kind),
             write ? "write" : "read", addr, cpu->op_pc);
     cpu->tea = addr;
     bool translated = addr < 0x80000000u || (addr >= 0xC0000000u && addr < 0xE0000000u);
@@ -636,7 +660,7 @@ static inline void step_one(Cpu *cpu)
         if (cpu->syscall) {
             cpu->syscall(cpu, cpu->syscall_user);
         } else {
-            fprintf(stderr, "cpu: syscall 0x%04X with no handler\n", cpu->r[0]);
+            cpu_report(cpu, "cpu: syscall 0x%04X with no handler", cpu->r[0]);
             cpu->state = CPU_ERROR;
         }
         cpu->attention = true;
@@ -650,6 +674,10 @@ static inline void step_one(Cpu *cpu)
 
     cpu->exception = false;
     exec(cpu, cpu->pc);
+    if (cpu->mem->stall_cycles) { /* uncached memory accesses */
+        cpu->instructions += cpu->mem->stall_cycles;
+        cpu->mem->stall_cycles = 0;
+    }
     if (cpu->mem->fault) {
         memory_exception(cpu);
         return;

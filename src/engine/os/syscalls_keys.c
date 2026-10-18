@@ -24,10 +24,15 @@ static void os_matrix(int k, int *col, int *row)
     *row = (m >> 4) + 1;
 }
 
+/* The OS's non-blocking key reads "stall for a small amount of time"
+ * (WikiPrizm, PRGM_GetKey): about 20 us here, an estimate. */
+#define KEY_POLL_CYCLES 2400
+
 /* First key held right now, or -1. */
 static int held_key(Emu *emu)
 {
     emu->polls_keys = true;
+    sc_spend(emu, KEY_POLL_CYCLES);
     for (int k = 0; k < KEY_COUNT; k++)
         if (emu->key_down[k])
             return k;

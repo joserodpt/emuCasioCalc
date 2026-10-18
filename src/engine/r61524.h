@@ -33,6 +33,9 @@ uint16_t r61524_read(R61524 *lcd);
 /* What Bdisp_PutDisp_DD does: shows the OS's 384x216 VRAM (big-endian
  * RGB565), centred on the panel. */
 void r61524_blit_vram(R61524 *lcd, const uint8_t *vram);
+/* The inverse: the panel's VRAM-sized centre area as big-endian RGB565. */
+void r61524_read_vram(const R61524 *lcd, uint8_t *vram);
+
 /* DrawFrame: repaints the border around the VRAM area. */
 void r61524_set_border(R61524 *lcd, uint16_t color);
 
