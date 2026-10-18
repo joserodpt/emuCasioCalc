@@ -9,12 +9,18 @@
 #define G3A_HEADER_SIZE 0x7000
 #define G3A_ICON_W 92
 #define G3A_ICON_H 64
+/* The languages of the header's labels, in order (the last two unused) */
+#define G3A_LABELS 8
+extern const char *const G3A_LANGS[G3A_LABELS];
 
 /* What the OS knows about an add-in, from the g3a header (offsets from
  * fxSDK's fxgxa/g3a.h). Icons are host-endian RGB565. */
 typedef struct {
     char name[17];          /* 0x040 */
     char internal[12];      /* 0x060, "@NAME" */
+    /* 0x06B: the name in the main menu for each language (G3A_LANGS),
+     * Latin-1 for the UI; characters it can't show (Chinese) are '?' */
+    char labels[8][25];
     char version[11];       /* 0x130, "MM.mm.pppp" */
     char date[15];          /* 0x13C, "yyyy.MMdd.hhmm" */
     char filename[64];      /* 0xEBC */

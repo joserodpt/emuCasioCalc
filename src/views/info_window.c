@@ -7,7 +7,8 @@
 #include "view.h"
 
 #define INFO_W      640
-#define CONTROLS_Y  290  /* "Controls" title */
+#define NAMES_Y     290  /* "Names" title, when the header has labels */
+#define CONTROLS_Y  controls_y()  /* "Controls" title, under the names */
 #define LIST_Y      (CONTROLS_Y + 26)
 #define ICON_X      20
 #define ICON_Y      24
@@ -66,6 +67,64 @@ static void field(float x, float y, const char *label, const char *value)
     view_text(ren, x, y, label, TEXT);
     SDL_SetRenderDrawColor(ren, 0, 0, 0, 255);
     view_text(ren, x + 9 * 8 * TEXT, y, value[0] ? value : "-", TEXT);
+}
+
+/* The rows of the names section: none if the header has no labels, one if
+ * every language has the same, else each language (the two unused slots
+ * only when they differ from English: the fxSDK copies the name there). */
+static int names_rows(bool *same)
+{
+    *same = true;
+    if (!view_have_app)
+        return 0;
+    const char *first = NULL;
+    for (int i = 0; i < G3A_LABELS; i++) {
+        const char *l = view_app.labels[i];
+        if (!l[0])
+            continue;
+        if (!first)
+            first = l;
+        else if (strcmp(first, l))
+            *same = false;
+    }
+    if (!first)
+        return 0;
+    if (*same)
+        return 1;
+    const char(*l)[25] = view_app.labels;
+    return l[7][0] && strcmp(l[7], l[0]) ? 8 : l[6][0] && strcmp(l[6], l[0]) ? 7 : 6;
+}
+
+static int controls_y(void)
+{
+    bool same;
+    int rows = names_rows(&same);
+    return rows ? NAMES_Y + 26 + rows * 22 + 14 : NAMES_Y;
+}
+
+/* The add-in's name in the main menu for each language (header labels) */
+static void draw_names(void)
+{
+    bool same;
+    int rows = names_rows(&same);
+    if (!rows)
+        return;
+    SDL_SetRenderDrawColor(ren, 200, 200, 200, 255);
+    SDL_FRect line = {ICON_X, NAMES_Y - 10, INFO_W - 2 * ICON_X, 1};
+    SDL_RenderFillRect(ren, &line);
+    SDL_SetRenderDrawColor(ren, 0, 0, 0, 255);
+    view_text(ren, ICON_X, NAMES_Y, "Names in the menu", TEXT);
+    float y = NAMES_Y + 26;
+    if (same) {
+        for (int i = 0; i < G3A_LABELS; i++)
+            if (view_app.labels[i][0]) {
+                field(ICON_X, y, "All", view_app.labels[i]);
+                break;
+            }
+        return;
+    }
+    for (int i = 0; i < rows; i++, y += 22)
+        field(ICON_X, y, G3A_LANGS[i], view_app.labels[i]);
 }
 
 static int used_count(void)
@@ -140,7 +199,9 @@ static void redraw(void)
     SDL_FRect dst = {ICON_X, ICON_Y, G3A_ICON_W * ICON_SCALE, G3A_ICON_H * ICON_SCALE};
     if (have && app->has_icon) {
         SDL_RenderTexture(ren, icons[hover ? 1 : 0], NULL, &dst);
-        name_on_icon(app->name);
+        /* as the main menu shows it: the label of the calculator's language */
+        const char *label = view_language < G3A_LABELS ? app->labels[view_language] : "";
+        name_on_icon(label[0] ? label : app->name);
     } else {
         SDL_SetRenderDrawColor(ren, 120, 120, 120, 255);
         view_text(ren, ICON_X + 36, ICON_Y + 56, "no icon", TEXT);
@@ -175,6 +236,7 @@ static void redraw(void)
     field(x, y += ROW, "Size", have ? size : "");
     field(x, y += ROW, "Header", have ? app->filename : "");
     field(x, y += ROW, "File", file);
+    draw_names();
     draw_controls();
     SDL_RenderPresent(ren);
 }

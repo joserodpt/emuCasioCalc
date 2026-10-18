@@ -20,6 +20,31 @@ static void header_string(char *out, size_t cap, const unsigned char *src, size_
     out[n] = '\0';
 }
 
+const char *const G3A_LANGS[G3A_LABELS] = {"English", "Spanish", "German", "French",
+                                           "Portuguese", "Chinese", "Slot 7", "Slot 8"};
+
+/* A language label: ASCII as is, UTF-8 letters of Latin-1 as Latin-1 (what
+ * the UI font draws), any other character (GB 18030 in the Chinese one,
+ * Casio codes) as '?', a 2-byte character as one. */
+static void header_label(char *out, size_t cap, const unsigned char *src, size_t len)
+{
+    size_t n = 0, i = 0;
+    while (i < len && src[i] && n + 1 < cap) {
+        unsigned char c = src[i];
+        if (c >= 0x20 && c < 0x7F) {
+            out[n++] = (char)c;
+            i++;
+        } else if ((c == 0xC2 || c == 0xC3) && i + 1 < len && (src[i + 1] & 0xC0) == 0x80) {
+            out[n++] = (char)((c & 0x03) << 6 | (src[i + 1] & 0x3F));
+            i += 2;
+        } else {
+            out[n++] = '?';
+            i += c >= 0x80 && i + 1 < len && src[i + 1] >= 0x40 ? 2 : 1;
+        }
+    }
+    out[n] = '\0';
+}
+
 static void read_icon(uint16_t *icon, const unsigned char *src, bool *any)
 {
     for (int i = 0; i < G3A_ICON_W * G3A_ICON_H; i++) {
@@ -33,6 +58,8 @@ static void read_info(const unsigned char *buf, long size, G3aInfo *info)
 {
     header_string(info->name, sizeof info->name, buf + 0x040, 16);
     header_string(info->internal, sizeof info->internal, buf + 0x060, 11);
+    for (int i = 0; i < G3A_LABELS; i++)
+        header_label(info->labels[i], sizeof info->labels[i], buf + 0x06B + 24 * i, 24);
     header_string(info->version, sizeof info->version, buf + 0x130, 10);
     header_string(info->date, sizeof info->date, buf + 0x13C, 14);
     header_string(info->filename, sizeof info->filename, buf + 0xEBC, 324);

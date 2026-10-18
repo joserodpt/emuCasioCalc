@@ -719,6 +719,7 @@ static void run_action(Action a)
     case A_TIMING_FAST: view_realistic = false; break;
     case A_LANG_EN: case A_LANG_ES: case A_LANG_DE: case A_LANG_FR: case A_LANG_PT: case A_LANG_ZH:
         view_language = (int)(a - A_LANG_EN);
+        info_window_refresh(); /* the icon shows the name in that language */
         break;
     case A_BATTERY_FULL: case A_BATTERY_HALF: case A_BATTERY_LOW: case A_BATTERY_EMPTY:
         view_battery_cv = BATTERY_LEVEL_CV[a - A_BATTERY_FULL];
