@@ -60,8 +60,22 @@ put it in `storage/fls0/doom.wad`).
 choose "USB Flash" (F1) on it; it shows up as a drive. The folder dialog
 opens on that drive when one with an `@MainMem` folder is mounted; pick it
 and the running .g3a is copied to its root (asking before replacing a file
-of the same name or writing to a folder that isn't a calculator). Eject the
-drive before unplugging; the add-in then appears in the main menu.
+of the same name or writing to a folder that isn't a calculator), then the
+drive is ejected (`udisksctl` or `gio` on Linux, `diskutil` on macOS) so the
+cable can be unplugged; the add-in then appears in the main menu. Every step
+is logged on the terminal (`copy to calculator: ...`).
+
+The calculator's USB storage (fx-CG50, `07cf:6103`) fails any transfer over
+4 kB, while Linux sends up to 120 kB at once, so ordinary copies to it fail
+with "Input/output error" (the kernel log shows `DID_ERROR`). The emulator
+sends each 4 kB block on its own. To fix copies from any program, limit
+transfers for the calculator (as root), then plug it in again:
+
+```sh
+echo 'ACTION=="add|change", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", ATTRS{idVendor}=="07cf", ATTR{queue/max_sectors_kb}="4"' \
+  | sudo tee /etc/udev/rules.d/90-casio-calculator.rules
+sudo udevadm control --reload
+```
 
 Keyboard (all 50 calculator keys): arrows, Enter = EXE, Esc = EXIT,
 Backspace = DEL, Delete = AC, Home = MENU, Tab = SHIFT, Left Alt = ALPHA,
