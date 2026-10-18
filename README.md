@@ -62,10 +62,15 @@ O = OPTN, V = VARS, F1–F6, digits, `. + - * / ( ) ,`, E = ×10^x, U = (-),
 X = X,θ,T, L = log, N = ln, S/C/T = sin/cos/tan, F = a b/c, D = F↔D,
 A = →, Q = x², P = ^ (Help > Keyboard controls lists them).
 
+The status row under the menu bar shows SHIFT, ALPHA, the battery and the
+add-in's status message. Click the battery, or use Emulation > Battery, to
+set it to full, half, low or empty (`--battery low` or `--battery 4.6` at
+start); add-ins see it in `GetMainBatteryVoltage` and on the OS status bar,
+which `DisplayStatusArea` and `GetKey` draw at the top of the screen.
+
 In OS add-ins, `GetKey` handles SHIFT and ALPHA like the calculator: the
 next key returns its yellow or red function (ALPHA 7 = `M`, SHIFT EXIT =
-QUIT), and SHIFT then ALPHA locks ALPHA. The right of the menu bar shows
-SHIFT, ALPHA and the battery, like the calculator's status bar. With
+QUIT), and SHIFT then ALPHA locks ALPHA. With
 ALPHA on, PC letters and space type those characters directly. gint add-ins
 read the keyboard themselves and see SHIFT and ALPHA as plain keys; the
 window follows them with the OS's rules, which most add-ins share, so PC
@@ -96,6 +101,7 @@ GiteaPC puts it), the CMake build compiles them and CTest runs them.
 | `emu.c` | Builds the machine (memory map, devices), key script |
 | **`src/engine/os/`** | **High-level emulation of the Casio OS** |
 | `syscalls.c` | Syscall table and system calls (memory, strings, time, settings) |
+| `syscalls_status.c` | The status area: battery, SHIFT/ALPHA, message, glyphs |
 | `syscalls_draw.c` | Drawing: fills, rectangles, points, bitmaps (`Bdisp_WriteGraph*`), the display (`_DD`) |
 | `syscalls_text.c` | Text: PrintXY/PrintMini/PrintCXY, message boxes, VRAM save/load |
 | `syscalls_dialogs.c` | OS dialogs: message box, colour picker, progress bars, scrollbar |

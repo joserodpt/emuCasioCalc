@@ -70,6 +70,19 @@ SC(sc_putdisp_stripe);
 SC(sc_write_graph_vram);
 SC(sc_write_graph_dd);
 
+/* syscalls_status.c: the status area (top 24 rows of VRAM) */
+void status_area_draw(Emu *emu);
+SC(sc_enable_status_area);
+SC(sc_define_status_area_flags);
+SC(sc_define_status_message);
+SC(sc_define_status_glyph);
+SC(sc_display_status_area);
+SC(sc_header_text);
+SC(sc_header_fill);
+SC(sc_draw_header_line);
+SC(sc_enable_display_header);
+SC(sc_battery_icon);
+
 /* syscalls_dialogs.c: OS dialogs */
 SC(sc_display_message_box);
 SC(sc_color_index_dialog);

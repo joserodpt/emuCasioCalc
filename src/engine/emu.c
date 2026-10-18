@@ -85,6 +85,10 @@ bool emu_init(Emu *emu, Model model)
      * product ID (0x8001FFD0) for Casio's PC emulator. */
     memset(emu->rom + OS_ROM_SIZE, 0xFF, ROM_SIZE - OS_ROM_SIZE);
     emu->flash_next = FLASH_FILES;
+    emu->battery_cv = BATTERY_CENTIVOLTS;
+    emu->status_flags = 0x0303; /* battery, SHIFT/ALPHA, text, glyph */
+    emu->status_color[0] = emu->status_color[1] = 7; /* white */
+    emu->getkey_status = 1;
     mem_map_phys(mem, ROM_PHYS, ROM_SIZE, emu->rom, false);
     /* U0 below the add-in is scratch memory. Add-ins that read and write
      * through a NULL pointer (Gravity Duck does every time the duck dies)

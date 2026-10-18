@@ -1,8 +1,8 @@
 # TODO
 
 What emuCasioFxCG still lacks. The syscall list is measured against
-[libfxcg](https://github.com/Jonimoose/libfxcg)'s stubs: 118 of its 273 syscalls
-are implemented, 155 are left. Add-ins only use a small part of them, so the
+[libfxcg](https://github.com/Jonimoose/libfxcg)'s stubs: 129 of its 273 syscalls
+are implemented, 144 are left. Add-ins only use a small part of them, so the
 groups are ordered by how likely real add-ins are to need them.
 
 Approach that has worked so far: run an add-in, implement what it stops at,
@@ -76,13 +76,16 @@ return 1 on a non-hex character.
 ## Syscalls, less likely
 
 ### Status bar
-The status bar is never drawn: `DisplayStatusArea`, `DefineStatusAreaFlags`,
-`DefineStatusMessage`, `EnableStatusArea` and the icons are accepted and
-ignored. Missing: `EnableDisplayHeader` (1D7F), `DefineStatusGlyph` (1D7B),
-`Bdisp_HeaderText` / `HeaderText2` (1D82, 1D85), `Bdisp_HeaderFill` /
-`HeaderFill2` (1D86, 1D87), `DrawHeaderLine` (02BB), `KeyboardIcon` (1D8A),
-`LineIcon` (1D8F), `RadIcon` / `RealIcon` / `NormIcon` / `d_c_Icon` (1D8B-1D8E),
-`APP_EACT_StatusIcon` (0A87), `SetupMode_StatusIcon` (0A8B).
+Drawn (test app `apps/status-bar`). Missing: `Bdisp_HeaderText2` /
+`Bdisp_HeaderFill2` (1D85, 1D87), `APP_EACT_StatusIcon` (0A87),
+`SetupMode_StatusIcon` (0A8B): parameters unknown. `KeyboardIcon`, `LineIcon`,
+`RadIcon`, `RealIcon`, `NormIcon`, `d_c_Icon` are accepted and ignored
+(parameters unknown; the `SAF_*` flags draw those items).
+
+Guessed: the look of the area (layout, the battery's 3 bars and their
+voltages, the S / A indicator), the two header colours as a top-to-bottom
+gradient, and the setup items, which show the angle unit from the setup
+and fixed "Math", "d/c", "Real", "Norm1" for the rest.
 
 ### Dialogs (not documented well enough to implement yet)
 `Box` (092B) and `Box2` (17FC): "function unknown" on WikiPrizm.

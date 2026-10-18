@@ -26,6 +26,7 @@ extern bool view_show_speed;    /* Emulation > Speed: custom shows the slider ro
 extern bool view_key_shift;     /* SHIFT is on (for the next key) */
 extern int view_key_alpha;      /* ALPHA: 0 off, 1 for the next key, 2 locked */
 extern int view_battery_cv;     /* battery voltage, 1/100 V */
+extern char view_os_status[64]; /* the add-in's status message */
 
 void view_redraw(void);
 /* View > Zoom: sizes the window for the screen at exactly scale x. */
@@ -45,7 +46,9 @@ void view_flash_status(const char *msg);
 #define GLYPH_H    (8 * TEXT_SCALE)
 #define MENU_H     (GLYPH_H + 16)       /* the menu row */
 #define TOOL_H     (GLYPH_H + 14)       /* the speed row under it, when shown */
-#define BAR_H      (MENU_H + (view_show_speed ? TOOL_H : 0)) /* everything above the screen */
+#define STATUS_Y   (MENU_H + (view_show_speed ? TOOL_H : 0)) /* the status row, last */
+#define STATUS_H   (GLYPH_H + 14)
+#define BAR_H      (STATUS_Y + STATUS_H) /* everything above the screen */
 #define ITEM_H     (GLYPH_H + 18)
 #define PAD        (6 + 4 * TEXT_SCALE)
 

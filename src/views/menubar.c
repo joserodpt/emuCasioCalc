@@ -12,6 +12,7 @@ typedef enum {
     A_KEYS, A_ABOUT,
     A_MODEL_AUTO, A_MODEL_CG20, A_MODEL_CG50, A_TIMING_REAL, A_TIMING_FAST,
     A_FASTER, A_SLOWER, A_NORMAL_SPEED, A_CUSTOM_SPEED,
+    A_BATTERY_FULL, A_BATTERY_HALF, A_BATTERY_LOW, A_BATTERY_EMPTY, /* consecutive, as BATTERY_LEVEL_CV */
 } Action;
 
 typedef struct {
@@ -41,6 +42,11 @@ static const Item EMU_ITEMS[] = {
     {"", "", A_SEPARATOR},
     {"Speed: normal (100%)", "Ctrl+0", A_NORMAL_SPEED},
     {"Speed: custom...", "", A_CUSTOM_SPEED},
+    {"", "", A_SEPARATOR},
+    {"Battery: full (5.20 V)", "", A_BATTERY_FULL},
+    {"Battery: half (4.80 V)", "", A_BATTERY_HALF},
+    {"Battery: low (4.40 V)", "", A_BATTERY_LOW},
+    {"Battery: empty (4.00 V)", "", A_BATTERY_EMPTY},
 };
 static const Item VIEW_ITEMS[] = {
     {"Zoom 1x", "Ctrl+1", A_ZOOM1},
@@ -154,6 +160,8 @@ static bool checked(Action a)
         return view_show_speed == (a == A_CUSTOM_SPEED);
     if (a == A_TIMING_REAL || a == A_TIMING_FAST)
         return view_realistic == (a == A_TIMING_REAL);
+    if (a >= A_BATTERY_FULL && a <= A_BATTERY_EMPTY)
+        return view_battery_cv == BATTERY_LEVEL_CV[a - A_BATTERY_FULL];
     return a == A_PAUSE && view_paused;
 }
 
@@ -178,109 +186,116 @@ static void text(float x, float y, const char *s)
 }
 
 /*
- * Right of the menu row, like the calculator's status bar: SHIFT and ALPHA
- * (yellow and red, as on the keys; dim when off) and the battery. Full
- * labels if they fit after the menu titles, else S / A, else nothing.
+ * The status row under the bar, like the calculator's status bar: SHIFT and
+ * ALPHA (yellow and red as on the keys, dim when off), the battery
+ * (click it for the next level, Emulation > Battery to pick one) and the
+ * add-in's status message.
  */
 #define GAP (4 * TEXT_SCALE)
-
-static const char *shift_label(bool compact)
-{
-    return compact ? "S" : "SHIFT";
-}
-
-static const char *alpha_label(bool compact)
-{
-    if (view_key_alpha == 2)
-        return compact ? "A+" : "ALPHA LOCK";
-    return compact ? "A" : "ALPHA";
-}
 
 static int badge_w(const char *s)
 {
     return (int)strlen(s) * CHAR_W + 6 * TEXT_SCALE;
 }
 
-static int battery_w(void)
-{
-    return 15 * TEXT_SCALE + GAP + 5 * CHAR_W; /* icon, "5.20V" */
-}
-
-static int indicators_w(bool compact)
-{
-    return badge_w(shift_label(compact)) + GAP + badge_w(alpha_label(compact)) + 2 * GAP + battery_w() + PAD;
-}
-
-/* Width the indicators take (0 if they don't fit), and their form. */
-static int indicators_fit(int width, bool *compact)
-{
-    int room = width - title_x(MENU_COUNT - 1) - title_w(MENU_COUNT - 1) - PAD;
-    for (int c = 0; c < 2; c++) {
-        *compact = c;
-        if (indicators_w(*compact) <= room)
-            return indicators_w(*compact);
-    }
-    return 0;
-}
-
 static void badge(float x, const char *s, bool on, int r, int g, int b, bool light_text)
 {
-    float h = GLYPH_H + 6, y = (MENU_H - h) / 2;
+    float h = GLYPH_H + 6, y = STATUS_Y + (STATUS_H - h) / 2;
     SDL_FRect box = {x, y, (float)badge_w(s), h};
     if (on) {
         color(r, g, b);
         SDL_RenderFillRect(view_renderer, &box);
         color(light_text ? 255 : 0, light_text ? 255 : 0, light_text ? 255 : 0);
     } else {
-        color(200, 200, 200);
+        color(205, 205, 205);
         SDL_RenderRect(view_renderer, &box);
         color(175, 175, 175);
     }
-    text(x + 3 * TEXT_SCALE, (MENU_H - GLYPH_H) / 2.0f, s);
+    text(x + 3 * TEXT_SCALE, STATUS_Y + (STATUS_H - GLYPH_H) / 2.0f, s);
 }
 
-static void draw_indicators(int width)
-{
-    bool compact;
-    int w = indicators_fit(width, &compact);
-    if (!w)
-        return;
-    float x = (float)(width - w);
-    const char *s = shift_label(compact), *a = alpha_label(compact);
-    badge(x, s, view_key_shift, 240, 190, 0, false);
-    x += badge_w(s) + GAP;
-    badge(x, a, view_key_alpha != 0, 200, 30, 30, true);
-    x += badge_w(a) + 2 * GAP;
+static const char *const LEVEL_NAMES[BATTERY_LEVELS] = {"full", "half", "low", "empty"};
 
-    /* Battery: body, terminal, four bars (5.2 V and up: full) */
+/* Index of the battery level nearest to the current voltage. */
+static int battery_level(void)
+{
+    int best = 0;
+    for (int i = 1; i < BATTERY_LEVELS; i++) {
+        int d = BATTERY_LEVEL_CV[i] - view_battery_cv, b = BATTERY_LEVEL_CV[best] - view_battery_cv;
+        if (d * d < b * b)
+            best = i;
+    }
+    return best;
+}
+
+static float battery_x(void)
+{
+    return (float)(PAD + badge_w("SHIFT") + GAP + badge_w("ALPHA LOCK") + 3 * GAP);
+}
+
+static int battery_w(void)
+{
+    return 15 * TEXT_SCALE + GAP + 12 * CHAR_W; /* icon, "5.20V (full)" */
+}
+
+static bool on_battery(float x, float y)
+{
+    return y >= STATUS_Y && y < BAR_H && x >= battery_x() - GAP && x < battery_x() + battery_w();
+}
+
+static void draw_status_row(int width)
+{
+    color(246, 246, 246);
+    fill(0, STATUS_Y, (float)width, STATUS_H);
+    color(200, 200, 200);
+    fill(0, BAR_H - 1, (float)width, 1);
+
+    float x = PAD;
+    badge(x, "SHIFT", view_key_shift, 240, 190, 0, false);
+    x += badge_w("SHIFT") + GAP;
+    const char *alpha = view_key_alpha == 2 ? "ALPHA LOCK" : "ALPHA";
+    badge(x, alpha, view_key_alpha != 0, 200, 30, 30, true);
+
+    /* Battery: body, terminal, 3 bars, as on the status bar */
     int k = TEXT_SCALE;
-    float bh = 8.0f * k, by = (MENU_H - bh) / 2;
-    color(60, 60, 60);
+    x = battery_x();
+    float bh = 8.0f * k, by = STATUS_Y + (STATUS_H - bh) / 2;
+    bool hot = open_menu < 0 && on_battery(mouse_x, mouse_y);
+    color(hot ? 0 : 60, hot ? 90 : 60, hot ? 180 : 60);
     SDL_FRect body = {x, by, 13.0f * k, bh};
     SDL_RenderRect(view_renderer, &body);
     fill(x + 13.0f * k, by + 2.0f * k, 2.0f * k, bh - 4.0f * k);
-    int bars = (view_battery_cv - 440) / 20;
-    bars = bars < 0 ? 0 : bars > 4 ? 4 : bars;
+    int bars = battery_bars(view_battery_cv);
     if (bars <= 1)
         color(200, 30, 30);
     else
         color(40, 160, 40);
     for (int i = 0; i < bars; i++)
-        fill(x + (1.0f + 3.0f * i) * k, by + 1.0f * k, 2.0f * k, bh - 2.0f * k);
+        fill(x + (1.0f + 4.0f * i) * k, by + 1.0f * k, 3.0f * k, bh - 2.0f * k);
     x += 15 * k + GAP;
-    char volts[16];
-    snprintf(volts, sizeof volts, "%d.%02dV", view_battery_cv / 100, view_battery_cv % 100);
+    char volts[32];
+    snprintf(volts, sizeof volts, "%d.%02dV (%s)", view_battery_cv / 100, view_battery_cv % 100,
+             LEVEL_NAMES[battery_level()]);
     color(0, 0, 0);
-    text(x, (MENU_H - GLYPH_H) / 2.0f, volts);
+    text(x, STATUS_Y + (STATUS_H - GLYPH_H) / 2.0f, volts);
+
+    /* The add-in's status message, cut to the room left */
+    x = battery_x() + battery_w() + 3 * GAP;
+    int fit = (int)((float)width - PAD - x) / CHAR_W;
+    if (view_os_status[0] && fit > 3) {
+        char msg[80];
+        snprintf(msg, sizeof msg, "\"%.*s\"", fit - 2, view_os_status);
+        color(70, 70, 70);
+        text(x, STATUS_Y + (STATUS_H - GLYPH_H) / 2.0f, msg);
+    }
 }
 
 /* Status on the right: in the speed row next to the slider when it is
- * shown, else in the menu row after the titles (left of the indicators). Smaller text, then cut, if
+ * shown, else in the menu row after the titles. Smaller text, then cut, if
  * it doesn't fit. */
 static void draw_status(int width, const char *right)
 {
-    bool compact;
-    int right_edge = view_show_speed ? width : width - indicators_fit(width, &compact);
+    int right_edge = width;
     int room = view_show_speed ? width - VALUE_X - 5 * CHAR_W - 2 * PAD
                                : right_edge - title_x(MENU_COUNT - 1) - title_w(MENU_COUNT - 1) - 2 * PAD;
     float row = view_show_speed ? MENU_H : 0, row_h = view_show_speed ? TOOL_H : MENU_H;
@@ -371,7 +386,7 @@ static int speed_at(float x)
 
 static bool on_slider(float x, float y)
 {
-    return view_show_speed && y >= MENU_H && y < BAR_H && x >= TRACK_X - 2 * PAD &&
+    return view_show_speed && y >= MENU_H && y < MENU_H + TOOL_H && x >= TRACK_X - 2 * PAD &&
            x <= TRACK_X + TRACK_W + 2 * PAD;
 }
 
@@ -383,7 +398,7 @@ static void draw_toolbar(int width)
     color(232, 232, 232);
     fill(0, MENU_H, (float)width, TOOL_H);
     color(200, 200, 200);
-    fill(0, BAR_H - 1, (float)width, 1);
+    fill(0, MENU_H + TOOL_H - 1, (float)width, 1);
 
     color(0, 0, 0);
     text(SPEED_LABEL_X, mid - GLYPH_H / 2.0f, "Speed");
@@ -428,9 +443,9 @@ void menubar_draw(int width, const char *status)
         color(0, 0, 0);
         text((float)(title_x(m) + PAD), (MENU_H - GLYPH_H) / 2.0f, MENUS[m].title);
     }
-    draw_indicators(width);
     if (view_show_speed)
         draw_toolbar(width);
+    draw_status_row(width);
     char right[400];
     snprintf(right, sizeof right, "%s%s%s", view_paused ? "PAUSED" : "", view_paused && status[0] ? "  " : "",
              status);
@@ -573,6 +588,9 @@ static void run_action(Action a)
     case A_CUSTOM_SPEED: view_show_speed_row(true); break;
     case A_TIMING_REAL: view_realistic = true; break;
     case A_TIMING_FAST: view_realistic = false; break;
+    case A_BATTERY_FULL: case A_BATTERY_HALF: case A_BATTERY_LOW: case A_BATTERY_EMPTY:
+        view_battery_cv = BATTERY_LEVEL_CV[a - A_BATTERY_FULL];
+        break;
     case A_NONE: case A_SEPARATOR: break;
     }
 }
@@ -601,6 +619,11 @@ static bool shortcut(SDL_Keycode k)
 
 static void click(float x, float y)
 {
+    if (open_menu < 0 && on_battery(x, y)) {
+        view_battery_cv = BATTERY_LEVEL_CV[(battery_level() + 1) % BATTERY_LEVELS];
+        view_redraw();
+        return;
+    }
     if (open_menu < 0 && on_slider(x, y)) {
         dragging = true;
         view_speed = speed_at(x);

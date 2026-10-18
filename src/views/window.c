@@ -29,6 +29,7 @@ bool view_show_speed;
 bool view_key_shift;
 int view_key_alpha;
 int view_battery_cv = BATTERY_CENTIVOLTS;
+char view_os_status[64];
 
 static SDL_Texture *screen;    /* the panel, 396 x 224 */
 static SDL_Texture *upscaled;  /* the panel at a whole scale, see draw_screen() */
@@ -148,7 +149,7 @@ void view_set_scale(int scale)
 {
     int w = PANEL_WIDTH * scale;
     int ts = text_scale_for(w);
-    int bar = (8 * ts + 16) + (view_show_speed ? 8 * ts + 14 : 0); /* BAR_H at that width */
+    int bar = (8 * ts + 16) + (view_show_speed ? 8 * ts + 14 : 0) + (8 * ts + 14); /* BAR_H at that width */
     SDL_SetWindowSize(view_window, w, bar + PANEL_HEIGHT * scale);
     SDL_SyncWindow(view_window);
     update_layout();
@@ -363,6 +364,7 @@ void platform_set_app(const G3aInfo *info, const char *path, Model model)
              model_name(model));
     SDL_SetWindowTitle(view_window, title);
     platform_set_key_mode(false, 0);
+    platform_set_os_status("");
     info_window_refresh();
 }
 
@@ -375,10 +377,23 @@ void platform_set_key_mode(bool shift, int alpha)
     view_redraw();
 }
 
+void platform_set_os_status(const char *msg)
+{
+    if (!strcmp(msg, view_os_status))
+        return;
+    snprintf(view_os_status, sizeof view_os_status, "%s", msg);
+    view_redraw();
+}
+
+int platform_battery(void)
+{
+    return view_battery_cv;
+}
+
 void platform_set_battery(int centivolts)
 {
     view_battery_cv = centivolts;
-    if (!view_headless)
+    if (view_renderer) /* --battery comes before the window exists */
         view_redraw();
 }
 

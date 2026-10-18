@@ -36,7 +36,8 @@ static void usage(const char *argv0)
             "                     add-in), cg20 (fx-CG10/20) or cg50 (fx-CG50)\n"
             "  --speed S          window speed in percent (10-400, default 100) or max\n"
             "  --timing T         realistic (default: OS calls, memory and DMA take\n"
-            "                     the time they would on the calculator) or fast\n",
+            "                     the time they would on the calculator) or fast\n"
+            "  --battery B        battery: full (default), half, low, empty, or volts (4.6)\n",
             argv0);
 }
 
@@ -148,7 +149,7 @@ static bool load(Emu *emu, const Options *opt, const char *path, G3aInfo *info, 
            model_name(model), platform_model_choice() == CHOICE_AUTO ? "" : "chosen; detected: ",
            platform_model_choice() == CHOICE_AUTO ? info->model_reason : model_name(info->model));
     platform_set_app(info, path, model);
-    platform_set_battery(BATTERY_CENTIVOLTS);
+    emu->battery_cv = platform_battery();
     emu_start(emu);
     platform_status(NULL);
     return true;
@@ -172,6 +173,7 @@ static bool run(Emu *emu, bool headless)
         }
         if (emu->realistic != platform_realistic())
             emu_set_realistic(emu, platform_realistic());
+        emu->battery_cv = platform_battery();
         cpu_run(cpu, (uint64_t)hz / 1000 * SLICE_MS);
         if (!platform_poll(down))
             return true;
@@ -216,7 +218,7 @@ int main(int argc, char **argv)
     Options opt = {0};
     const char *path = NULL, *screenshot = NULL, *icon = NULL;
     bool show_info = false;
-    const char *model = "auto", *timing = "realistic", *speed = NULL;
+    const char *model = "auto", *timing = "realistic", *speed = NULL, *battery = NULL;
     static Emu emu;
     static G3aInfo info;
 
@@ -232,6 +234,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--model") && i + 1 < argc) model = argv[++i];
         else if (!strcmp(argv[i], "--timing") && i + 1 < argc) timing = argv[++i];
         else if (!strcmp(argv[i], "--speed") && i + 1 < argc) speed = argv[++i];
+        else if (!strcmp(argv[i], "--battery") && i + 1 < argc) battery = argv[++i];
         else if (argv[i][0] != '-' && !path) path = argv[i];
         else { usage(argv[0]); return 2; }
     }
@@ -254,6 +257,18 @@ int main(int argc, char **argv)
     } else if (strcmp(timing, "realistic")) {
         usage(argv[0]);
         return 2;
+    }
+    if (battery) {
+        static const char *const LEVELS[BATTERY_LEVELS] = {"full", "half", "low", "empty"};
+        int cv = (int)(atof(battery) * 100 + 0.5);
+        for (int i = 0; i < BATTERY_LEVELS; i++)
+            if (!strcmp(battery, LEVELS[i]))
+                cv = BATTERY_LEVEL_CV[i];
+        if (cv < 300 || cv > 600) {
+            usage(argv[0]);
+            return 2;
+        }
+        platform_set_battery(cv);
     }
     if (!platform_init(scale > 0 ? scale : 4, opt.headless))
         return 1;

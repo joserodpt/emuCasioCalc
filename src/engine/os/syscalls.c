@@ -8,7 +8,7 @@
  * Syscall numbers and signatures: WikiPrizm (prizm.cemetech.net) and the
  * syscall stubs in libfxcg (github.com/Jonimoose/libfxcg). This file has
  * the table and the system calls; drawing, keyboard and storage are in
- * syscalls_draw.c, syscalls_text.c, syscalls_keys.c, syscalls_bfile.c and syscalls_mcs.c.
+ * syscalls_draw.c, syscalls_status.c, syscalls_text.c, syscalls_keys.c, syscalls_bfile.c and syscalls_mcs.c.
  */
 #include "syscalls.h"
 
@@ -403,8 +403,8 @@ static SC(sc_get_app_name)
 
 static SC(sc_battery_voltage)
 {
-    (void)emu; (void)a;
-    return BATTERY_CENTIVOLTS;
+    (void)a;
+    return (uint32_t)emu->battery_cv;
 }
 
 static SC(sc_get_battery_type) { (void)a; return (uint32_t)emu->battery_type; }
@@ -458,8 +458,9 @@ static const Syscall SYSCALLS[] = {
     {0x02A8, "DrawFrame", sc_draw_frame},
     {0x02AA, "DirectDrawRectangle", sc_direct_draw_rectangle},
     {0x02B2, "Bdisp_AreaClr", sc_area_clr},
-    {0x02B7, "EnableStatusArea", sc_nothing},
-    {0x02B8, "DefineStatusAreaFlags", sc_nothing},
+    {0x02B7, "EnableStatusArea", sc_enable_status_area},
+    {0x02B8, "DefineStatusAreaFlags", sc_define_status_area_flags},
+    {0x02BB, "DrawHeaderLine", sc_draw_header_line},
     {0x02C0, "RTC_GetTime", sc_rtc_get_time},
     {0x02C1, "RTC_GetTicks", sc_rtc_get_ticks},
     {0x02C7, "HourGlass", sc_nothing},       /* status bar busy icon: no status bar */
@@ -522,9 +523,20 @@ static const Syscall SYSCALLS[] = {
     {0x1BBF, "Serial_PollRX", sc_serial_poll_rx},
     {0x1BC0, "Serial_PollTX", sc_serial_poll_tx},
     {0x1BC6, "Serial_IsOpen", sc_serial_is_open},
-    {0x1D77, "DefineStatusMessage", sc_nothing},
-    {0x1D81, "DisplayStatusArea", sc_nothing},
-    {0x1D89, "BatteryIcon", sc_nothing},      /* status bar icon: no status bar */
+    {0x1D77, "DefineStatusMessage", sc_define_status_message},
+    {0x1D7B, "DefineStatusGlyph", sc_define_status_glyph},
+    {0x1D7F, "EnableDisplayHeader", sc_enable_display_header},
+    {0x1D81, "DisplayStatusArea", sc_display_status_area},
+    {0x1D82, "Bdisp_HeaderText", sc_header_text},
+    {0x1D86, "Bdisp_HeaderFill", sc_header_fill},
+    {0x1D89, "BatteryIcon", sc_battery_icon},
+    /* Status icons with unknown parameters: the flags draw these items. */
+    {0x1D8A, "KeyboardIcon", sc_nothing},
+    {0x1D8B, "RadIcon", sc_nothing},
+    {0x1D8C, "RealIcon", sc_nothing},
+    {0x1D8D, "NormIcon", sc_nothing},
+    {0x1D8E, "d_c_Icon", sc_nothing},
+    {0x1D8F, "LineIcon", sc_nothing},
     {0x1DA3, "Bfile_OpenFile_OS", sc_bfile_open},
     {0x1DA4, "Bfile_CloseFile_OS", sc_bfile_close},
     {0x1DA9, "Bfile_SeekFile_OS", sc_bfile_seek},

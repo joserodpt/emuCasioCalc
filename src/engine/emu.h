@@ -22,8 +22,22 @@ const char *model_name(Model model);
 /* Where things are on a model. Addresses are what the CPU sees. */
 typedef enum { ALPHA_OFF, ALPHA_ONCE, ALPHA_LOCK } KeyAlpha;
 
-/* The main battery (GetMainBatteryVoltage): four fresh-ish AAA cells. */
+/* The main battery (GetMainBatteryVoltage), in 1/100 V: four AAA cells.
+ * Emulation > Battery and --battery choose one of these levels. The
+ * thresholds of the status bar's 3 bars are our guess. */
 #define BATTERY_CENTIVOLTS 520
+#define BATTERY_LEVELS 4
+static const int BATTERY_LEVEL_CV[BATTERY_LEVELS] = {520, 480, 440, 400}; /* full, half, low, empty */
+static inline int battery_bars(int cv)
+{
+    return cv >= 500 ? 3 : cv >= 460 ? 2 : cv >= 420 ? 1 : 0;
+}
+
+/* A glyph of the status area (DefineStatusGlyph). */
+typedef struct {
+    int dx, dy, xalign, xoffset;
+    uint32_t bitmap; /* RGB565, dx * dy */
+} StatusGlyph;
 
 typedef struct {
     uint32_t ram_phys, ram_size;   /* physical RAM */
@@ -68,6 +82,16 @@ typedef struct {
     /* GetKey's modifiers: SHIFT pressed, ALPHA for one key or locked. */
     bool key_shift;
     KeyAlpha key_alpha;
+    int battery_cv;         /* battery voltage, 1/100 V */
+
+    /* The OS status area, the top 24 rows of VRAM (syscalls_status.c). */
+    bool status_off;        /* EnableStatusArea(3) */
+    uint32_t status_flags;  /* SAF_* */
+    uint8_t status_color[2]; /* header colours, PrintXY indices */
+    char status_msg[64];    /* DefineStatusMessage */
+    uint8_t status_msg_color;
+    StatusGlyph status_glyph[4];
+    uint32_t getkey_status; /* EnableDisplayHeader: GetKey draws the area */
 
     /* OS state for the HLE syscalls. */
     uint8_t setup[256];   /* GetSetupSetting / SetSetupSetting */

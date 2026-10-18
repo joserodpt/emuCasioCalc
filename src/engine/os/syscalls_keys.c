@@ -51,9 +51,18 @@ static void set_mode(Emu *emu, bool shift, KeyAlpha alpha)
  * mode and the next key returns its yellow (SHIFT) or red (ALPHA) function.
  * SHIFT then ALPHA locks ALPHA until ALPHA is pressed again; SHIFT keeps
  * the lock. SHIFT AC/ON switches the calculator off: here, nothing. */
+static void show(Emu *emu)
+{
+    if (emu->getkey_status)
+        status_area_draw(emu);
+    r61524_blit_vram(&emu->lcd, emu->vram);
+}
+
+/* GetKey draws the status area (unless disabled) before waiting, and again
+ * when SHIFT or ALPHA changes its indicator. */
 int sc_wait_key(Emu *emu)
 {
-    r61524_blit_vram(&emu->lcd, emu->vram);
+    show(emu);
     for (;;) {
         int key = emu_next_key(emu);
         if (key < 0) {
@@ -65,6 +74,7 @@ int sc_wait_key(Emu *emu)
         KeyAlpha alpha = emu->key_alpha;
         if (k->getkey == KEY_CTRL_SHIFT) {
             set_mode(emu, !shift, alpha);
+            show(emu);
             continue;
         }
         if (k->getkey == KEY_CTRL_ALPHA) {
@@ -72,6 +82,7 @@ int sc_wait_key(Emu *emu)
                 set_mode(emu, false, ALPHA_LOCK);
             else
                 set_mode(emu, false, alpha == ALPHA_OFF ? ALPHA_ONCE : ALPHA_OFF);
+            show(emu);
             continue;
         }
         set_mode(emu, false, alpha == ALPHA_ONCE ? ALPHA_OFF : alpha);

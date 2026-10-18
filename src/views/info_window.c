@@ -35,7 +35,7 @@ static bool over_icon(float x, float y)
     return x >= ICON_X && x < ICON_X + G3A_ICON_W * ICON_SCALE && y >= ICON_Y && y < ICON_Y + G3A_ICON_H * ICON_SCALE;
 }
 
-/* The add-in's name over the top of its icon, as the calculator's main
+/* The add-in's name along the bottom of its icon, as the calculator's main
  * menu shows it: centred, black with a white outline so it reads on any
  * icon; smaller if it doesn't fit. */
 static void name_on_icon(const char *name)
@@ -46,7 +46,8 @@ static void name_on_icon(const char *name)
     int k = (int)strlen(name) * 8 * TEXT + 8 <= w ? TEXT : 1;
     char shown[32];
     snprintf(shown, sizeof shown, "%.*s", (int)(w - 4) / (8 * k), name);
-    float x = ICON_X + (w - (float)strlen(shown) * 8 * k) / 2, y = ICON_Y + 4;
+    float x = ICON_X + (w - (float)strlen(shown) * 8 * k) / 2;
+    float y = ICON_Y + G3A_ICON_H * ICON_SCALE - 8 * k - 4;
     SDL_SetRenderDrawColor(ren, 255, 255, 255, 255);
     for (int dy = -1; dy <= 1; dy++)
         for (int dx = -1; dx <= 1; dx++)
