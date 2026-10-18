@@ -11,7 +11,8 @@
 extern SDL_Window *view_window;
 extern SDL_Renderer *view_renderer;
 extern bool view_headless;
-extern int view_scale;          /* zoom: panel pixels are view_scale x view_scale */
+extern int view_text_scale;     /* menu text size: 2x in wide windows, else 1x */
+extern SDL_FRect view_screen;   /* where the calculator screen is drawn, in window pixels */
 extern Command view_pending;    /* command waiting for the main loop */
 extern bool view_paused;
 extern G3aInfo view_app;        /* the add-in being run */
@@ -21,13 +22,16 @@ extern Model view_model;        /* the model being emulated */
 extern ModelChoice view_model_choice;
 
 void view_redraw(void);
+/* View > Zoom: sizes the window for the screen at exactly scale x. */
 void view_set_scale(int scale);
+/* The zoom the screen is exactly at, or 0 if in between. */
+int view_zoom(void);
 /* Shows text on the right of the menu bar for a few seconds. */
 void view_flash_status(const char *msg);
 
-/* Menu text is SDL's 8x8 debug font drawn at 2x, or 1x at zoom 1 (396 px
- * is too narrow for the bar at 2x). Sizes in window pixels. */
-#define TEXT_SCALE (view_scale >= 2 ? 2 : 1)
+/* Menu text is SDL's 8x8 debug font drawn at 2x, or 1x in narrow windows
+ * (the bar doesn't fit at 2x below 600 px). Sizes in window pixels. */
+#define TEXT_SCALE view_text_scale
 #define CHAR_W     (8 * TEXT_SCALE)
 #define GLYPH_H    (8 * TEXT_SCALE)
 #define BAR_H      (GLYPH_H + 16)

@@ -8,12 +8,14 @@
 #include "r61524.h"
 #include "view.h"
 
-#define STATUS_MS 4000  /* how long a flashed status message stays */
+#define STATUS_MS    4000  /* how long a flashed status message stays */
+#define WIDE_TEXT_W  600   /* windows at least this wide get 2x menu text */
 
 SDL_Window *view_window;
 SDL_Renderer *view_renderer;
 bool view_headless;
-int view_scale;
+int view_text_scale = 1;
+SDL_FRect view_screen;
 Command view_pending;
 bool view_paused;
 G3aInfo view_app;
@@ -22,7 +24,10 @@ char view_app_path[1024];
 Model view_model;
 ModelChoice view_model_choice;
 
-static SDL_Texture *screen;
+static SDL_Texture *screen;    /* the panel, 396 x 224 */
+static SDL_Texture *upscaled;  /* the panel at a whole scale, see draw_screen() */
+static int upscale;            /* its scale, 0 = not created */
+static int window_w;
 static uint16_t frame[PANEL_WIDTH * PANEL_HEIGHT]; /* last presented frame, host RGB565 */
 static char status[320];
 static uint64_t status_until; /* 0 = stays */
@@ -51,6 +56,67 @@ void view_text(SDL_Renderer *r, float x, float y, const char *s, int k)
     SDL_SetRenderScale(r, 1, 1);
 }
 
+static int text_scale_for(int width)
+{
+    return width >= WIDE_TEXT_W ? 2 : 1;
+}
+
+/* Fits the screen under the menu bar, keeping its shape, centred. */
+static void update_layout(void)
+{
+    int w, h;
+    SDL_GetWindowSize(view_window, &w, &h);
+    window_w = w;
+    view_text_scale = text_scale_for(w);
+    float area_h = (float)(h - BAR_H);
+    float k = (float)w / PANEL_WIDTH;
+    if (area_h / PANEL_HEIGHT < k)
+        k = area_h / PANEL_HEIGHT;
+    if (k < 0.25f)
+        k = 0.25f;
+    view_screen.w = PANEL_WIDTH * k;
+    view_screen.h = PANEL_HEIGHT * k;
+    view_screen.x = ((float)w - view_screen.w) / 2;
+    view_screen.y = BAR_H + (area_h - view_screen.h) / 2;
+}
+
+int view_zoom(void)
+{
+    for (int z = 1; z <= 4; z++)
+        if ((int)view_screen.w == PANEL_WIDTH * z && (int)view_screen.h == PANEL_HEIGHT * z)
+            return z;
+    return 0;
+}
+
+/* "Sharp bilinear": scale the panel up by a whole factor with nearest
+ * pixels, then smoothly to the final size. Pixels stay crisp at any window
+ * size, without the uneven rows and columns of nearest-only scaling. */
+static void draw_screen(void)
+{
+    int k = (int)(view_screen.w / PANEL_WIDTH);
+    if (k < 1)
+        k = 1;
+    if ((float)(PANEL_WIDTH * k) == view_screen.w) { /* exact: one nearest blit */
+        SDL_RenderTexture(view_renderer, screen, NULL, &view_screen);
+        return;
+    }
+    if (k != upscale) {
+        SDL_DestroyTexture(upscaled);
+        upscaled = SDL_CreateTexture(view_renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET,
+                                     PANEL_WIDTH * k, PANEL_HEIGHT * k);
+        SDL_SetTextureScaleMode(upscaled, SDL_SCALEMODE_LINEAR);
+        upscale = upscaled ? k : 0;
+    }
+    if (!upscaled) {
+        SDL_RenderTexture(view_renderer, screen, NULL, &view_screen);
+        return;
+    }
+    SDL_SetRenderTarget(view_renderer, upscaled);
+    SDL_RenderTexture(view_renderer, screen, NULL, NULL);
+    SDL_SetRenderTarget(view_renderer, NULL);
+    SDL_RenderTexture(view_renderer, upscaled, NULL, &view_screen);
+}
+
 void view_redraw(void)
 {
     if (view_headless)
@@ -61,17 +127,19 @@ void view_redraw(void)
     }
     SDL_SetRenderDrawColor(view_renderer, 32, 32, 32, 255);
     SDL_RenderClear(view_renderer);
-    SDL_FRect dst = {0, BAR_H, (float)(PANEL_WIDTH * view_scale), (float)(PANEL_HEIGHT * view_scale)};
     SDL_UpdateTexture(screen, NULL, frame, PANEL_WIDTH * 2);
-    SDL_RenderTexture(view_renderer, screen, NULL, &dst);
-    menubar_draw(PANEL_WIDTH * view_scale, status);
+    draw_screen();
+    menubar_draw(window_w, status);
     SDL_RenderPresent(view_renderer);
 }
 
 void view_set_scale(int scale)
 {
-    view_scale = scale;
-    SDL_SetWindowSize(view_window, PANEL_WIDTH * view_scale, BAR_H + PANEL_HEIGHT * view_scale);
+    int w = PANEL_WIDTH * scale;
+    int bar = 8 * text_scale_for(w) + 16; /* BAR_H at that width */
+    SDL_SetWindowSize(view_window, w, bar + PANEL_HEIGHT * scale);
+    SDL_SyncWindow(view_window);
+    update_layout();
 }
 
 void view_flash_status(const char *msg)
@@ -117,8 +185,12 @@ static int handle_event(const SDL_Event *e)
             return k;
         }
         break;
-    case SDL_EVENT_WINDOW_EXPOSED:
     case SDL_EVENT_WINDOW_RESIZED:
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+        update_layout();
+        view_redraw();
+        break;
+    case SDL_EVENT_WINDOW_EXPOSED:
         view_redraw();
         break;
     }
@@ -136,7 +208,6 @@ static void housekeeping(void)
 bool platform_init(int scale, bool headless)
 {
     view_headless = headless;
-    view_scale = scale;
     if (headless)
         SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
     if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -149,7 +220,9 @@ bool platform_init(int scale, bool headless)
     }
     if (headless)
         return true;
-    if (!SDL_CreateWindowAndRenderer("emuCasioFxCG", PANEL_WIDTH * scale, BAR_H + PANEL_HEIGHT * scale, 0,
+    int w = PANEL_WIDTH * scale;
+    view_text_scale = text_scale_for(w);
+    if (!SDL_CreateWindowAndRenderer("emuCasioFxCG", w, BAR_H + PANEL_HEIGHT * scale, SDL_WINDOW_RESIZABLE,
                                      &view_window, &view_renderer)) {
         fprintf(stderr, "SDL window: %s\n", SDL_GetError());
         return false;
@@ -163,12 +236,15 @@ bool platform_init(int scale, bool headless)
     screen = SDL_CreateTexture(view_renderer, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING, PANEL_WIDTH,
                                PANEL_HEIGHT);
     SDL_SetTextureScaleMode(screen, SDL_SCALEMODE_NEAREST);
+    SDL_SetWindowMinimumSize(view_window, PANEL_WIDTH, 8 + 16 + PANEL_HEIGHT); /* 1x screen, 1x bar */
+    update_layout();
     return screen != NULL;
 }
 
 void platform_shutdown(void)
 {
     info_window_close();
+    SDL_DestroyTexture(upscaled);
     SDL_DestroyTexture(screen);
     SDL_DestroyRenderer(view_renderer);
     SDL_DestroyWindow(view_window);

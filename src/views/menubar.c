@@ -125,7 +125,7 @@ static int item_at(float x, float y)
 static bool checked(Action a)
 {
     if (a >= A_ZOOM1 && a <= A_ZOOM4)
-        return view_scale == (int)(a - A_ZOOM1) + 1;
+        return view_zoom() == (int)(a - A_ZOOM1) + 1;
     if (a >= A_MODEL_AUTO && a <= A_MODEL_CG50)
         return view_model_choice == (ModelChoice)(a - A_MODEL_AUTO);
     return a == A_PAUSE && view_paused;
