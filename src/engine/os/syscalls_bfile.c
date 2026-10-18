@@ -64,6 +64,44 @@ static bool host_path(Emu *emu, uint32_t addr, char *out, size_t cap)
     return snprintf(out, cap, "%s/%s", emu->data_dir, rel) < (int)cap;
 }
 
+/* Copies an opened file into the flash (ROM), 4 kB-aligned like the file
+ * system's clusters, unless the same version is already there. Add-ins like
+ * CGDoom find a file's data by searching flash for its pages. */
+static void copy_to_flash(Emu *emu, const char *path, FILE *f)
+{
+    struct stat st;
+    if (fstat(fileno(f), &st) != 0)
+        return;
+    int i;
+    for (i = 0; i < emu->flash_file_count; i++)
+        if (!strcmp(emu->flash_files[i].path, path))
+            break;
+    if (i < emu->flash_file_count && emu->flash_files[i].size == (uint32_t)st.st_size &&
+        emu->flash_files[i].mtime == (int64_t)st.st_mtime)
+        return; /* unchanged */
+    uint32_t off = (emu->flash_next + 0xFFF) & ~0xFFFu;
+    if (off + (uint64_t)st.st_size + 0x1000 > ADDIN_PHYS) /* no room before the add-in */
+        return;
+    if (i == emu->flash_file_count) {
+        if (i == (int)(sizeof emu->flash_files / sizeof emu->flash_files[0]))
+            return;
+        emu->flash_file_count++;
+    }
+    long pos = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    size_t n = fread(emu->rom + off, 1, (size_t)st.st_size, f);
+    fseek(f, pos, SEEK_SET);
+    /* The rest of the last cluster reads as zeros, like Bfile_ReadFile_OS
+     * past the end of the file. */
+    uint32_t end = (off + (uint32_t)n + 0xFFF) & ~0xFFFu;
+    memset(emu->rom + off + n, 0, end - off - n);
+    snprintf(emu->flash_files[i].path, sizeof emu->flash_files[i].path, "%s", path);
+    emu->flash_files[i].offset = off;
+    emu->flash_files[i].size = (uint32_t)n;
+    emu->flash_files[i].mtime = (int64_t)st.st_mtime;
+    emu->flash_next = end;
+}
+
 static int new_handle(Emu *emu, FILE *f)
 {
     for (int i = 0; i < (int)(sizeof emu->files / sizeof emu->files[0]); i++) {
@@ -91,6 +129,7 @@ SC(sc_bfile_open)
     FILE *f = fopen(path, (a[1] & 3) == MODE_READ ? "rb" : "r+b");
     if (!f)
         return (uint32_t)ERR_NOT_FOUND;
+    copy_to_flash(emu, path, f);
     return (uint32_t)new_handle(emu, f);
 }
 
@@ -105,8 +144,10 @@ SC(sc_bfile_close)
 }
 
 /* Bfile_ReadFile_OS(handle, buf, size, readpos): readpos -1 reads from the
- * current position. Like Fugue, reading past the end gives zeros (without
- * growing the file) and returns the size asked for. */
+ * current position. Past the end of the file the buffer gets zeros. What it
+ * returns there depends on the OS: the fx-CG50's returns the size asked for
+ * (as gint documents for Fugue), the fx-CG10/20's the bytes actually read,
+ * which add-ins of that time rely on to find the end (CGDoom). */
 SC(sc_bfile_read)
 {
     FILE *f = handle_file(emu, a[0]);
@@ -114,13 +155,16 @@ SC(sc_bfile_read)
         return (uint32_t)ERR_OTHER;
     if ((int32_t)a[3] >= 0 && fseek(f, (long)a[3], SEEK_SET) != 0)
         return (uint32_t)ERR_OTHER;
+    uint32_t got = 0;
     bool eof = false;
     for (uint32_t n = 0; n < a[2]; n++) {
         int c = eof ? EOF : fgetc(f);
         eof = c == EOF;
+        if (!eof)
+            got++;
         mem_write8(&emu->mem, a[1] + n, eof ? 0 : (uint8_t)c);
     }
-    return a[2];
+    return emu->model == MODEL_CG20 ? got : a[2];
 }
 
 /* Bfile_WriteFile_OS(handle, buf, size): at the current position. Returns

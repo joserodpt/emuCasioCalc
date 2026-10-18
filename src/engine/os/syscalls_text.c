@@ -92,6 +92,29 @@ SC(sc_print_xy)
     return 0;
 }
 
+/* locate_OS(x, y): text cursor for PrintLine, in PrintXY cells (1-based). */
+SC(sc_locate)
+{
+    emu->cursor_x = (int32_t)a[0];
+    emu->cursor_y = (int32_t)a[1];
+    return 0;
+}
+
+/* PrintLine(msg, imax): the message at the cursor, at most imax characters,
+ * the rest of the line up to imax cleared; black on white. */
+SC(sc_print_line)
+{
+    char text[128];
+    read_text(emu, a[0], text, sizeof text);
+    int imax = (int32_t)a[1];
+    if (imax < 0 || imax >= (int)sizeof text)
+        imax = (int)sizeof text - 1;
+    char line[128];
+    snprintf(line, sizeof line, "%-*.*s", imax, imax, text);
+    display_print_xy(emu->vram, emu->cursor_x, emu->cursor_y, line, TEXT_MODE_NORMAL, 0);
+    return 0;
+}
+
 /* PrintXY_2(mode, x, y, msgno, color): a message from the OS's localised
  * tables, which we don't have; show its number instead. */
 SC(sc_print_xy_2)

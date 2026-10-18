@@ -29,6 +29,8 @@
 #define ADDIN_BASE    0x00300000u  /* g3a code (from file offset 0x7000), read-only */
 #define ADDIN_MAX     0x00400000u  /* largest add-in we map */
 #define ADDIN_PHYS    0x01000000u  /* where we put it in ROM */
+#define OS_ROM_SIZE   0x00400000u  /* where the OS would be: reads as zeros */
+#define FLASH_FILES   0x00400000u  /* storage files are copied here, see syscalls_bfile.c */
 #define URAM_BASE     0x08100000u  /* add-in static RAM: .data, .bss */
 #define URAM_SIZE     0x00080000u
 

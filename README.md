@@ -51,7 +51,10 @@ the screen in a red-bordered box.
 Saved data goes to a `storage` folder in the directory you run the emulator
 from: files in the storage memory (`Bfile_*` syscalls, paths like
 `\\fls0\GAME.sav`) under `storage/fls0/`, main memory items (`MCS*`
-syscalls) under `storage/mcs/<folder>/<item>`.
+syscalls) under `storage/mcs/<folder>/<item>`. Files an add-in opens are also
+copied into the emulated flash, where they live on the calculator: some
+add-ins read them from there directly (CGDoom finds `doom.wad` that way, so
+put it in `storage/fls0/doom.wad`).
 
 Keyboard: arrows, Enter = EXE, Esc = EXIT, Backspace = DEL, Delete = AC,
 Home = MENU, Tab = SHIFT, F1–F6, digits, `. + - * / ( )`.

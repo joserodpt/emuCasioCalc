@@ -76,6 +76,11 @@ bool emu_init(Emu *emu, Model model)
     emu->ram = mem_alloc(mem, l->ram_size);
     if (!emu->rom || !emu->ram)
         return false;
+    /* Past the OS, flash is erased (0xFF) until files and the add-in are
+     * written into it. The OS area stays zero: gint takes an all-0xFF
+     * product ID (0x8001FFD0) for Casio's PC emulator. */
+    memset(emu->rom + OS_ROM_SIZE, 0xFF, ROM_SIZE - OS_ROM_SIZE);
+    emu->flash_next = FLASH_FILES;
     mem_map_phys(mem, ROM_PHYS, ROM_SIZE, emu->rom, false);
     /* U0 below the add-in is scratch memory. Add-ins that read and write
      * through a NULL pointer (Gravity Duck does every time the duck dies)

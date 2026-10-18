@@ -37,6 +37,8 @@ SC(sc_display_mbstring2);
 SC(sc_save_vram_1);
 SC(sc_load_vram_1);
 SC(sc_print_mini_mini);
+SC(sc_locate);
+SC(sc_print_line);
 
 /* syscalls_keys.c: keyboard and text input */
 SC(sc_get_key);

@@ -68,6 +68,17 @@ typedef struct {
     FILE *files[16];      /* open Bfile handles */
     uint8_t *saved_vram;  /* SaveVRAM_1 / LoadVRAM_1 */
     bool serial_open;     /* Serial_Open was called (no cable: nothing arrives) */
+    int cursor_x, cursor_y; /* locate_OS: PrintLine's position, in PrintXY cells */
+
+    /* Storage files copied into the flash (ROM), as on the calculator where
+     * they live there: some add-ins (CGDoom) read them from flash directly. */
+    struct {
+        char path[700];
+        uint32_t offset, size;
+        int64_t mtime;
+    } flash_files[16];
+    int flash_file_count;
+    uint32_t flash_next;  /* next free ROM offset for a file */
 } Emu;
 
 /* Builds the memory map and peripherals of a model. */
