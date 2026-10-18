@@ -1,8 +1,8 @@
 # TODO
 
 What emuCasioFxCG still lacks. The syscall list is measured against
-[libfxcg](https://github.com/Jonimoose/libfxcg)'s stubs: 129 of its 273 syscalls
-are implemented, 144 are left. Add-ins only use a small part of them, so the
+[libfxcg](https://github.com/Jonimoose/libfxcg)'s stubs: 139 of its 273 syscalls
+are implemented, 134 are left. Add-ins only use a small part of them, so the
 groups are ordered by how likely real add-ins are to need them.
 
 Approach that has worked so far: run an add-in, implement what it stops at,
@@ -36,11 +36,15 @@ Also: the OS fonts are approximated by an 8x8 font (PrintXY 18x24, PrintMini,
 PrintMiniMini); multi-byte characters show as `?`; bold is not drawn.
 
 ### Files
-`Bfile_GetFileSize_OS` (1DA6), `Bfile_FindFirst` / `FindNext` / `FindClose`
-(1DB7, 1DB9, 1DBA) and their `_NON_SMEM` versions (1DB6, 1DB8),
-`Bfile_NameToStr_ncpy` (1DDB), `Bfile_Name_MatchMask` (1DDA),
-`Bfile_GetMediaFree_OS` (1DA5), `Bfile_GetBlockAddress` (1DAA, can map to the
-flash copies of files), `SMEM_FindFirst` (0DAC).
+Done (test app `apps/file-syscalls`) except `SMEM_FindFirst` (0DAC): its
+return values are not documented.
+
+Guessed: searches list folders first, then files, sorted by name, without
+"." and ".."; a search with no match returns -16 on the fx-CG10/20
+(WikiPrizm) and -1 on the fx-CG50 (gint); storage is 16 MB for
+`Bfile_GetMediaFree_OS`; `fileinfo.address` is only set for files already
+copied into flash (opened before); `Bfile_GetBlockAddress` points at the
+copy made when the file was opened.
 
 ### Keyboard
 SHIFT / ALPHA in `GetKey` are done (test app `apps/key-modifiers`). Not

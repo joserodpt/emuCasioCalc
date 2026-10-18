@@ -100,6 +100,14 @@ typedef struct {
     char mcs_path[600];   /* item selected by MCSGetDlen2, for MCSGetData1 */
     const char *data_dir; /* host folder for saved data: ./storage (mcs/, fls0/) */
     FILE *files[16];      /* open Bfile handles */
+    int file_flash[16];   /* their flash_files index, -1 if not copied */
+    /* Bfile_FindFirst searches: the matching names, sorted, folders first. */
+    struct {
+        bool used;
+        char dir[600];    /* host folder searched */
+        char **names;
+        int count, pos;
+    } finds[4];
     bool serial_open;     /* Serial_Open was called (no cable: nothing arrives) */
     int cursor_x, cursor_y; /* locate_OS: PrintLine's position, in PrintXY cells */
     char app_name[12];      /* GetAppName: the add-in's internal name (@NAME) */

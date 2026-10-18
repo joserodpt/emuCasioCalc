@@ -145,6 +145,11 @@ void emu_free(Emu *emu)
     for (size_t i = 0; i < sizeof emu->files / sizeof emu->files[0]; i++)
         if (emu->files[i])
             fclose(emu->files[i]);
+    for (size_t i = 0; i < sizeof emu->finds / sizeof emu->finds[0]; i++) {
+        for (int k = 0; k < emu->finds[i].count; k++)
+            free(emu->finds[i].names[k]);
+        free(emu->finds[i].names);
+    }
     mem_free(&emu->mem);
 }
 

@@ -106,7 +106,7 @@ GiteaPC puts it), the CMake build compiles them and CTest runs them.
 | `syscalls_text.c` | Text: PrintXY/PrintMini/PrintCXY, message boxes, VRAM save/load |
 | `syscalls_dialogs.c` | OS dialogs: message box, colour picker, progress bars, scrollbar |
 | `syscalls_keys.c` | Keyboard: GetKey, GetKeyWait_OS, PRGM_GetKey_OS, line editing |
-| `syscalls_bfile.c` | Storage memory files (`Bfile_*`), stored in `./storage/fls0` |
+| `syscalls_bfile.c` | Storage memory files (`Bfile_*`: files, folders, searches, free space), stored in `./storage/fls0` |
 | `syscalls_mcs.c` | Main memory (MCS) items, stored in `./storage/mcs` |
 | `display.c` | VRAM drawing used by the syscalls |
 | **`src/views/`** | **Windows (SDL3)** |
@@ -202,11 +202,9 @@ transfers and the first access to every peripheral page we don't model. The
 gint sources (`include/gint/mpu/*.h`, `src/*/`) document each register.
 
 Next steps:
-1. **More `Bfile_*` syscalls**: open/read/write/create/delete work (also from
-   gint through its world switch); seeking, sizes, renaming and directory
-   listing (`Bfile_FindFirst`...) are next.
-2. **More HLE syscalls** (see `TODO.md`): drawing the status bar, OS
-   timers, the OS's localised messages (`PrintXY_2` shows message numbers).
+1. **More HLE syscalls** (see `TODO.md`): OS timers, the keyboard group,
+   the OS's localised messages (`PrintXY_2` shows message numbers).
+2. **Text input**: lowercase alpha and the multi-byte character set.
 3. **Real font** for PrintXY (18x24) and PrintMini.
 4. **Proper `free`/`realloc`** in the HLE heap (it is a bump allocator).
 5. **USB** (fxlink), the SPU, and overclocking tools if add-ins need them.

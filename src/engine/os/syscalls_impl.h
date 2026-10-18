@@ -111,6 +111,14 @@ SC(sc_bfile_seek);
 SC(sc_bfile_tell);
 SC(sc_bfile_rename);
 SC(sc_bfile_str_to_name);
+SC(sc_bfile_name_to_str);
+SC(sc_bfile_size);
+SC(sc_bfile_match_mask);
+SC(sc_bfile_media_free);
+SC(sc_bfile_block_address);
+SC(sc_bfile_find_first);
+SC(sc_bfile_find_next);
+SC(sc_bfile_find_close);
 
 /* syscalls_mcs.c: main memory (MCS) files */
 SC(sc_mcs_create_dir);
