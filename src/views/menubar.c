@@ -433,8 +433,13 @@ static void run_action(Action a)
     case A_KEYS:
         message("Keyboard controls",
                 "Arrows: arrows\nEnter: EXE\nEsc: EXIT\nHome: MENU\nTab: SHIFT\nLeft Alt: ALPHA\n"
-                "O: OPTN\nBackspace: DEL\nDelete: AC/ON\nF1-F6: F1-F6\n"
-                "0-9 . + - * / ( ): the same keys\nE: x10^x");
+                "O: OPTN\nV: VARS\nBackspace: DEL\nDelete: AC/ON\nF1-F6: F1-F6\n"
+                "0-9 . + - * / ( ) ,: the same keys\nE: x10^x\nU: (-)\n"
+                "X: X,theta,T\nL: log\nN: ln\nS C T: sin cos tan\n"
+                "F: a b/c\nD: F<>D\nA: ->\nQ: x^2\nP: ^\n\n"
+                "In OS add-ins, SHIFT and ALPHA work as on the calculator\n"
+                "(SHIFT then ALPHA locks ALPHA; the title bar shows the mode).\n"
+                "With ALPHA on, PC letters and space type those characters.");
         break;
     case A_ABOUT:
         message("About emuCasioFxCG",

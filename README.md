@@ -56,8 +56,17 @@ copied into the emulated flash, where they live on the calculator: some
 add-ins read them from there directly (CGDoom finds `doom.wad` that way, so
 put it in `storage/fls0/doom.wad`).
 
-Keyboard: arrows, Enter = EXE, Esc = EXIT, Backspace = DEL, Delete = AC,
-Home = MENU, Tab = SHIFT, F1–F6, digits, `. + - * / ( )`.
+Keyboard (all 50 calculator keys): arrows, Enter = EXE, Esc = EXIT,
+Backspace = DEL, Delete = AC, Home = MENU, Tab = SHIFT, Left Alt = ALPHA,
+O = OPTN, V = VARS, F1–F6, digits, `. + - * / ( ) ,`, E = ×10^x, U = (-),
+X = X,θ,T, L = log, N = ln, S/C/T = sin/cos/tan, F = a b/c, D = F↔D,
+A = →, Q = x², P = ^ (Help > Keyboard controls lists them).
+
+In OS add-ins, `GetKey` handles SHIFT and ALPHA like the calculator: the
+next key returns its yellow or red function (ALPHA 7 = `M`, SHIFT EXIT =
+QUIT), and SHIFT then ALPHA locks ALPHA. The title bar shows the mode. With
+ALPHA on, PC letters and space type those characters directly. gint add-ins
+read the keyboard themselves and see SHIFT and ALPHA as plain keys.
 
 `--keys` works for both kinds of add-ins: OS `GetKey` calls pop the keys in
 order; for gint add-ins each key is held down for 100 ms of emulated time.

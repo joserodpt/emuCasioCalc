@@ -20,6 +20,8 @@ typedef enum {
 const char *model_name(Model model);
 
 /* Where things are on a model. Addresses are what the CPU sees. */
+typedef enum { ALPHA_OFF, ALPHA_ONCE, ALPHA_LOCK } KeyAlpha;
+
 typedef struct {
     uint32_t ram_phys, ram_size;   /* physical RAM */
     uint32_t uram_phys;            /* add-in static RAM behind URAM_BASE */
@@ -60,6 +62,9 @@ typedef struct {
     uint64_t script_done; /* cycle when the last scripted key was released */
     bool polls_keys;      /* the add-in reads the key state (PRGM_GetKey...) */
     bool key_down[256];   /* KEYS currently held (host keyboard + script) */
+    /* GetKey's modifiers: SHIFT pressed, ALPHA for one key or locked. */
+    bool key_shift;
+    KeyAlpha key_alpha;
 
     /* OS state for the HLE syscalls. */
     uint8_t setup[256];   /* GetSetupSetting / SetSetupSetting */

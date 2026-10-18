@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "keys.h"
+#include "platform.h"
 #include "syscalls_impl.h"
 
 /* OS matrix position of KEYS[k]: columns 7..2 left to right, rows 2..10
@@ -39,15 +40,52 @@ static int held_key(Emu *emu)
     return -1;
 }
 
+static void set_mode(Emu *emu, bool shift, KeyAlpha alpha)
+{
+    emu->key_shift = shift;
+    emu->key_alpha = alpha;
+    platform_set_key_mode(shift, (int)alpha);
+}
+
+/* GetKey handles SHIFT and ALPHA itself, as the OS does: they change the
+ * mode and the next key returns its yellow (SHIFT) or red (ALPHA) function.
+ * SHIFT then ALPHA locks ALPHA until ALPHA is pressed again; SHIFT keeps
+ * the lock. SHIFT AC/ON switches the calculator off: here, nothing. */
 int sc_wait_key(Emu *emu)
 {
     r61524_blit_vram(&emu->lcd, emu->vram);
-    int key = emu_next_key(emu);
-    if (key < 0) {
-        emu->cpu.state = CPU_EXITED;
-        return -1;
+    for (;;) {
+        int key = emu_next_key(emu);
+        if (key < 0) {
+            emu->cpu.state = CPU_EXITED;
+            return -1;
+        }
+        const KeyInfo *k = &KEYS[key];
+        bool shift = emu->key_shift;
+        KeyAlpha alpha = emu->key_alpha;
+        if (k->getkey == KEY_CTRL_SHIFT) {
+            set_mode(emu, !shift, alpha);
+            continue;
+        }
+        if (k->getkey == KEY_CTRL_ALPHA) {
+            if (shift)
+                set_mode(emu, false, ALPHA_LOCK);
+            else
+                set_mode(emu, false, alpha == ALPHA_OFF ? ALPHA_ONCE : ALPHA_OFF);
+            continue;
+        }
+        set_mode(emu, false, alpha == ALPHA_ONCE ? ALPHA_OFF : alpha);
+        if (shift) {
+            if (k->getkey == KEY_CTRL_AC)
+                continue;
+            if (k->getkey == KEY_CTRL_DEL && emu->model == MODEL_CG50)
+                return KEY_CTRL_UNDO;
+            return k->shift ? k->shift : k->getkey;
+        }
+        if (alpha != ALPHA_OFF)
+            return k->alpha ? k->alpha : k->getkey;
+        return k->getkey;
     }
-    return KEYS[key].getkey;
 }
 
 /* GetKey(int *key): refreshes the screen, blocks for a key. */

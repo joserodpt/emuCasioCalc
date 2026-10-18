@@ -50,7 +50,15 @@ static const struct { const char *name; SDL_Keycode sdl; } KEYMAP[] = {
     {"DP", SDLK_PERIOD}, {"PLUS", SDLK_PLUS}, {"MINUS", SDLK_MINUS},
     {"MULT", SDLK_ASTERISK}, {"DIV", SDLK_SLASH},
     {"LPAR", SDLK_LEFTPAREN}, {"RPAR", SDLK_RIGHTPAREN}, {"EXP", SDLK_E},
+    {"VARS", SDLK_V}, {"XOT", SDLK_X}, {"LOG", SDLK_L}, {"LN", SDLK_N},
+    {"SIN", SDLK_S}, {"COS", SDLK_C}, {"TAN", SDLK_T}, {"FRAC", SDLK_F},
+    {"FD", SDLK_D}, {"COMMA", SDLK_COMMA}, {"ARROW", SDLK_A}, {"SQUARE", SDLK_Q},
+    {"POWER", SDLK_P}, {"NEG", SDLK_U},
 };
+/* GetKey's modifiers (platform_set_key_mode). */
+static bool key_shift;
+static int key_alpha;
+static char base_title[64] = "emuCasioFxCG";
 
 void view_text(SDL_Renderer *r, float x, float y, const char *s, int k)
 {
@@ -189,6 +197,10 @@ const char *view_calc_key(int key)
     static const struct { const char *name, *label; } LABELS[] = {
         {"AC", "AC/ON"}, {"DP", "."}, {"EXP", "x10^x"}, {"PLUS", "+"}, {"MINUS", "-"},
         {"MULT", "*"}, {"DIV", "/"}, {"LPAR", "("}, {"RPAR", ")"},
+        {"XOT", "X,theta,T"}, {"LOG", "log"}, {"LN", "ln"}, {"SIN", "sin"},
+        {"COS", "cos"}, {"TAN", "tan"}, {"FRAC", "a b/c"}, {"FD", "F<>D"},
+        {"COMMA", ","}, {"ARROW", "->"}, {"SQUARE", "x^2"}, {"POWER", "^"},
+        {"NEG", "(-)"},
     };
     for (size_t i = 0; i < sizeof LABELS / sizeof LABELS[0]; i++)
         if (!strcmp(KEYS[key].name, LABELS[i].name))
@@ -196,9 +208,12 @@ const char *view_calc_key(int key)
     return KEYS[key].name;
 }
 
-/* KEYS index for an SDL key, or -1. */
+/* KEYS index for an SDL key, or -1. With ALPHA on, letters and space
+ * press the key whose alpha function they are. */
 static int key_for(SDL_Keycode k)
 {
+    if (key_alpha && ((k >= SDLK_A && k <= SDLK_Z) || k == SDLK_SPACE))
+        return key_for_letter(k == SDLK_SPACE ? ' ' : (int)(k - SDLK_A) + 'A');
     for (size_t i = 0; i < sizeof KEYMAP / sizeof KEYMAP[0]; i++)
         if (KEYMAP[i].sdl == k)
             return key_find(KEYMAP[i].name);
@@ -321,11 +336,25 @@ void platform_set_app(const G3aInfo *info, const char *path, Model model)
     snprintf(view_app_path, sizeof view_app_path, "%s", path);
     if (view_headless)
         return;
-    char title[64];
-    snprintf(title, sizeof title, "%s - %s - emuCasioFxCG", view_app.name[0] ? view_app.name : "add-in",
-             model_name(model));
-    SDL_SetWindowTitle(view_window, title);
+    snprintf(base_title, sizeof base_title, "%s - %s - emuCasioFxCG",
+             view_app.name[0] ? view_app.name : "add-in", model_name(model));
+    platform_set_key_mode(false, 0);
     info_window_refresh();
+}
+
+void platform_set_key_mode(bool shift, int alpha)
+{
+    static bool shown;
+    if (view_headless || (shown && shift == key_shift && alpha == key_alpha))
+        return;
+    shown = true;
+    key_shift = shift;
+    key_alpha = alpha;
+    static const char *const ALPHA[] = {"", " [ALPHA]", " [ALPHA lock]"};
+    char title[96];
+    snprintf(title, sizeof title, "%s%s%s", base_title, shift ? " [SHIFT]" : "",
+             ALPHA[alpha >= 0 && alpha <= 2 ? alpha : 0]);
+    SDL_SetWindowTitle(view_window, title);
 }
 
 double platform_speed(void)
