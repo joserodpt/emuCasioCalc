@@ -144,6 +144,34 @@ SC(sc_print_mini)
     return 0;
 }
 
+/* PrintMiniMini(int *x, int *y, string, mode, color, P6): the 10 px font
+ * (approximated by the 8x8 one), y under the status bar unless mode bit 6.
+ * Mode bits (WikiPrizm): 0 white text on `color`, 2 black background, 4
+ * bold (not shown), 7 leaves the background (our reading of "whether the
+ * background is cleared"). Advances *x. */
+SC(sc_print_mini_mini)
+{
+    Memory *mem = &emu->mem;
+    char text[256];
+    read_text(emu, a[2], text, sizeof text);
+    int x = (int32_t)mem_read32(mem, a[0]), y = (int32_t)mem_read32(mem, a[1]);
+    uint32_t mode = a[3];
+    uint16_t fg = display_text_color((int)(a[4] & 7)), bg = 0xFFFF;
+    if (mode & 0x01) {
+        bg = fg;
+        fg = 0xFFFF;
+    }
+    if (mode & 0x04)
+        bg = 0x0000;
+    int py = y + ((mode & 0x40) ? 0 : STATUS_HEIGHT);
+    int w = (int)strlen(text) * SMALL_CELL_W;
+    if (!(mode & 0x80))
+        display_rect(emu->vram, x, py, x + w - 1, py + SMALL_CELL_H - 1, bg);
+    display_text_small(emu->vram, x, py, text, fg);
+    mem_write32(mem, a[0], (uint32_t)(x + w));
+    return 0;
+}
+
 /* GetMiniGlyphPtr(glyph_no, unsigned short *glyph_info): we hand out a fake
  * pointer that encodes the character, for PrintMiniGlyph to decode, and
  * report its width in glyph_info. */

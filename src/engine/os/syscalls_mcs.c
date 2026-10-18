@@ -72,6 +72,14 @@ static uint8_t *copy_in(Emu *emu, uint32_t addr, uint32_t len)
     return buf;
 }
 
+/* MCS_CreateDirectory(dir) */
+SC(sc_mcs_create_dir)
+{
+    char path[600];
+    /* item_path with create makes the directory; the item name is unused */
+    return item_path(emu, a[0], a[0], path, sizeof path, true) ? 0 : MCS_FAIL;
+}
+
 /* MCSPutVar2(dir, item, data_len, buffer): creates or replaces an item. */
 SC(sc_mcs_put_var2)
 {

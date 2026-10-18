@@ -160,6 +160,52 @@ SC(sc_bfile_create)
     return fclose(f) == 0 ? 0 : (uint32_t)ERR_OTHER;
 }
 
+/* Bfile_SeekFile_OS(handle, pos): absolute. Like Fugue, returns how much
+ * of the file follows the new position. */
+SC(sc_bfile_seek)
+{
+    FILE *f = handle_file(emu, a[0]);
+    if (!f || fseek(f, 0, SEEK_END) != 0)
+        return (uint32_t)ERR_OTHER;
+    long size = ftell(f);
+    if (fseek(f, (long)(int32_t)a[1], SEEK_SET) != 0)
+        return (uint32_t)ERR_OTHER;
+    return (uint32_t)(size - (long)(int32_t)a[1]);
+}
+
+SC(sc_bfile_tell)
+{
+    FILE *f = handle_file(emu, a[0]);
+    return f ? (uint32_t)ftell(f) : (uint32_t)ERR_OTHER;
+}
+
+/* Bfile_RenameEntry(oldpath, newpath) */
+SC(sc_bfile_rename)
+{
+    char from[700], to[700];
+    if (!host_path(emu, a[0], from, sizeof from) || !host_path(emu, a[1], to, sizeof to))
+        return (uint32_t)ERR_NOT_FOUND;
+    make_parents(to);
+    if (rename(from, to) == 0)
+        return 0;
+    return errno == ENOENT ? (uint32_t)ERR_NOT_FOUND : (uint32_t)ERR_OTHER;
+}
+
+/* Bfile_StrToName_ncpy(unsigned short *dest, const char *source, n): an
+ * 8-bit string to the 16-bit file name format, at most n characters, NUL
+ * terminated when there is room. */
+SC(sc_bfile_str_to_name)
+{
+    uint32_t i = 0;
+    for (; i < a[2]; i++) {
+        uint8_t c = mem_read8(&emu->mem, a[1] + i);
+        mem_write16(&emu->mem, a[0] + 2 * i, c);
+        if (!c)
+            return 0;
+    }
+    return 0;
+}
+
 SC(sc_bfile_delete)
 {
     char path[700];

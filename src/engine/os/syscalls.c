@@ -234,6 +234,47 @@ static SC(sc_itoa)
     return a[1]; /* add-ins use the result as the string */
 }
 
+/* The serial port (3-pin link cable): we behave like a port with nothing
+ * plugged in. Opening works, nothing ever arrives, what is sent is lost. */
+static SC(sc_serial_open)
+{
+    (void)a;
+    emu->serial_open = true;
+    return 0;
+}
+
+static SC(sc_serial_is_open)
+{
+    (void)a;
+    return emu->serial_open ? 1 : 3; /* 3: not open (any nonzero code) */
+}
+
+static SC(sc_serial_poll_rx)
+{
+    (void)emu; (void)a;
+    return 0; /* bytes waiting */
+}
+
+static SC(sc_serial_poll_tx)
+{
+    (void)emu; (void)a;
+    return 256; /* free space in the send buffer */
+}
+
+/* Serial_Read(out, size, short *count): nothing to read. */
+static SC(sc_serial_read)
+{
+    if (a[2])
+        mem_write16(&emu->mem, a[2], 0);
+    return 1; /* "no data" */
+}
+
+static SC(sc_serial_write)
+{
+    (void)emu; (void)a;
+    return 0;
+}
+
 /* Calls that only change OS state we don't show (status bar contents,
  * cursor blinking, launch checks) or that have nothing to do here. */
 static SC(sc_nothing)
@@ -244,10 +285,13 @@ static SC(sc_nothing)
 
 static const Syscall SYSCALLS[] = {
     {0x0029, "GlibAddinAplExecutionCheck", sc_nothing},
+    {0x0129, "Set_FKeys2", sc_nothing},
+    {0x012B, "Set_FKeys1", sc_nothing},
     {0x0031, "GetSetupSetting", sc_get_setup_setting},
     {0x0032, "SetSetupSetting", sc_set_setup_setting},
     {0x01E6, "GetVRAMAddress", sc_get_vram_address},
     {0x01E9, "GetMiniGlyphPtr", sc_get_mini_glyph_ptr},
+    {0x021B, "PrintMiniMini", sc_print_mini_mini},
     {0x0239, "PrintCXY", sc_print_cxy},
     {0x023B, "PrintMiniGlyph", sc_print_mini_glyph},
     {0x023C, "PrintMini", sc_print_mini},
@@ -273,6 +317,7 @@ static const Syscall SYSCALLS[] = {
     {0x12F3, "GetFKeyPtr", sc_get_fkey_ptr},
     {0x1349, "strlen", sc_strlen},
     {0x1511, "memset", sc_memset},
+    {0x154B, "MCS_CreateDirectory", sc_mcs_create_dir},
     {0x154D, "MCSPutVar2", sc_mcs_put_var2},
     {0x1552, "MCSOvwDat2", sc_mcs_ovw_dat2},
     {0x1558, "MCSDelVar2", sc_mcs_del_var2},
@@ -283,17 +328,28 @@ static const Syscall SYSCALLS[] = {
     {0x18EC, "PrintXY_2", sc_print_xy_2},
     {0x18F9, "PrintXY", sc_print_xy},
     {0x1BB4, "OS_InnerWait_ms", sc_wait_ms},
+    {0x1BB7, "Serial_Open", sc_serial_open},
+    {0x1BBA, "Serial_Read", sc_serial_read},
+    {0x1BBE, "Serial_Write", sc_serial_write},
+    {0x1BBF, "Serial_PollRX", sc_serial_poll_rx},
+    {0x1BC0, "Serial_PollTX", sc_serial_poll_tx},
+    {0x1BC6, "Serial_IsOpen", sc_serial_is_open},
     {0x1D77, "DefineStatusMessage", sc_nothing},
     {0x1DA3, "Bfile_OpenFile_OS", sc_bfile_open},
     {0x1DA4, "Bfile_CloseFile_OS", sc_bfile_close},
+    {0x1DA9, "Bfile_SeekFile_OS", sc_bfile_seek},
+    {0x1DAB, "Bfile_TellFile_OS", sc_bfile_tell},
     {0x1DAC, "Bfile_ReadFile_OS", sc_bfile_read},
     {0x1DAE, "Bfile_CreateEntry_OS", sc_bfile_create},
     {0x1DAF, "Bfile_WriteFile_OS", sc_bfile_write},
+    {0x1DB3, "Bfile_RenameEntry", sc_bfile_rename},
     {0x1DB4, "Bfile_DeleteEntry", sc_bfile_delete},
     {0x1D81, "DisplayStatusArea", sc_nothing},
     {0x1DD0, "memcpy", sc_memcpy},
+    {0x1DDC, "Bfile_StrToName_ncpy", sc_bfile_str_to_name},
     {0x1E62, "SaveVRAM_1", sc_save_vram_1},
     {0x1E63, "LoadVRAM_1", sc_load_vram_1},
+    {0x1E6E, "SetQuitHandler", sc_nothing}, /* no OS menu to quit through */
     {0x1F42, "sys_free", sc_free},
     {0x1F44, "sys_malloc", sc_malloc},
     {0x1F46, "sys_realloc", sc_realloc},

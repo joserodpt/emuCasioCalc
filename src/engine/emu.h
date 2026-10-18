@@ -67,6 +67,7 @@ typedef struct {
     const char *data_dir; /* host folder for saved data: ./storage (mcs/, fls0/) */
     FILE *files[16];      /* open Bfile handles */
     uint8_t *saved_vram;  /* SaveVRAM_1 / LoadVRAM_1 */
+    bool serial_open;     /* Serial_Open was called (no cable: nothing arrives) */
 } Emu;
 
 /* Builds the memory map and peripherals of a model. */
