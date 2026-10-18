@@ -1,15 +1,15 @@
 # TODO
 
 What emuCasioFxCG still lacks. The syscall list is measured against
-[libfxcg](https://github.com/Jonimoose/libfxcg)'s stubs: 160 of its 273 syscalls
-are implemented, 113 are left. Add-ins only use a small part of them, so the
+[libfxcg](https://github.com/Jonimoose/libfxcg)'s stubs: 162 of its 273 syscalls
+are implemented, 111 are left. Add-ins only use a small part of them, so the
 groups are ordered by how likely real add-ins are to need them.
 
 Approach that has worked so far: run an add-in, implement what it stops at,
 check it on screen. For calls no add-in at hand uses, write a test app in
 `~/VSCode/casioPrizmApps` (see `apps/os-syscalls`, which tests the system-info
 and dialog calls; also `draw-syscalls`, `key-modifiers`, `status-bar`,
-`file-syscalls` and `time-keys`). Semantics come from WikiPrizm (prizm.cemetech.net),
+`file-syscalls`, `time-keys` and `language`). Semantics come from WikiPrizm (prizm.cemetech.net),
 libfxcg's headers, and the add-in's source when it has one.
 
 ## Syscalls, likely to be needed
@@ -28,12 +28,21 @@ status bar offset).
 `Bdisp_MMPrint` (0D09), `Bdisp_MMPrintRef` (0D08), `PrintGlyph` (0238),
 `PrintLine2` (1865), `DisplayMBString` (121D), `EditMBStringCtrl` (120E),
 `EditMBStringCtrl3` (120B), `EditMBStringCtrl4` (120C), `ProcessPrintChars`
-(1300), `CharacterSelectDialog` (07A2), `DispInt` (0259), `LocalizeMessage1`
-(12FC), `MB_IsLead` (1161), `MB_ElementCount` (1163), `EnableGB18030` /
+(1300), `CharacterSelectDialog` (07A2), `DispInt` (0259), `MB_IsLead` (1161), `MB_ElementCount` (1163), `EnableGB18030` /
 `DisableGB18030` (01E0, 01DF).
 
 Also: the OS fonts are approximated by an 8x8 font (PrintXY 18x24, PrintMini,
 PrintMiniMini); multi-byte characters show as `?`; bold is not drawn.
+
+### Language
+Done (test app `apps/language`): Language menu / `--language`,
+`LocalizeMessage1`, `PrintXY_2`, `APP_SYSTEM_LANGUAGE`. Only the ~40
+messages WikiPrizm lists are known (others read `<msg N>`); the Spanish,
+German, French, Portuguese and Chinese texts are our translations, except
+message 1 (the language's name); accents are dropped, as the OS's codes
+for accented letters aren't documented; Chinese is GB 18030, shown once
+the text and fonts work decodes it. Where the OS keeps the setting is
+unknown: it lasts while the emulator runs.
 
 ### Files
 Done (test app `apps/file-syscalls`) except `SMEM_FindFirst` (0DAC): its
@@ -127,7 +136,7 @@ nothing is plugged in. USB: `USB_Open` / `Close` / `IsOpen` (134E, 1350,
 ### Built-in applications
 Casio's own apps are not emulated: `APP_RUNMAT` (1A03), `APP_Program` (1945),
 `APP_FINANCE` (0C6B), `APP_MEMORY` (1632), `APP_SYSTEM` and its pages (1E13,
-1E05, 1E07, 1E0A, 1E0D, 1E17, 1E34).
+1E05, 1E07, 1E0A, 1E17, 1E34); its language page (1E0D) is done.
 
 ### Low-level display
 `Bdisp_ShapeBase` (01C7), `Bdisp_ShapeBase3XVRAM` (01BE), `Bdisp_ShapeToDD`

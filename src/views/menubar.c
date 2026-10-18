@@ -14,6 +14,7 @@ typedef enum {
     A_MODEL_AUTO, A_MODEL_CG20, A_MODEL_CG50, A_TIMING_REAL, A_TIMING_FAST,
     A_FASTER, A_SLOWER, A_NORMAL_SPEED, A_CUSTOM_SPEED,
     A_BATTERY_FULL, A_BATTERY_HALF, A_BATTERY_LOW, A_BATTERY_EMPTY, /* consecutive, as BATTERY_LEVEL_CV */
+    A_LANG_EN, A_LANG_ES, A_LANG_DE, A_LANG_FR, A_LANG_PT, A_LANG_ZH, /* consecutive, as LANG_* */
 } Action;
 
 #define GITHUB_URL "https://github.com/joserodpt/emuCasioFxCG"
@@ -61,6 +62,15 @@ static const Item VIEW_ITEMS[] = {
     {"Zoom 5x", "Ctrl+5", A_ZOOM5},
     {"Zoom 6x", "Ctrl+6", A_ZOOM6},
 };
+/* The calculator's message language (System > Language on the calculator) */
+static const Item LANGUAGE_ITEMS[] = {
+    {"English", "", A_LANG_EN},
+    {"Espanol (Spanish)", "", A_LANG_ES},
+    {"Deutsch (German)", "", A_LANG_DE},
+    {"Francais (French)", "", A_LANG_FR},
+    {"Portugues (Portuguese)", "", A_LANG_PT},
+    {"Chinese", "", A_LANG_ZH},
+};
 static const Item HELP_ITEMS[] = {
     {"Keyboard controls", "", A_KEYS},
     {"About", "", A_ABOUT},
@@ -78,6 +88,7 @@ static const struct {
     MENU("File", FILE_ITEMS),
     MENU("Emulation", EMU_ITEMS),
     MENU("View", VIEW_ITEMS),
+    MENU("Language", LANGUAGE_ITEMS),
     MENU("Help", HELP_ITEMS),
     {"Info", NULL, 0, A_INFO},
 };
@@ -165,6 +176,8 @@ static bool checked(Action a)
         return view_show_speed == (a == A_CUSTOM_SPEED);
     if (a == A_TIMING_REAL || a == A_TIMING_FAST)
         return view_realistic == (a == A_TIMING_REAL);
+    if (a >= A_LANG_EN && a <= A_LANG_ZH)
+        return view_language == (int)(a - A_LANG_EN);
     if (a >= A_BATTERY_FULL && a <= A_BATTERY_EMPTY)
         return view_battery_cv == BATTERY_LEVEL_CV[a - A_BATTERY_FULL];
     return a == A_PAUSE && view_paused;
@@ -284,8 +297,16 @@ static void draw_status_row(int width)
     color(0, 0, 0);
     text(x, STATUS_Y + (STATUS_H - GLYPH_H) / 2.0f, volts);
 
-    /* The add-in's status message, cut to the room left */
-    x = battery_x() + battery_w() + 3 * GAP;
+    /* The message language, then the add-in's status message, cut to the
+     * room left */
+    x = battery_x() + battery_w() + 2 * GAP;
+    char lang[8];
+    snprintf(lang, sizeof lang, "%s", LANG_CODES[view_language]);
+    lang[0] = (char)(lang[0] - 'a' + 'A');
+    lang[1] = (char)(lang[1] - 'a' + 'A');
+    color(60, 60, 60);
+    text(x, STATUS_Y + (STATUS_H - GLYPH_H) / 2.0f, lang);
+    x += 2 * CHAR_W + 3 * GAP;
     int fit = (int)((float)width - PAD - x) / CHAR_W;
     if (view_os_status[0] && fit > 3) {
         char msg[80];
@@ -609,6 +630,9 @@ static void run_action(Action a)
     case A_CUSTOM_SPEED: view_show_speed_row(true); break;
     case A_TIMING_REAL: view_realistic = true; break;
     case A_TIMING_FAST: view_realistic = false; break;
+    case A_LANG_EN: case A_LANG_ES: case A_LANG_DE: case A_LANG_FR: case A_LANG_PT: case A_LANG_ZH:
+        view_language = (int)(a - A_LANG_EN);
+        break;
     case A_BATTERY_FULL: case A_BATTERY_HALF: case A_BATTERY_LOW: case A_BATTERY_EMPTY:
         view_battery_cv = BATTERY_LEVEL_CV[a - A_BATTERY_FULL];
         break;

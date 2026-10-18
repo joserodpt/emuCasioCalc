@@ -57,6 +57,11 @@ void platform_show_info(void);
 void platform_set_key_mode(bool shift, int alpha);
 /* The add-in's status message (DefineStatusMessage). */
 void platform_set_os_status(const char *msg);
+/* The OS's message language (LANG_*): Language menu, --language, or the
+ * add-in through APP_SYSTEM_LANGUAGE. */
+int platform_language(void);
+void platform_set_language(int lang);
+
 /* Battery voltage in 1/100 V: chosen in Emulation > Battery or by
  * clicking the battery (--battery sets it at start). */
 int platform_battery(void);

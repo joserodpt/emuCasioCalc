@@ -22,6 +22,11 @@ const char *model_name(Model model);
 /* Where things are on a model. Addresses are what the CPU sees. */
 typedef enum { ALPHA_OFF, ALPHA_ONCE, ALPHA_LOCK } KeyAlpha;
 
+/* The OS's message languages (System > Language), in its order. */
+enum { LANG_EN, LANG_ES, LANG_DE, LANG_FR, LANG_PT, LANG_ZH, LANG_COUNT };
+static const char *const LANG_CODES[LANG_COUNT] = {"en", "es", "de", "fr", "pt", "zh"};
+static const char *const LANG_NAMES[LANG_COUNT] = {"English", "Espanol", "Deutsch", "Francais", "Portugues", "Chinese"};
+
 /* The main battery (GetMainBatteryVoltage), in 1/100 V: four AAA cells.
  * Emulation > Battery and --battery choose one of these levels. The
  * thresholds of the status bar's 3 bars are our guess. */
@@ -83,6 +88,7 @@ typedef struct {
     bool key_shift;
     KeyAlpha key_alpha;
     int battery_cv;         /* battery voltage, 1/100 V */
+    int language;           /* LANG_*: the OS's message language */
 
     /* OS timers (Timer_Install...), slots 1-10; 5-10 are the add-in's. */
     struct {

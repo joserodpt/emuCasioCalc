@@ -37,7 +37,9 @@ static void usage(const char *argv0)
             "  --speed S          window speed in percent (10-400, default 100) or max\n"
             "  --timing T         realistic (default: OS calls, memory and DMA take\n"
             "                     the time they would on the calculator) or fast\n"
-            "  --battery B        battery: full (default), half, low, empty, or volts (4.6)\n",
+            "  --battery B        battery: full (default), half, low, empty, or volts (4.6)\n"
+            "  --language L       the calculator's message language: en (default), es, de,\n"
+            "                     fr, pt or zh\n",
             argv0);
 }
 
@@ -150,6 +152,7 @@ static bool load(Emu *emu, const Options *opt, const char *path, G3aInfo *info, 
            platform_model_choice() == CHOICE_AUTO ? info->model_reason : model_name(info->model));
     platform_set_app(info, path, model);
     emu->battery_cv = platform_battery();
+    emu->language = platform_language();
     emu_start(emu);
     platform_status(NULL);
     return true;
@@ -174,6 +177,7 @@ static bool run(Emu *emu, bool headless)
         if (emu->realistic != platform_realistic())
             emu_set_realistic(emu, platform_realistic());
         emu->battery_cv = platform_battery();
+        emu->language = platform_language();
         emu_run(emu, (uint64_t)hz / 1000 * SLICE_MS);
         if (!platform_poll(down))
             return true;
@@ -218,7 +222,7 @@ int main(int argc, char **argv)
     Options opt = {0};
     const char *path = NULL, *screenshot = NULL, *icon = NULL;
     bool show_info = false;
-    const char *model = "auto", *timing = "realistic", *speed = NULL, *battery = NULL;
+    const char *model = "auto", *timing = "realistic", *speed = NULL, *battery = NULL, *language = NULL;
     static Emu emu;
     static G3aInfo info;
 
@@ -235,6 +239,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--timing") && i + 1 < argc) timing = argv[++i];
         else if (!strcmp(argv[i], "--speed") && i + 1 < argc) speed = argv[++i];
         else if (!strcmp(argv[i], "--battery") && i + 1 < argc) battery = argv[++i];
+        else if (!strcmp(argv[i], "--language") && i + 1 < argc) language = argv[++i];
         else if (argv[i][0] != '-' && !path) path = argv[i];
         else { usage(argv[0]); return 2; }
     }
@@ -257,6 +262,17 @@ int main(int argc, char **argv)
     } else if (strcmp(timing, "realistic")) {
         usage(argv[0]);
         return 2;
+    }
+    if (language) {
+        int lang = -1;
+        for (int i = 0; i < LANG_COUNT; i++)
+            if (!strcmp(language, LANG_CODES[i]))
+                lang = i;
+        if (lang < 0) {
+            usage(argv[0]);
+            return 2;
+        }
+        platform_set_language(lang);
     }
     if (battery) {
         static const char *const LEVELS[BATTERY_LEVELS] = {"full", "half", "low", "empty"};

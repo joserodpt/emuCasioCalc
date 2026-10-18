@@ -30,6 +30,7 @@ bool view_key_shift;
 int view_key_alpha;
 int view_battery_cv = BATTERY_CENTIVOLTS;
 char view_os_status[64];
+int view_language = LANG_EN;
 
 static SDL_Texture *screen;    /* the panel, 396 x 224 */
 static SDL_Texture *upscaled;  /* the panel at a whole scale, see draw_screen() */
@@ -389,6 +390,20 @@ void platform_set_os_status(const char *msg)
         return;
     snprintf(view_os_status, sizeof view_os_status, "%s", msg);
     view_redraw();
+}
+
+int platform_language(void)
+{
+    return view_language;
+}
+
+void platform_set_language(int lang)
+{
+    if (lang < 0 || lang >= LANG_COUNT || lang == view_language)
+        return;
+    view_language = lang;
+    if (view_renderer) /* --language comes before the window exists */
+        view_redraw();
 }
 
 int platform_battery(void)

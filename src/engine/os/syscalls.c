@@ -496,6 +496,7 @@ static const Syscall SYSCALLS[] = {
     {0x12D8, "SetBacklightDuration", sc_set_backlight},
     {0x12D9, "GetBacklightDuration", sc_get_backlight},
     {0x12F3, "GetFKeyPtr", sc_get_fkey_ptr},
+    {0x12FC, "LocalizeMessage1", sc_localize_message1},
     {0x1343, "HexToNibble", sc_hex_to_nibble},
     {0x1344, "HexToByte", sc_hex_to_byte},
     {0x1345, "HexToWord", sc_hex_to_word},
@@ -570,6 +571,7 @@ static const Syscall SYSCALLS[] = {
     {0x1DDA, "Bfile_Name_MatchMask", sc_bfile_match_mask},
     {0x1DDB, "Bfile_NameToStr_ncpy", sc_bfile_name_to_str},
     {0x1DDC, "Bfile_StrToName_ncpy", sc_bfile_str_to_name},
+    {0x1E0D, "APP_SYSTEM_LANGUAGE", sc_app_system_language},
     {0x1E23, "ResetAllDialog", sc_nothing},   /* nothing to reset */
     {0x1E4B, "DisplayMessageBox", sc_display_message_box},
     {0x1E50, "GetSecondaryVRAMAddress", sc_get_secondary_vram_address},

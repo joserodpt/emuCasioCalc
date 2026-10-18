@@ -37,7 +37,6 @@ SC(sc_bdisp_allclr_vram);
 SC(sc_bdisp_putdisp_dd);
 SC(sc_bdisp_setpoint_vram);
 SC(sc_print_xy);
-SC(sc_print_xy_2);
 SC(sc_print_cxy);
 SC(sc_print_mini);
 SC(sc_get_mini_glyph_ptr);
@@ -94,6 +93,13 @@ SC(sc_rtc_reset);
 SC(sc_rtc_set_date_time);
 SC(sc_delay_micros);
 SC(sc_delay_100micros);
+
+/* messages.c: OS messages in the chosen language */
+bool os_message(int lang, int no, char *out, size_t cap);
+void set_language(Emu *emu, int lang);
+SC(sc_localize_message1);
+SC(sc_print_xy_2);
+SC(sc_app_system_language);
 
 /* syscalls_dialogs.c: OS dialogs */
 SC(sc_display_message_box);

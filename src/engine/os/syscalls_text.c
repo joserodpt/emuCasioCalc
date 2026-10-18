@@ -130,16 +130,6 @@ SC(sc_print_line)
     return 0;
 }
 
-/* PrintXY_2(mode, x, y, msgno, color): a message from the OS's localised
- * tables, which we don't have; show its number instead. */
-SC(sc_print_xy_2)
-{
-    char text[32];
-    snprintf(text, sizeof text, "<msg %u>", a[3]);
-    display_print_xy(emu->vram, (int32_t)a[1], (int32_t)a[2], text, (int32_t)a[0], (int32_t)a[4]);
-    return 0;
-}
-
 /* PrintCXY(x, y, string, mode, P5, color, back_color, P8, P9): big font at
  * pixel coordinates. Assumed relative to the area under the status bar
  * like PrintMini (WikiPrizm doesn't say). Mode: 0x01 invert, 0x20 no background. */
