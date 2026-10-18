@@ -158,6 +158,31 @@ void platform_status(const char *msg)
     view_redraw();
 }
 
+const char *view_pc_key(int key)
+{
+    for (size_t i = 0; i < sizeof KEYMAP / sizeof KEYMAP[0]; i++) {
+        if (key_find(KEYMAP[i].name) != key)
+            continue;
+        const char *name = SDL_GetKeyName(KEYMAP[i].sdl);
+        if (!strcmp(name, "Return")) return "Enter";
+        if (!strcmp(name, "Escape")) return "Esc";
+        return name;
+    }
+    return "-";
+}
+
+const char *view_calc_key(int key)
+{
+    static const struct { const char *name, *label; } LABELS[] = {
+        {"AC", "AC/ON"}, {"DP", "."}, {"EXP", "x10^x"}, {"PLUS", "+"}, {"MINUS", "-"},
+        {"MULT", "*"}, {"DIV", "/"}, {"LPAR", "("}, {"RPAR", ")"},
+    };
+    for (size_t i = 0; i < sizeof LABELS / sizeof LABELS[0]; i++)
+        if (!strcmp(KEYS[key].name, LABELS[i].name))
+            return LABELS[i].label;
+    return KEYS[key].name;
+}
+
 /* KEYS index for an SDL key, or -1. */
 static int key_for(SDL_Keycode k)
 {

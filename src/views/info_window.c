@@ -3,10 +3,12 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "keys.h"
 #include "view.h"
 
 #define INFO_W      640
-#define INFO_H      310
+#define CONTROLS_Y  300  /* "Controls" title */
+#define LIST_Y      (CONTROLS_Y + 26)
 #define ICON_X      20
 #define ICON_Y      64
 #define ICON_SCALE  2   /* icons shown at 2x: 184 x 128 */
@@ -39,6 +41,62 @@ static void field(float x, float y, const char *label, const char *value)
     view_text(ren, x, y, label, TEXT);
     SDL_SetRenderDrawColor(ren, 0, 0, 0, 255);
     view_text(ren, x + 9 * 8 * TEXT, y, value[0] ? value : "-", TEXT);
+}
+
+static int used_count(void)
+{
+    int n = 0;
+    for (int k = 0; k < KEY_COUNT && k < 64; k++)
+        n += view_have_app && (view_app.keys_used >> k & 1);
+    return n;
+}
+
+/* Window height: the header part plus the controls list. */
+static int window_height(void)
+{
+    int n = used_count();
+    if (n)
+        return LIST_Y + (n + 1) / 2 * 22 + 16;
+    return LIST_Y + 18 + (KEY_COUNT + 2) / 3 * 12 + 16;
+}
+
+/* The keys the add-in uses with their PC keys, or the whole table when the
+ * add-in reads the keyboard itself (nothing to detect). */
+static void draw_controls(void)
+{
+    SDL_SetRenderDrawColor(ren, 200, 200, 200, 255);
+    SDL_FRect line = {ICON_X, CONTROLS_Y - 10, INFO_W - 2 * ICON_X, 1};
+    SDL_RenderFillRect(ren, &line);
+    SDL_SetRenderDrawColor(ren, 0, 0, 0, 255);
+    view_text(ren, ICON_X, CONTROLS_Y, "Controls", TEXT);
+
+    char cell[48];
+    if (used_count()) {
+        int i = 0;
+        for (int k = 0; k < KEY_COUNT && k < 64; k++) {
+            if (!(view_app.keys_used >> k & 1))
+                continue;
+            float x = ICON_X + (i % 2) * 300.0f, y = LIST_Y + (i / 2) * 22.0f;
+            SDL_SetRenderDrawColor(ren, 100, 100, 100, 255);
+            view_text(ren, x, y, view_calc_key(k), TEXT);
+            SDL_SetRenderDrawColor(ren, 0, 0, 0, 255);
+            snprintf(cell, sizeof cell, "%s", view_pc_key(k));
+            view_text(ren, x + 7 * 8 * TEXT, y, cell, TEXT);
+            i++;
+        }
+        return;
+    }
+    SDL_SetRenderDrawColor(ren, 60, 60, 60, 255);
+    view_text(ren, ICON_X, LIST_Y,
+              view_have_app ? "Keys can't be detected (it reads the keyboard itself). All keys:"
+                            : "All keys:",
+              1);
+    for (int k = 0; k < KEY_COUNT; k++) {
+        float x = ICON_X + (k % 3) * 200.0f, y = LIST_Y + 18 + (k / 3) * 12.0f;
+        snprintf(cell, sizeof cell, "%-7s %s", view_calc_key(k), view_pc_key(k));
+        SDL_SetRenderDrawColor(ren, 0, 0, 0, 255);
+        view_text(ren, x, y, cell, 1);
+    }
 }
 
 static void redraw(void)
@@ -91,6 +149,7 @@ static void redraw(void)
     field(x, y += ROW, "Size", have ? size : "");
     field(x, y += ROW, "Header", have ? app->filename : "");
     field(x, y += ROW, "File", file);
+    draw_controls();
     SDL_RenderPresent(ren);
 }
 
@@ -112,7 +171,7 @@ void info_window_open(void)
     if (view_headless)
         return;
     if (!win) {
-        if (!SDL_CreateWindowAndRenderer("Add-in information", INFO_W, INFO_H, 0, &win, &ren)) {
+        if (!SDL_CreateWindowAndRenderer("Add-in information", INFO_W, window_height(), 0, &win, &ren)) {
             fprintf(stderr, "info window: %s\n", SDL_GetError());
             return;
         }

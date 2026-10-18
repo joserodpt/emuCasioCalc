@@ -27,6 +27,11 @@ typedef struct {
      * (g3a files have no field for it), and why. */
     Model model;
     char model_reason[64];
+
+    /* Keys the add-in looks for, as bits over KEYS indices: found as the
+     * OS GetKey codes for control keys (30000 and up) in its code. Add-ins
+     * that read the keyboard hardware directly leave this empty. */
+    uint64_t keys_used;
 } G3aInfo;
 
 /* A g3a read into memory. */

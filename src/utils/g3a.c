@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "keys.h"
+
 /* The header starts with "USBPower" with every byte inverted. */
 static const unsigned char MAGIC[8] = {0xAA, 0xAC, 0xBD, 0xAF, 0x90, 0x88, 0x9A, 0x8D};
 
@@ -83,6 +85,23 @@ static void detect_model(const unsigned char *code, uint32_t size, const char *d
     }
 }
 
+/* Looks for GetKey control-key codes (KEY_CTRL_*, 30000 and up) as 16-bit
+ * constants. Character codes are small numbers that would match anything,
+ * so they are not looked for. */
+static uint64_t detect_keys(const unsigned char *code, uint32_t size)
+{
+    uint64_t used = 0;
+    for (uint32_t i = 0; i + 2 <= size; i += 2) {
+        int v = code[i] << 8 | code[i + 1];
+        if (v < 30000 || v > 30100)
+            continue;
+        for (int k = 0; k < KEY_COUNT && k < 64; k++)
+            if (KEYS[k].getkey == v)
+                used |= (uint64_t)1 << k;
+    }
+    return used;
+}
+
 bool g3a_read(const char *path, G3aFile *file)
 {
     memset(file, 0, sizeof *file);
@@ -114,6 +133,7 @@ bool g3a_read(const char *path, G3aFile *file)
     file->size = (uint32_t)size;
     read_info(buf, size, &file->info);
     detect_model(buf + G3A_HEADER_SIZE, file->size - G3A_HEADER_SIZE, file->info.date, &file->info);
+    file->info.keys_used = detect_keys(buf + G3A_HEADER_SIZE, file->size - G3A_HEADER_SIZE);
     return true;
 }
 

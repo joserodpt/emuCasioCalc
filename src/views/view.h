@@ -42,6 +42,11 @@ void view_flash_status(const char *msg);
 #define ITEM_H     (GLYPH_H + 18)
 #define PAD        (6 + 4 * TEXT_SCALE)
 
+/* The PC key for KEYS[key] ("Enter", "Esc"...), and a short label for the
+ * calculator key ("EXE", "AC/ON", "x10^x"...). */
+const char *view_pc_key(int key);
+const char *view_calc_key(int key);
+
 /* Debug-font text at an integer scale k (stays crisp). */
 void view_text(SDL_Renderer *r, float x, float y, const char *s, int k);
 
