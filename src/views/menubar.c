@@ -282,6 +282,13 @@ static void saved(bool ok, const char *path)
     }
 }
 
+/* Restarts the add-in; a reset also ends a pause. */
+static void request_reset(void)
+{
+    view_pending = CMD_RESET;
+    view_paused = false;
+}
+
 static void run_action(Action a)
 {
     static const SDL_DialogFileFilter FILTERS[] = {{"Casio fx-CG add-ins", "g3a"}, {"All files", "*"}};
@@ -310,7 +317,7 @@ static void run_action(Action a)
         break;
     case A_QUIT: view_pending = CMD_QUIT; break;
     case A_PAUSE: view_paused = !view_paused; break;
-    case A_RESET: view_pending = CMD_RESET; break;
+    case A_RESET: request_reset(); break;
     case A_ZOOM1: case A_ZOOM2: case A_ZOOM3: case A_ZOOM4: view_set_scale((int)(a - A_ZOOM1) + 1); break;
     case A_KEYS:
         message("Keyboard controls",
@@ -329,7 +336,7 @@ static void run_action(Action a)
         if (c != view_model_choice) {
             view_model_choice = c;
             if (view_have_app)
-                view_pending = CMD_RESET; /* run it again on the new model */
+                request_reset(); /* run it again on the new model */
         }
         break;
     }
