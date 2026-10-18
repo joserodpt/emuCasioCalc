@@ -85,7 +85,7 @@ static void update_layout(void)
 
 int view_zoom(void)
 {
-    for (int z = 1; z <= 4; z++)
+    for (int z = 1; z <= 6; z++)
         if ((int)view_screen.w == PANEL_WIDTH * z && (int)view_screen.h == PANEL_HEIGHT * z)
             return z;
     return 0;

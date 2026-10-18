@@ -24,7 +24,7 @@ static void usage(const char *argv0)
     fprintf(stderr,
             "usage: %s [options] [addin.g3a]\n"
             "  (without an add-in, the window opens empty: use File > Open)\n"
-            "  --scale N          window scale (default 2)\n"
+            "  --scale N          window scale, 1-6 (default 4)\n"
             "  --trace            log every syscall\n"
             "  --trace-hw         log exceptions, DMA transfers and unmodelled I/O registers\n"
             "  --keys K1,K2,...   keys to press first (EXE, EXIT, UP, F1, 0-9...)\n"
@@ -211,7 +211,7 @@ static bool run(Emu *emu, bool headless)
 
 int main(int argc, char **argv)
 {
-    int scale = 2;
+    int scale = 4;
     Options opt = {0};
     const char *path = NULL, *screenshot = NULL, *icon = NULL;
     bool show_info = false;
@@ -254,7 +254,7 @@ int main(int argc, char **argv)
         usage(argv[0]);
         return 2;
     }
-    if (!platform_init(scale > 0 ? scale : 2, opt.headless))
+    if (!platform_init(scale > 0 ? scale : 4, opt.headless))
         return 1;
     static char current[1024]; /* the add-in Reset reloads, "" if none yet */
     bool loaded = false, first = true;

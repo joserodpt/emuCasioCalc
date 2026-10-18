@@ -77,6 +77,14 @@ bool emu_init(Emu *emu, Model model)
     if (!emu->rom || !emu->ram)
         return false;
     mem_map_phys(mem, ROM_PHYS, ROM_SIZE, emu->rom, false);
+    /* U0 below the add-in is scratch memory. Add-ins that read and write
+     * through a NULL pointer (Gravity Duck does every time the duck dies)
+     * don't crash on the calculator, so they must not here: their stray
+     * accesses land in this zeroed area, away from anything that matters. */
+    uint8_t *low = mem_alloc(mem, ADDIN_BASE);
+    if (!low)
+        return false;
+    mem_map(mem, 0, ADDIN_BASE, low, true);
     mem_map_phys(mem, l->ram_phys, l->ram_size, emu->ram, true);
     /* Add-in static RAM: a U0 view of part of the physical RAM. */
     mem_map(mem, URAM_BASE, URAM_SIZE, emu->ram + (l->uram_phys - l->ram_phys), true);

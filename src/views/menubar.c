@@ -8,7 +8,8 @@
 
 typedef enum {
     A_NONE, A_SEPARATOR, A_OPEN, A_INFO, A_SCREENSHOT, A_SAVE_ICON, A_QUIT, A_PAUSE, A_RESET,
-    A_ZOOM1, A_ZOOM2, A_ZOOM3, A_ZOOM4, A_KEYS, A_ABOUT,
+    A_ZOOM1, A_ZOOM2, A_ZOOM3, A_ZOOM4, A_ZOOM5, A_ZOOM6, /* consecutive */
+    A_KEYS, A_ABOUT,
     A_MODEL_AUTO, A_MODEL_CG20, A_MODEL_CG50, A_TIMING_REAL, A_TIMING_FAST,
     A_FASTER, A_SLOWER, A_NORMAL_SPEED, A_CUSTOM_SPEED,
 } Action;
@@ -46,6 +47,8 @@ static const Item VIEW_ITEMS[] = {
     {"Zoom 2x", "Ctrl+2", A_ZOOM2},
     {"Zoom 3x", "Ctrl+3", A_ZOOM3},
     {"Zoom 4x", "Ctrl+4", A_ZOOM4},
+    {"Zoom 5x", "Ctrl+5", A_ZOOM5},
+    {"Zoom 6x", "Ctrl+6", A_ZOOM6},
 };
 static const Item HELP_ITEMS[] = {
     {"Keyboard controls", "", A_KEYS},
@@ -143,7 +146,7 @@ static int item_at(float x, float y)
 
 static bool checked(Action a)
 {
-    if (a >= A_ZOOM1 && a <= A_ZOOM4)
+    if (a >= A_ZOOM1 && a <= A_ZOOM6)
         return view_zoom() == (int)(a - A_ZOOM1) + 1;
     if (a >= A_MODEL_AUTO && a <= A_MODEL_CG50)
         return view_model_choice == (ModelChoice)(a - A_MODEL_AUTO);
@@ -424,7 +427,9 @@ static void run_action(Action a)
     case A_QUIT: view_pending = CMD_QUIT; break;
     case A_PAUSE: view_paused = !view_paused; break;
     case A_RESET: request_reset(); break;
-    case A_ZOOM1: case A_ZOOM2: case A_ZOOM3: case A_ZOOM4: view_set_scale((int)(a - A_ZOOM1) + 1); break;
+    case A_ZOOM1: case A_ZOOM2: case A_ZOOM3: case A_ZOOM4: case A_ZOOM5: case A_ZOOM6:
+        view_set_scale((int)(a - A_ZOOM1) + 1);
+        break;
     case A_KEYS:
         message("Keyboard controls",
                 "Arrows: arrows\nEnter: EXE\nEsc: EXIT\nHome: MENU\nTab: SHIFT\nLeft Alt: ALPHA\n"
@@ -474,6 +479,7 @@ static bool shortcut(SDL_Keycode k)
         {SDLK_O, A_OPEN}, {SDLK_I, A_INFO}, {SDLK_S, A_SCREENSHOT}, {SDLK_Q, A_QUIT}, {SDLK_P, A_PAUSE},
         {SDLK_R, A_RESET}, {SDLK_EQUALS, A_FASTER}, {SDLK_PLUS, A_FASTER}, {SDLK_MINUS, A_SLOWER},
         {SDLK_0, A_NORMAL_SPEED}, {SDLK_1, A_ZOOM1}, {SDLK_2, A_ZOOM2}, {SDLK_3, A_ZOOM3}, {SDLK_4, A_ZOOM4},
+        {SDLK_5, A_ZOOM5}, {SDLK_6, A_ZOOM6},
     };
     for (size_t i = 0; i < sizeof SHORTCUTS / sizeof SHORTCUTS[0]; i++) {
         if (SHORTCUTS[i].key == k) {

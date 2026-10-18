@@ -39,11 +39,11 @@ ctest --test-dir build --output-on-failure
 
 The window has a menu bar: **File** (open another add-in, add-in info, save a
 screenshot or the add-in's icon), **Emulation** (pause, reset, model, timing), **View**
-(zoom 1x-4x) and **Help**, plus an **Info** button that opens a window with the
+(zoom 1x-6x, 4x at start) and **Help**, plus an **Info** button that opens a window with the
 add-in's name, header fields and icon (hover the icon to see its selected
 version), and its controls: the calculator keys it uses with the PC key for
 each, when they can be found in its code (add-ins using the OS's GetKey), or
-the whole key table otherwise. Shortcuts: Ctrl+O, Ctrl+I, Ctrl+S, Ctrl+P, Ctrl+R, Ctrl+1..4, Ctrl+Q.
+the whole key table otherwise. Shortcuts: Ctrl+O, Ctrl+I, Ctrl+S, Ctrl+P, Ctrl+R, Ctrl+1..6, Ctrl+Q.
 When the add-in exits, the window stays open so you can reset or open another.
 If it stops with an error, the error is printed on the terminal and shown on
 the screen in a red-bordered box.
