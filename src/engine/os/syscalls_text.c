@@ -256,36 +256,50 @@ SC(sc_get_fkey_ptr)
     return 0;
 }
 
-/* MsgBoxPush(lines): saves VRAM and draws an empty box with a blue border.
- * Geometry is our guess: it frames PrintXY rows 2..lines+1, columns 2..19,
- * which is where add-ins print their message text. */
-SC(sc_msgbox_push)
+/* Message box geometry is our guess: a box of `lines` lines frames PrintXY
+ * rows 2..lines+1, columns 2..19, which is where add-ins print their
+ * message text. */
+BoxRect msgbox_rect(int lines)
 {
-    int lines = (int32_t)a[0];
     if (lines < 1) lines = 1;
     if (lines > 6) lines = 6;
+    return (BoxRect){BIG_CELL_W - 6, 2 * BIG_CELL_H - 6, 20 * BIG_CELL_W + 5, (2 + lines) * BIG_CELL_H + 5};
+}
+
+void msgbox_open(Emu *emu, int lines)
+{
     if (emu->msgbox_depth < (int)(sizeof emu->msgbox / sizeof emu->msgbox[0])) {
         uint8_t *save = malloc(VRAM_SIZE);
         if (save)
             memcpy(save, emu->vram, VRAM_SIZE);
         emu->msgbox[emu->msgbox_depth++] = save;
     }
-    int x0 = BIG_CELL_W - 6, x1 = 20 * BIG_CELL_W + 5;
-    int y0 = 2 * BIG_CELL_H - 6, y1 = (2 + lines) * BIG_CELL_H + 5;
-    display_rect(emu->vram, x0, y0, x1, y1, 0x001F);
-    display_rect(emu->vram, x0 + 2, y0 + 2, x1 - 2, y1 - 2, 0xFFFF);
+    BoxRect r = msgbox_rect(lines);
+    display_rect(emu->vram, r.x0, r.y0, r.x1, r.y1, 0x001F);
+    display_rect(emu->vram, r.x0 + 2, r.y0 + 2, r.x1 - 2, r.y1 - 2, 0xFFFF);
+}
+
+void msgbox_close(Emu *emu)
+{
+    if (emu->msgbox_depth <= 0)
+        return;
+    uint8_t *save = emu->msgbox[--emu->msgbox_depth];
+    if (save)
+        memcpy(emu->vram, save, VRAM_SIZE);
+    free(save);
+}
+
+/* MsgBoxPush(lines): saves VRAM and draws an empty box with a blue border. */
+SC(sc_msgbox_push)
+{
+    msgbox_open(emu, (int32_t)a[0]);
     return 0;
 }
 
 SC(sc_msgbox_pop)
 {
     (void)a;
-    if (emu->msgbox_depth <= 0)
-        return 0;
-    uint8_t *save = emu->msgbox[--emu->msgbox_depth];
-    if (save)
-        memcpy(emu->vram, save, VRAM_SIZE);
-    free(save);
+    msgbox_close(emu);
     return 0;
 }
 

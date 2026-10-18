@@ -154,5 +154,6 @@ bool g3a_map(Emu *emu, const G3aFile *file)
      * Writes only change this in-memory copy, not the file. */
     mem_map(&emu->mem, ADDIN_BASE, mapped, emu->rom + ADDIN_PHYS - ROM_PHYS, true);
     sh7305_add_mapping(&emu->hw, ADDIN_BASE, ADDIN_PHYS, mapped);
+    snprintf(emu->app_name, sizeof emu->app_name, "%s", file->info.internal);
     return true;
 }

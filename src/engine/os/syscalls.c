@@ -275,6 +275,50 @@ static SC(sc_serial_write)
     return 0;
 }
 
+/*
+ * System information. The OS version is the one each model shipped late in
+ * its life (fx-CG50 03.60, fx-CG10/20 02.02); how its parts map to the four
+ * outputs isn't documented, this is our reading. The battery voltage is a
+ * plausible fixed value, in hundredths of a volt (an assumption).
+ */
+static SC(sc_os_version)
+{
+    Memory *mem = &emu->mem;
+    bool cg50 = emu->model == MODEL_CG50;
+    if (a[0]) mem_write8(mem, a[0], cg50 ? 3 : 2);
+    if (a[1]) mem_write8(mem, a[1], cg50 ? 60 : 2);
+    if (a[2]) mem_write16(mem, a[2], cg50 ? 2 : 2);
+    if (a[3]) mem_write16(mem, a[3], 0);
+    return 0;
+}
+
+/* GetAppName(name): the add-in's internal name; returns name. */
+static SC(sc_get_app_name)
+{
+    for (size_t i = 0; i <= strlen(emu->app_name); i++)
+        mem_write8(&emu->mem, a[0] + (uint32_t)i, (uint8_t)emu->app_name[i]);
+    return a[0];
+}
+
+static SC(sc_battery_voltage)
+{
+    (void)emu; (void)a;
+    return 520; /* 5.20 V: four fresh-ish AAA cells */
+}
+
+static SC(sc_get_battery_type) { (void)a; return (uint32_t)emu->battery_type; }
+static SC(sc_set_battery_type) { emu->battery_type = (int)a[0]; return 0; }
+static SC(sc_get_backlight) { (void)a; return (uint32_t)emu->backlight_halfmin; }
+static SC(sc_set_backlight) { emu->backlight_halfmin = (int)(a[0] & 0xFF); return 0; }
+static SC(sc_get_power_off) { (void)a; return (uint32_t)emu->power_off_min; }
+static SC(sc_set_power_off) { emu->power_off_min = (int)a[0]; return 0; }
+
+static SC(sc_get_stack_ptr)
+{
+    (void)a;
+    return emu->cpu.r[15];
+}
+
 /* Calls that only change OS state we don't show (status bar contents,
  * cursor blinking, launch checks) or that have nothing to do here. */
 static SC(sc_nothing)
@@ -285,10 +329,11 @@ static SC(sc_nothing)
 
 static const Syscall SYSCALLS[] = {
     {0x0029, "GlibAddinAplExecutionCheck", sc_nothing},
-    {0x0129, "Set_FKeys2", sc_nothing},
-    {0x012B, "Set_FKeys1", sc_nothing},
+    {0x002B, "GlibGetOSVersionInfo", sc_os_version},
     {0x0031, "GetSetupSetting", sc_get_setup_setting},
     {0x0032, "SetSetupSetting", sc_set_setup_setting},
+    {0x0129, "Set_FKeys2", sc_nothing},
+    {0x012B, "Set_FKeys1", sc_nothing},
     {0x01E6, "GetVRAMAddress", sc_get_vram_address},
     {0x01E9, "GetMiniGlyphPtr", sc_get_mini_glyph_ptr},
     {0x01F9, "Print_OS", sc_print_os},
@@ -304,6 +349,7 @@ static const Syscall SYSCALLS[] = {
     {0x02B8, "DefineStatusAreaFlags", sc_nothing},
     {0x02C0, "RTC_GetTime", sc_rtc_get_time},
     {0x02C1, "RTC_GetTicks", sc_rtc_get_ticks},
+    {0x02C7, "HourGlass", sc_nothing},       /* status bar busy icon: no status bar */
     {0x08C7, "Cursor_SetFlashOn", sc_nothing}, /* we don't draw the text cursor */
     {0x08C8, "Cursor_SetFlashOff", sc_nothing},
     {0x08D9, "Timer_Install", sc_timer_install},
@@ -311,11 +357,16 @@ static const Syscall SYSCALLS[] = {
     {0x0D39, "PRGM_GetKey_OS", sc_prgm_get_key_os},
     {0x0EAB, "GetKey", sc_get_key},
     {0x1170, "itoa", sc_itoa},
+    {0x1186, "GetMainBatteryVoltage", sc_battery_voltage},
     {0x120A, "EditMBStringCtrl2", sc_edit_mbstring_ctrl2},
     {0x1218, "DisplayMBString2", sc_display_mbstring2},
     {0x1224, "EditMBStringChar", sc_edit_mbstring_char},
     {0x12BF, "GetKeyWait_OS", sc_get_key_wait_os},
     {0x12C7, "Keyboard_ClearKeyBuffer", sc_nothing},
+    {0x12D4, "SetBatteryType", sc_set_battery_type},
+    {0x12D5, "GetBatteryType", sc_get_battery_type},
+    {0x12D8, "SetBacklightDuration", sc_set_backlight},
+    {0x12D9, "GetBacklightDuration", sc_get_backlight},
     {0x12F3, "GetFKeyPtr", sc_get_fkey_ptr},
     {0x1349, "strlen", sc_strlen},
     {0x1511, "memset", sc_memset},
@@ -325,12 +376,22 @@ static const Syscall SYSCALLS[] = {
     {0x1558, "MCSDelVar2", sc_mcs_del_var2},
     {0x1562, "MCSGetDlen2", sc_mcs_get_dlen2},
     {0x1563, "MCSGetData1", sc_mcs_get_data1},
-    {0x1863, "locate_OS", sc_locate},
+    {0x1630, "App_Optimize", sc_nothing},     /* storage optimisation: nothing to do */
     {0x17F7, "MsgBoxPush", sc_msgbox_push},
     {0x17F9, "MsgBoxPop", sc_msgbox_pop},
-    {0x18EC, "PrintXY_2", sc_print_xy_2},
+    {0x17FB, "BoxYLimits", sc_box_y_limits},
+    {0x17FD, "BoxInnerClear", sc_box_inner_clear},
+    {0x1809, "ProgressBar2", sc_progress_bar2},
+    {0x180B, "ProgressBar0", sc_progress_bar0},
+    {0x180E, "ProgressBar", sc_progress_bar},
+    {0x1815, "ColorIndexDialog1", sc_color_index_dialog},
+    {0x1839, "PowerOff", sc_nothing},         /* off and on again at once */
+    {0x1863, "locate_OS", sc_locate},
     {0x1883, "PrintLine", sc_print_line},
+    {0x18EC, "PrintXY_2", sc_print_xy_2},
     {0x18F9, "PrintXY", sc_print_xy},
+    {0x1A0A, "Scrollbar", sc_scrollbar},
+    {0x1A2C, "GetStackPtr", sc_get_stack_ptr},
     {0x1BB4, "OS_InnerWait_ms", sc_wait_ms},
     {0x1BB7, "Serial_Open", sc_serial_open},
     {0x1BBA, "Serial_Read", sc_serial_read},
@@ -339,6 +400,8 @@ static const Syscall SYSCALLS[] = {
     {0x1BC0, "Serial_PollTX", sc_serial_poll_tx},
     {0x1BC6, "Serial_IsOpen", sc_serial_is_open},
     {0x1D77, "DefineStatusMessage", sc_nothing},
+    {0x1D81, "DisplayStatusArea", sc_nothing},
+    {0x1D89, "BatteryIcon", sc_nothing},      /* status bar icon: no status bar */
     {0x1DA3, "Bfile_OpenFile_OS", sc_bfile_open},
     {0x1DA4, "Bfile_CloseFile_OS", sc_bfile_close},
     {0x1DA9, "Bfile_SeekFile_OS", sc_bfile_seek},
@@ -348,12 +411,18 @@ static const Syscall SYSCALLS[] = {
     {0x1DAF, "Bfile_WriteFile_OS", sc_bfile_write},
     {0x1DB3, "Bfile_RenameEntry", sc_bfile_rename},
     {0x1DB4, "Bfile_DeleteEntry", sc_bfile_delete},
-    {0x1D81, "DisplayStatusArea", sc_nothing},
     {0x1DD0, "memcpy", sc_memcpy},
     {0x1DDC, "Bfile_StrToName_ncpy", sc_bfile_str_to_name},
+    {0x1E23, "ResetAllDialog", sc_nothing},   /* nothing to reset */
+    {0x1E4B, "DisplayMessageBox", sc_display_message_box},
     {0x1E62, "SaveVRAM_1", sc_save_vram_1},
     {0x1E63, "LoadVRAM_1", sc_load_vram_1},
+    {0x1E6A, "DisplayMainMenu", sc_nothing},  /* no OS main menu */
     {0x1E6E, "SetQuitHandler", sc_nothing}, /* no OS menu to quit through */
+    {0x1E90, "SetAutoPowerOffTime", sc_set_power_off},
+    {0x1E91, "GetAutoPowerOffTime", sc_get_power_off},
+    {0x1E9F, "GetAppName", sc_get_app_name},
+    {0x1EF8, "SetBackGround", sc_nothing},
     {0x1F42, "sys_free", sc_free},
     {0x1F44, "sys_malloc", sc_malloc},
     {0x1F46, "sys_realloc", sc_realloc},

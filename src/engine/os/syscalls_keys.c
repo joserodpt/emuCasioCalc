@@ -39,16 +39,24 @@ static int held_key(Emu *emu)
     return -1;
 }
 
-/* GetKey(int *key): refreshes the screen, blocks for a key. */
-SC(sc_get_key)
+int sc_wait_key(Emu *emu)
 {
     r61524_blit_vram(&emu->lcd, emu->vram);
     int key = emu_next_key(emu);
     if (key < 0) {
         emu->cpu.state = CPU_EXITED;
-        return 0;
+        return -1;
     }
-    mem_write32(&emu->mem, a[0], (uint32_t)KEYS[key].getkey);
+    return KEYS[key].getkey;
+}
+
+/* GetKey(int *key): refreshes the screen, blocks for a key. */
+SC(sc_get_key)
+{
+    int key = sc_wait_key(emu);
+    if (key < 0)
+        return 0;
+    mem_write32(&emu->mem, a[0], (uint32_t)key);
     return 1;
 }
 

@@ -112,6 +112,9 @@ bool emu_init(Emu *emu, Model model)
                      emu->vram, true);
     emu->data_dir = "storage"; /* main memory files, next to where we run */
     emu_set_realistic(emu, true);
+    emu->battery_type = 1;
+    emu->backlight_halfmin = 6; /* 3 minutes */
+    emu->power_off_min = 10;
     emu->cpu.event = sh7305_event;
     emu->cpu.event_user = &emu->hw;
     syscalls_install(emu);

@@ -1,0 +1,137 @@
+# TODO
+
+What emuCasioFxCG still lacks. The syscall list is measured against
+[libfxcg](https://github.com/Jonimoose/libfxcg)'s stubs: 94 of its 273 syscalls
+are implemented, 179 are left. Add-ins only use a small part of them, so the
+groups are ordered by how likely real add-ins are to need them.
+
+Approach that has worked so far: run an add-in, implement what it stops at,
+check it on screen. For calls no add-in at hand uses, write a test app in
+`~/VSCode/casioPrizmApps` (see `apps/os-syscalls`, which tests the system-info
+and dialog calls). Semantics come from WikiPrizm (prizm.cemetech.net),
+libfxcg's headers, and the add-in's source when it has one.
+
+## Syscalls, likely to be needed
+
+### Drawing
+`Bdisp_Fill_VRAM` (0275), `Bdisp_AreaClr` (02B2), `Bdisp_Rectangle` (0924),
+`Bdisp_FilledRectangle` (0925), `Bdisp_FilledRectangleFullColor` (0926),
+`Bdisp_GetPoint_VRAM` (0267), `Bdisp_SetPointWB_VRAM` (0262),
+`Bdisp_SetPoint_DD` (026B), `Bdisp_GetPoint_DD` (026F),
+`Bdisp_WriteGraphVRAM` (0290), `Bdisp_WriteGraphVRAM_WB` (028F),
+`Bdisp_WriteGraphDD_WB` (0291), `Bdisp_PutDisp_DD_stripe` (0260),
+`Bdisp_AreaClr_DD_x3` (01B6), `DirectDrawRectangle` (02AA), `FrameColor`
+(02A3), `DrawFrameWorkbench` (0923), `GetSecondaryVRAMAddress` (1E50),
+`WriteBackground` (1EF7).
+
+### Text and fonts
+`Bdisp_MMPrint` (0D09), `Bdisp_MMPrintRef` (0D08), `PrintGlyph` (0238),
+`PrintLine2` (1865), `DisplayMBString` (121D), `EditMBStringCtrl` (120E),
+`EditMBStringCtrl3` (120B), `EditMBStringCtrl4` (120C), `ProcessPrintChars`
+(1300), `CharacterSelectDialog` (07A2), `DispInt` (0259), `LocalizeMessage1`
+(12FC), `MB_IsLead` (1161), `MB_ElementCount` (1163), `EnableGB18030` /
+`DisableGB18030` (01E0, 01DF).
+
+Also: the OS fonts are approximated by an 8x8 font (PrintXY 18x24, PrintMini,
+PrintMiniMini); multi-byte characters show as `?`; bold is not drawn.
+
+### Files
+`Bfile_GetFileSize_OS` (1DA6), `Bfile_FindFirst` / `FindNext` / `FindClose`
+(1DB7, 1DB9, 1DBA) and their `_NON_SMEM` versions (1DB6, 1DB8),
+`Bfile_NameToStr_ncpy` (1DDB), `Bfile_Name_MatchMask` (1DDA),
+`Bfile_GetMediaFree_OS` (1DA5), `Bfile_GetBlockAddress` (1DAA, can map to the
+flash copies of files), `SMEM_FindFirst` (0DAC).
+
+### Keyboard
+`Keyboard_PutKeycode` (12C6), `Keyboard_SpyMatrixCode` (12C9), `Bkey_ClrAllFlags`
+(0111), `Bkey_SetFlag` (0112), `Bkey_GetAllFlags` (0EA0), `Bkey_SetAllFlags`
+(0EA1), `GetGetkeyToMainFunctionReturnFlag` (1E99),
+`EnableGetkeyToMainFunctionReturn` (1EA6), `DisableGetkeyToMainFunctionReturn`
+(1EA7), `SpecialMatrixcodeProcessing` (1E60), `Keyboard_CursorFlash` (08CA),
+`SetCursorFlashToggle` (08D2), `FKey_Display` (0131).
+
+### Timing
+`RTC_Elapsed_ms` (02C2), `RTC_Reset` (02BF), `RTC_SetDateTime` (11DE),
+`CMT_Delay_micros` (11D6), `CMT_Delay_100micros` (11D7).
+
+OS timers: `Timer_Install` (08D9) is answered with "no timer free";
+`Timer_Start` / `Timer_Stop` / `Timer_Deinstall` (08DB, 08DC, 08DA) are
+missing. Doing them properly means calling the add-in's handler
+periodically, like an interrupt.
+
+### Memory and strings
+`memcmp` (1DD1), `memcmp3` (115E), `strcmp_ignore_case` (1635), `ItoA_10digit`
+(1633), `HexToNibble` / `HexToByte` / `HexToWord` (1343-1345), `NibbleToHex` /
+`ByteToHex` / `WordToHex` (1346-1348), `LongToAscHex` (1841), `BCDtoInternal`
+(0160).
+
+## Syscalls, less likely
+
+### Status bar
+The status bar is never drawn: `DisplayStatusArea`, `DefineStatusAreaFlags`,
+`DefineStatusMessage`, `EnableStatusArea` and the icons are accepted and
+ignored. Missing: `EnableDisplayHeader` (1D7F), `DefineStatusGlyph` (1D7B),
+`Bdisp_HeaderText` / `HeaderText2` (1D82, 1D85), `Bdisp_HeaderFill` /
+`HeaderFill2` (1D86, 1D87), `DrawHeaderLine` (02BB), `KeyboardIcon` (1D8A),
+`LineIcon` (1D8F), `RadIcon` / `RealIcon` / `NormIcon` / `d_c_Icon` (1D8B-1D8E),
+`APP_EACT_StatusIcon` (0A87), `SetupMode_StatusIcon` (0A8B).
+
+### Dialogs (not documented well enough to implement yet)
+`Box` (092B) and `Box2` (17FC): "function unknown" on WikiPrizm.
+`StandardScrollbar` (0C5A): its structure is unknown. `MsgBoxMoveWB` (0938):
+direction values unknown. `OpenFileDialog` (17E9), `SaveFileDialog` (0C66):
+g3p file dialogs, return values unknown. `ConfirmFileOverwriteDialog` (1802),
+`OverwriteConfirmation` (0D91): return values unknown.
+`AUX_DisplayErrorMessage` (0C01), `Bdisp_WriteSystemMessage` (1906).
+
+### Main memory (MCS)
+`MCS_WriteItem` (151A), `MCS_DeleteDirectory` (1516), `MCS_GetState` (1529),
+`MCS_GetCapa` (1532), `MCS_GetMainMemoryStart` (1543), `MCSGetOpenItem` (1560),
+`Alpha_GetData` / `Alpha_SetData` (0034, 0035: alpha variables, value format
+to check), `CLIP_Store` (07E5).
+
+### System
+`App_InitDlgDescriptor` (0D79, parameters unknown), `Restart` (1187),
+`TakeScreenshot` / `TakeScreenshot2` (17E6, 17E7), `SMEM_MapIconToExt`
+(0C2C), `SMEM_maint` (0DDF).
+
+## Syscalls, unlikely
+
+### Link cable and USB
+Serial: `Serial_Close` (1BB8), `Serial_ReadSingle` (1BB9), `Serial_Peek`
+(1BBB), `Serial_WriteSingle` (1BBC), `Serial_WriteUnbuffered` (1BBD),
+`Serial_ClearRX` / `ClearTX` (1BC1, 1BC2); the implemented ones behave as if
+nothing is plugged in. USB: `USB_Open` / `Close` / `IsOpen` (134E, 1350,
+1ED9), `USB_Read` / `ReadSingle` / `Write` / `WriteSingle` / `Peek` (1EDE,
+1EDD, 1EDB, 1EDA, 1EDF), `USB_PollRX` / `PollTX` (1EE0, 1EE1), `USB_ClearRX` /
+`ClearTX` (1EE2, 1EE3). Protocol: `Comm_Open` / `Close` / `Terminate` /
+`TryCheckPacket` (1353, 1354, 13F1, 1396), `App_LINK_*` (1397-1399, 13A6,
+13A7, 1409, 140A), `APP_LINK_transmit_select_dialog` (1384).
+
+### Built-in applications
+Casio's own apps are not emulated: `APP_RUNMAT` (1A03), `APP_Program` (1945),
+`APP_FINANCE` (0C6B), `APP_MEMORY` (1632), `APP_SYSTEM` and its pages (1E13,
+1E05, 1E07, 1E0A, 1E0D, 1E17, 1E34).
+
+### Low-level display
+`Bdisp_ShapeBase` (01C7), `Bdisp_ShapeBase3XVRAM` (01BE), `Bdisp_ShapeToDD`
+(01C0), `Bdisp_ShapeToVRAM16C` (01C4), `Bdisp_DDRegisterSelect` (01A2),
+`Bdisp_DefineDMARange` (01A3), `Bdisp_WriteDDRegister3_bit7` (01A6).
+
+### Undocumented / test entry points
+`Test01A8`, `Test127E`, `Test17BC`, `Test1B0E`, `Test1E44`, `TestMode`
+(0EA7), `Syscall02A4`, `Syscall02A7`, `Syscall02A9`, `Syscall1816`.
+
+## Beyond syscalls
+
+- **gint add-ins**: USB (fxlink), the SPU (sound), DSP arithmetic
+  instructions, the FPU-less soft-float paths are fine; overclocking tools
+  that reprogram the CPG mostly work but are untested.
+- **Timing**: syscall, uncached-memory and DMA costs are estimates; the
+  fx-CG10/20 clock (58.98 MHz) is from memory, not measured.
+- **Model detection** is a guess (build date, then memory addresses);
+  Emulation > Model overrides it.
+- **Fonts**: real Casio fonts instead of the 8x8 approximation.
+- **Status bar**: draw it (battery, SHIFT/ALPHA, the add-in's text).
+- **Main menu**: MENU does nothing in OS add-ins and returns at once in gint
+  ones; there is no OS main menu to show.

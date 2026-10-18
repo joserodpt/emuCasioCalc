@@ -15,6 +15,19 @@
 /* Charges emulated time for work the real OS would do. */
 void sc_spend(Emu *emu, double cycles);
 
+/* Message boxes (syscalls_text.c), shared by MsgBoxPush and the dialogs. */
+typedef struct {
+    int x0, y0, x1, y1;
+} BoxRect;
+BoxRect msgbox_rect(int lines);
+void msgbox_open(Emu *emu, int lines);  /* saves VRAM, draws the box */
+void msgbox_close(Emu *emu);            /* puts VRAM back */
+
+/* Shows VRAM and waits for a key like GetKey (syscalls_keys.c). Returns its
+ * GetKey code, or -1 when there is none left (headless) or the window was
+ * closed; the add-in then stops, as with GetKey. */
+int sc_wait_key(Emu *emu);
+
 /* Reads a NUL-terminated string from emulated memory. */
 void sc_string(Emu *emu, uint32_t addr, char *out, size_t cap);
 
@@ -40,6 +53,16 @@ SC(sc_print_mini_mini);
 SC(sc_locate);
 SC(sc_print_line);
 SC(sc_print_os);
+
+/* syscalls_dialogs.c: OS dialogs */
+SC(sc_display_message_box);
+SC(sc_color_index_dialog);
+SC(sc_progress_bar);
+SC(sc_progress_bar0);
+SC(sc_progress_bar2);
+SC(sc_scrollbar);
+SC(sc_box_inner_clear);
+SC(sc_box_y_limits);
 
 /* syscalls_keys.c: keyboard and text input */
 SC(sc_get_key);

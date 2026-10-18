@@ -69,6 +69,11 @@ typedef struct {
     uint8_t *saved_vram;  /* SaveVRAM_1 / LoadVRAM_1 */
     bool serial_open;     /* Serial_Open was called (no cable: nothing arrives) */
     int cursor_x, cursor_y; /* locate_OS: PrintLine's position, in PrintXY cells */
+    char app_name[12];      /* GetAppName: the add-in's internal name (@NAME) */
+    /* System settings add-ins can read and change (calculator defaults). */
+    int battery_type;       /* 1 alkaline, 2 Ni-MH */
+    int backlight_halfmin;  /* backlight duration, half-minutes */
+    int power_off_min;      /* auto power off, minutes */
 
     /* Storage files copied into the flash (ROM), as on the calculator where
      * they live there: some add-ins (CGDoom) read them from flash directly. */
