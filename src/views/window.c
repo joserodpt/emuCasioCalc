@@ -332,7 +332,7 @@ static void track_modifiers(int k)
  * else -1. */
 static int handle_event(const SDL_Event *e)
 {
-    if (info_window_event(e) || menubar_event(e))
+    if (info_window_event(e) || about_window_event(e) || menubar_event(e))
         return -1;
     int pk = keypad_event(e);
     if (pk >= 0) {
@@ -435,11 +435,38 @@ static void housekeeping(void)
         view_redraw();
 }
 
+/* The window's icon, at a few sizes for the desktop to pick from. */
+static void set_window_icon(void)
+{
+    static const int SIZES[] = {256, 128, 64, 48, 32, 16};
+    SDL_Surface *main = NULL;
+    for (size_t i = 0; i < sizeof SIZES / sizeof SIZES[0]; i++) {
+        int n = SIZES[i];
+        SDL_Surface *s = SDL_CreateSurface(n, n, SDL_PIXELFORMAT_ARGB8888);
+        if (!s)
+            continue;
+        app_icon_pixels_size(n, (uint32_t *)s->pixels); /* pitch is n * 4 for this format */
+        if (!main) {
+            main = s;
+        } else {
+            SDL_AddSurfaceAlternateImage(main, s);
+            SDL_DestroySurface(s);
+        }
+    }
+    if (main) {
+        SDL_SetWindowIcon(view_window, main);
+        SDL_DestroySurface(main);
+    }
+}
+
 bool platform_init(int scale, bool headless)
 {
     view_headless = headless;
     if (headless)
         SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
+    /* The app's identity: its window class, which the desktop matches with
+     * the launcher --install-desktop writes (and its icon). */
+    SDL_SetAppMetadata("emuCasioFxCG", EMU_VERSION, APP_ID);
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
         return false;
@@ -458,12 +485,7 @@ bool platform_init(int scale, bool headless)
         fprintf(stderr, "SDL window: %s\n", SDL_GetError());
         return false;
     }
-    static uint32_t icon[APP_ICON_SIZE * APP_ICON_SIZE];
-    app_icon_pixels(icon);
-    SDL_Surface *s = SDL_CreateSurfaceFrom(APP_ICON_SIZE, APP_ICON_SIZE, SDL_PIXELFORMAT_ARGB8888, icon,
-                                           APP_ICON_SIZE * 4);
-    SDL_SetWindowIcon(view_window, s);
-    SDL_DestroySurface(s);
+    set_window_icon();
     screen = SDL_CreateTexture(view_renderer, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING, PANEL_WIDTH,
                                PANEL_HEIGHT);
     SDL_SetTextureScaleMode(screen, SDL_SCALEMODE_NEAREST);
@@ -475,6 +497,7 @@ bool platform_init(int scale, bool headless)
 void platform_shutdown(void)
 {
     info_window_close();
+    about_window_close();
     SDL_DestroyTexture(upscaled);
     SDL_DestroyTexture(screen);
     view_text_forget(view_renderer);

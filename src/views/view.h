@@ -87,6 +87,12 @@ double menubar_speed(void);
 /* Moves the slider to the step nearest to speed (0 = Max). */
 void menubar_set_speed(double speed);
 
+/* about_window.c: Help > About */
+void about_window_open(void);
+void about_window_close(void);
+/* Returns true if the event belonged to the About window. */
+bool about_window_event(const SDL_Event *e);
+
 /* info_window.c */
 void info_window_open(void);
 void info_window_close(void);

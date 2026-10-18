@@ -92,6 +92,12 @@ at first): the fx-CG50's keys right of the screen, with each key's SHIFT functio
 keys light up while pressed, from the mouse, the PC keyboard or `--keys`.
 `--window-shot F` saves the whole window (with the keyboard) as a .bmp.
 
+**Desktop launcher (Linux)**: `./run.sh --install-desktop "$PWD/run.sh"`
+adds the emulator to the applications menu with its icon (in
+`~/.local/share/applications` and the user's icon theme), so the dock,
+the app grid and Alt-Tab show it. `--export-icon F.png` saves the icon at
+1024 x 1024 (that's `assets/icon.png`).
+
 **Display scaling**: the menus, status row and Add-in info window follow
 the desktop's scaling (200% on a 4K screen gives twice the size), as SDL
 reports it; `--ui-scale 2` sets it by hand. The calculator screen keeps
@@ -174,6 +180,8 @@ CTest runs them all (`ctest`, 20 tests).
 | `info_window.c` | Add-in information window |
 | `send_addin.c` | File > Copy add-in to calculator |
 | `keypad.c` | The on-screen keyboard (View > Keyboard) |
+| `desktop.c` | `--install-desktop` (launcher and icon theme), `--export-icon` |
+| `about_window.c` | Help > About: version, what it emulates, credits, repository link |
 | `ui_font.c` | The UI's text: Inter through stb_truetype, glyph atlases per size |
 | `app_icon.c`, `font.c` | The emulator's icon (drawn in code), the 8x8 font |
 | **`src/utils/`** | **Helpers** |

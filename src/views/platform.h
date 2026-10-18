@@ -18,6 +18,15 @@ typedef enum {
     CMD_QUIT,   /* File > Quit or the window was closed */
 } Command;
 
+/* The app's identifier: window class, launcher and icon file names. */
+#define APP_ID "emucasiofxcg"
+
+/* desktop.c: --export-icon writes the icon as a size x size PNG;
+ * --install-desktop adds the icon to the user's icon theme and a launcher
+ * running `run` to the applications menu (Linux). */
+bool desktop_export_icon(const char *path, int size);
+bool desktop_install(const char *run);
+
 /* headless: no window (for tests). */
 bool platform_init(int scale, bool headless);
 void platform_shutdown(void);

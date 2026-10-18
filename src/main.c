@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "display.h"
 #include "emu.h"
@@ -31,6 +32,9 @@ static void usage(const char *argv0)
             "  --headless         no window; input only comes from --keys\n"
             "  --screenshot F     save the last frame to F (.bmp) on exit\n"
             "  --window-shot F    save the whole window (menus, keyboard) to F (.bmp) on exit\n"
+            "  --export-icon F    save the emulator's icon to F (.png, 1024 x 1024) and quit\n"
+            "  --install-desktop [CMD]  add the icon and a launcher running CMD (default:\n"
+            "                     this program) to the desktop's applications, and quit\n"
             "  --icon F           save the add-in's menu icon to F (.bmp)\n"
             "  --info             open the add-in information window at start\n"
             "  --model M          calculator to emulate: auto (default, detected from the\n"
@@ -236,6 +240,22 @@ int main(int argc, char **argv)
     static G3aInfo info;
 
     for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "--export-icon") && i + 1 < argc)
+            return desktop_export_icon(argv[i + 1], 1024) ? 0 : 1;
+        if (!strcmp(argv[i], "--install-desktop")) {
+            char self[1024];
+            const char *run = i + 1 < argc && argv[i + 1][0] != '-' ? argv[i + 1] : NULL;
+            if (!run) {
+                ssize_t n = readlink("/proc/self/exe", self, sizeof self - 1);
+                if (n <= 0) {
+                    fprintf(stderr, "--install-desktop: give the command to run\n");
+                    return 2;
+                }
+                self[n] = '\0';
+                run = self;
+            }
+            return desktop_install(run) ? 0 : 1;
+        }
         if (!strcmp(argv[i], "--scale") && i + 1 < argc) scale = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--trace")) opt.trace = true;
         else if (!strcmp(argv[i], "--trace-hw")) opt.trace_hw = true;

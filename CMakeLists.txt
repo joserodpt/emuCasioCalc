@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.20)
-project(emuCasioFxCG C)
+project(emuCasioFxCG VERSION 1.0 LANGUAGES C)
+
+# Shown in Help > About: the version, and (build_info.c, written at each
+# build) the build's date and time and git commit.
+add_compile_definitions(EMU_VERSION="${PROJECT_VERSION}")
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -31,18 +35,26 @@ add_custom_command(
   DEPENDS assets/fonts/Inter-Medium.ttf cmake/embed.cmake
   COMMENT "Embedding the UI font")
 
+add_custom_target(build_info
+  COMMAND ${CMAKE_COMMAND} -DOUTPUT=${CMAKE_BINARY_DIR}/build_info.c -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+          -P ${CMAKE_SOURCE_DIR}/cmake/build_info.cmake
+  BYPRODUCTS ${CMAKE_BINARY_DIR}/build_info.c
+  COMMENT "Recording the build's date and commit")
+
 add_executable(emucasiofxcg
   src/main.c
+  ${CMAKE_BINARY_DIR}/build_info.c
   src/views/ui_font.c ${CMAKE_BINARY_DIR}/ui_font_ttf.c
   src/engine/emu.c
   src/engine/os/syscalls.c src/engine/os/syscalls_text.c src/engine/os/syscalls_keys.c
   src/engine/os/syscalls_mcs.c src/engine/os/syscalls_bfile.c src/engine/os/syscalls_dialogs.c src/engine/os/syscalls_draw.c src/engine/os/syscalls_status.c src/engine/os/syscalls_time.c src/engine/os/messages.c src/engine/os/syscalls_system.c src/engine/os/font_data.c
   src/engine/os/display.c
-  src/views/window.c src/views/menubar.c src/views/info_window.c src/views/send_addin.c src/views/keypad.c src/views/font.c
+  src/views/window.c src/views/menubar.c src/views/info_window.c src/views/send_addin.c src/views/keypad.c src/views/about_window.c src/views/desktop.c src/views/font.c
   src/views/app_icon.c
-  src/utils/g3a.c src/utils/keys.c)
+  src/utils/g3a.c src/utils/keys.c src/utils/png.c)
 target_include_directories(emucasiofxcg PRIVATE src/engine/os src/views src/utils)
 target_link_libraries(emucasiofxcg PRIVATE emucore SDL3::SDL3 m)
+add_dependencies(emucasiofxcg build_info)
 
 # Hand-assembled smoke-test add-in.
 add_custom_command(
