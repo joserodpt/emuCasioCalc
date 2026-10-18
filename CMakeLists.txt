@@ -18,8 +18,8 @@ target_include_directories(emucore PUBLIC src)
 
 add_executable(emucasiofxcg
   src/main.c src/emu.c src/g3a.c src/keys.c src/syscalls.c src/syscalls_text.c
-  src/syscalls_keys.c src/syscalls_mcs.c src/display.c src/platform_sdl.c)
-target_link_libraries(emucasiofxcg PRIVATE emucore SDL3::SDL3)
+  src/syscalls_keys.c src/syscalls_mcs.c src/display.c src/platform_sdl.c src/app_icon.c)
+target_link_libraries(emucasiofxcg PRIVATE emucore SDL3::SDL3 m)
 
 # Hand-assembled smoke-test add-in.
 add_custom_command(
