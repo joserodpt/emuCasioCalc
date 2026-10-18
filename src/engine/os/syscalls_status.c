@@ -109,6 +109,7 @@ void status_area_draw(Emu *emu)
 {
     if (emu->status_off)
         return;
+    platform_set_status_area_shown(true);
     uint32_t f = emu->status_flags;
     header_fill(emu);
     int x = 3;
@@ -140,8 +141,10 @@ SC(sc_enable_status_area)
 {
     if (a[0] == 0 || a[0] == 2)
         emu->status_off = false;
-    else if (a[0] == 3)
+    else if (a[0] == 3) {
         emu->status_off = true;
+        platform_set_status_area_shown(false);
+    }
     return 0;
 }
 

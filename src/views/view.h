@@ -28,6 +28,7 @@ extern bool view_key_shift;     /* SHIFT is on (for the next key) */
 extern int view_key_alpha;      /* ALPHA: 0 off, 1 for the next key, 2 locked */
 extern int view_battery_cv;     /* battery voltage, 1/100 V */
 extern char view_os_status[64]; /* the add-in's status message */
+extern bool view_status_area_shown; /* the screen shows the OS status area */
 extern int view_language;       /* LANG_* */
 extern bool view_auto_reload;   /* File > Reload when the file changes */
 extern bool view_show_keypad;   /* View > Keyboard: the on-screen keys */

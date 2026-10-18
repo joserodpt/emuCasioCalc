@@ -69,6 +69,10 @@ void platform_show_info(void);
 void platform_set_key_mode(bool shift, int alpha);
 /* The add-in's status message (DefineStatusMessage). */
 void platform_set_os_status(const char *msg);
+/* Whether the calculator screen shows the OS status area (the add-in drew
+ * it, and hasn't turned it off since): the window's status row then leaves
+ * out what it shows too. */
+void platform_set_status_area_shown(bool shown);
 /* The OS's message language (LANG_*): Language menu, --language, or the
  * add-in through APP_SYSTEM_LANGUAGE. */
 int platform_language(void);

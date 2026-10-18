@@ -288,7 +288,9 @@ static int battery_level(void)
 }
 
 /* The status row, left to right: battery, SHIFT, ALPHA, message language,
- * the add-in's status message (its title). */
+ * the add-in's status message (its title). While the calculator screen
+ * shows the OS status area, SHIFT, ALPHA and the message are left out:
+ * the screen has them. */
 static float battery_x(void)
 {
     return (float)PAD;
@@ -337,11 +339,13 @@ static void draw_status_row(int width)
 
     /* SHIFT and ALPHA */
     x = battery_x() + battery_w() + 3 * GAP;
-    badge(x, "SHIFT", view_key_shift, 240, 190, 0, false);
-    x += badge_w("SHIFT") + GAP;
-    const char *alpha = view_key_alpha == 2 ? "ALPHA LOCK" : "ALPHA";
-    badge(x, alpha, view_key_alpha != 0, 200, 30, 30, true);
-    x += badge_w("ALPHA LOCK") + 3 * GAP; /* room for the longer one */
+    if (!view_status_area_shown) {
+        badge(x, "SHIFT", view_key_shift, 240, 190, 0, false);
+        x += badge_w("SHIFT") + GAP;
+        const char *alpha = view_key_alpha == 2 ? "ALPHA LOCK" : "ALPHA";
+        badge(x, alpha, view_key_alpha != 0, 200, 30, 30, true);
+        x += badge_w("ALPHA LOCK") + 3 * GAP; /* room for the longer one */
+    }
 
     /* The message language */
     char lang[8];
@@ -352,12 +356,19 @@ static void draw_status_row(int width)
     text(x, ty, lang);
     x += tw(lang) + 3 * GAP;
 
-    /* The add-in's status message, quoted, cut at its end to the room left */
-    if (view_os_status[0]) {
+    /* The add-in's status message without the spaces add-ins pad it with,
+     * cut at its end to the room left */
+    const char *os = view_os_status;
+    while (*os == ' ')
+        os++;
+    size_t len = strlen(os);
+    while (len > 0 && os[len - 1] == ' ')
+        len--;
+    if (len && !view_status_area_shown) {
         char msg[80];
-        size_t n = strlen(view_os_status);
+        size_t n = len;
         do
-            snprintf(msg, sizeof msg, "\"%.*s%s\"", (int)n, view_os_status, n < strlen(view_os_status) ? "..." : "");
+            snprintf(msg, sizeof msg, "%.*s%s", (int)n, os, n < len ? "..." : "");
         while (n > 0 && tw(msg) > (float)width - PAD - x && n--);
         color(70, 70, 70);
         if (n > 0)

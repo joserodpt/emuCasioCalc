@@ -33,6 +33,7 @@ bool view_key_shift;
 int view_key_alpha;
 int view_battery_cv = BATTERY_CENTIVOLTS;
 char view_os_status[64];
+bool view_status_area_shown;
 int view_language = LANG_EN;
 bool view_auto_reload = true;
 bool view_show_keypad = false;
@@ -599,6 +600,7 @@ void platform_set_app(const G3aInfo *info, const char *path, Model model)
     SDL_SetWindowTitle(view_window, title);
     platform_set_key_mode(false, 0);
     platform_set_os_status("");
+    platform_set_status_area_shown(false);
     info_window_refresh();
 }
 
@@ -616,6 +618,14 @@ void platform_set_os_status(const char *msg)
     if (!strcmp(msg, view_os_status))
         return;
     snprintf(view_os_status, sizeof view_os_status, "%s", msg);
+    view_redraw();
+}
+
+void platform_set_status_area_shown(bool shown)
+{
+    if (view_headless || shown == view_status_area_shown)
+        return;
+    view_status_area_shown = shown;
     view_redraw();
 }
 
