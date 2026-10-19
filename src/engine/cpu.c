@@ -656,7 +656,7 @@ void cpu_reset(Cpu *cpu, Memory *mem, uint32_t entry, uint32_t stack_top)
 /* Executes the instruction at PC (or the syscall/exit it stands for). */
 static inline void step_one(Cpu *cpu)
 {
-    if (cpu->pc == SYSCALL_ENTRY) {
+    if ((cpu->pc & ~(SYSCALL_ENTRY ^ SYSCALL_ENTRY_FX)) == (SYSCALL_ENTRY & SYSCALL_ENTRY_FX)) { /* either OS's */
         if (cpu->syscall) {
             cpu->syscall(cpu, cpu->syscall_user);
         } else {

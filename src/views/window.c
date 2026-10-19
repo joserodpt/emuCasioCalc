@@ -16,6 +16,8 @@
 #define STATUS_MS    4000  /* how long a flashed status message stays */
 #define WIDE_TEXT_W  600   /* windows at least this wide get 2x menu text */
 #define TITLE_BAR_H  40    /* room left for the window's title bar, at most */
+#define MONO_MIN_W   256   /* the smallest window: the 128x64 screen at 2x */
+#define MONO_MIN_H   128
 
 SDL_Window *view_window;
 SDL_Renderer *view_renderer;
@@ -24,6 +26,7 @@ int view_text_scale = 1;
 float view_ui_scale = 1;
 static float ui_scale_forced; /* --ui-scale, 0 = the desktop's */
 SDL_FRect view_screen;
+int view_panel_w = PANEL_WIDTH, view_panel_h = PANEL_HEIGHT;
 Command view_pending;
 bool view_paused;
 G3aInfo view_app;
@@ -44,13 +47,14 @@ bool view_auto_reload = true;
 bool view_show_keypad = false;
 int view_font = 0; /* FONT_STYLE_CLASSIC */
 
-static SDL_Texture *screen;    /* the panel, 396 x 224 */
+static SDL_Texture *screen;    /* the panel, view_panel_w x view_panel_h */
 static SDL_Texture *upscaled;  /* the panel at a whole scale, see draw_screen() */
 static int upscale;            /* its scale, 0 = not created */
 static float density = 1;      /* window pixels per window unit: 2 on a Retina Mac */
 static int window_w;
 static uint16_t frame[PANEL_WIDTH * PANEL_HEIGHT]; /* last presented frame, host RGB565 */
 static uint16_t emu_frame[PANEL_WIDTH * PANEL_HEIGHT]; /* the emulator's, while another is shown */
+static int emu_w = PANEL_WIDTH, emu_h = PANEL_HEIGHT;  /* its size */
 static char status[320];
 static uint64_t status_until; /* 0 = stays */
 /* Which KEYS entry each held scancode pressed (index + 1), so that a key
@@ -119,13 +123,13 @@ static void update_layout(void)
     if (kw > w * 0.6f)
         kw = w * 0.6f;
     float sw = (float)w - kw;
-    float k = sw / PANEL_WIDTH;
-    if (area_h / PANEL_HEIGHT < k)
-        k = area_h / PANEL_HEIGHT;
+    float k = sw / view_panel_w;
+    if (area_h / view_panel_h < k)
+        k = area_h / view_panel_h;
     if (k < 0.25f)
         k = 0.25f;
-    view_screen.w = PANEL_WIDTH * k;
-    view_screen.h = PANEL_HEIGHT * k;
+    view_screen.w = view_panel_w * k;
+    view_screen.h = view_panel_h * k;
     view_screen.x = (sw - view_screen.w) / 2;
     view_screen.y = BAR_H + (area_h - view_screen.h) / 2;
     float pad = area_h * 0.02f;
@@ -163,7 +167,7 @@ bool view_key_held(int k)
 int view_zoom(void)
 {
     for (int z = 1; z <= 6; z++)
-        if ((int)view_screen.w == PANEL_WIDTH * z && (int)view_screen.h == PANEL_HEIGHT * z)
+        if ((int)view_screen.w == view_panel_w * z && (int)view_screen.h == view_panel_h * z)
             return z;
     return 0;
 }
@@ -174,17 +178,17 @@ int view_zoom(void)
 static void draw_screen(void)
 {
     float w = view_screen.w * density; /* in window pixels */
-    int k = (int)(w / PANEL_WIDTH);
+    int k = (int)(w / view_panel_w);
     if (k < 1)
         k = 1;
-    if ((float)(PANEL_WIDTH * k) == w) { /* exact: one nearest blit */
+    if ((float)(view_panel_w * k) == w) { /* exact: one nearest blit */
         SDL_RenderTexture(view_renderer, screen, NULL, &view_screen);
         return;
     }
     if (k != upscale) {
         SDL_DestroyTexture(upscaled);
         upscaled = SDL_CreateTexture(view_renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET,
-                                     PANEL_WIDTH * k, PANEL_HEIGHT * k);
+                                     view_panel_w * k, view_panel_h * k);
         SDL_SetTextureScaleMode(upscaled, SDL_SCALEMODE_LINEAR);
         upscale = upscaled ? k : 0;
     }
@@ -208,7 +212,7 @@ void view_redraw(void)
     }
     SDL_SetRenderDrawColor(view_renderer, 32, 32, 32, 255);
     SDL_RenderClear(view_renderer);
-    SDL_UpdateTexture(screen, NULL, frame, PANEL_WIDTH * 2);
+    SDL_UpdateTexture(screen, NULL, frame, view_panel_w * 2);
     draw_screen();
     keypad_draw();
     menubar_draw(window_w, status);
@@ -218,10 +222,10 @@ void view_redraw(void)
 /* The window's size for the screen at zoom `scale`. */
 static void window_size(int scale, int *w, int *h)
 {
-    *w = PANEL_WIDTH * scale + keypad_width(PANEL_HEIGHT * scale);
+    *w = view_panel_w * scale + keypad_width(view_panel_h * scale);
     int before = view_text_scale;
     view_text_scale = text_scale_for(*w);
-    *h = BAR_H + PANEL_HEIGHT * scale; /* the bar at that width */
+    *h = BAR_H + view_panel_h * scale; /* the bar at that width */
     view_text_scale = before;
 }
 
@@ -598,10 +602,10 @@ bool platform_init(int scale, bool headless)
     SDL_SetWindowPosition(view_window, x, y);
     read_ui_scale(); /* again, now the window's density is known */
     set_window_icon();
-    screen = SDL_CreateTexture(view_renderer, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING, PANEL_WIDTH,
-                               PANEL_HEIGHT);
+    screen = SDL_CreateTexture(view_renderer, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING, view_panel_w,
+                               view_panel_h);
     SDL_SetTextureScaleMode(screen, SDL_SCALEMODE_NEAREST);
-    SDL_SetWindowMinimumSize(view_window, PANEL_WIDTH, (8 + 16) + (8 + 14) + PANEL_HEIGHT); /* 1x screen and bar */
+    SDL_SetWindowMinimumSize(view_window, MONO_MIN_W, (8 + 16) + (8 + 14) + MONO_MIN_H); /* a small screen and the bar */
     update_layout();
     settings_started();
     return screen != NULL;
@@ -609,7 +613,7 @@ bool platform_init(int scale, bool headless)
 
 bool platform_record(const char *path)
 {
-    return recorder_start(path, NULL);
+    return recorder_start(path, NULL, 0, 0);
 }
 
 void platform_clock(uint64_t emu_ms)
@@ -617,8 +621,10 @@ void platform_clock(uint64_t emu_ms)
     recorder_clock(emu_ms);
 }
 
-const uint16_t *view_last_frame(void)
+const uint16_t *view_last_frame(int *w, int *h)
 {
+    *w = view_panel_w;
+    *h = view_panel_h;
     return frame;
 }
 
@@ -641,22 +647,45 @@ void platform_shutdown(void)
     SDL_Quit();
 }
 
-void platform_present(const uint16_t *fb)
+void platform_present(const uint16_t *fb, int w, int h)
 {
-    memcpy(emu_frame, fb, sizeof emu_frame);
+    memcpy(emu_frame, fb, (size_t)w * (size_t)h * sizeof *fb);
+    emu_w = w;
+    emu_h = h;
     if (!receiver_active())
-        view_show_frame(fb);
+        view_show_frame(fb, w, h);
 }
 
-void view_show_frame(const uint16_t *fb)
+/* A screen of another size (another model, or the calculator over USB):
+ * a texture of that size, and the screen fitted in the window again. */
+static void resize_panel(int w, int h)
 {
-    memcpy(frame, fb, sizeof frame);
-    recorder_frame(frame);
+    view_panel_w = w;
+    view_panel_h = h;
+    if (view_headless)
+        return;
+    SDL_DestroyTexture(screen);
+    screen = SDL_CreateTexture(view_renderer, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING, w, h);
+    SDL_SetTextureScaleMode(screen, SDL_SCALEMODE_NEAREST);
+    SDL_DestroyTexture(upscaled);
+    upscaled = NULL;
+    upscale = 0;
+    update_layout();
+}
+
+void view_show_frame(const uint16_t *fb, int w, int h)
+{
+    if (w != view_panel_w || h != view_panel_h)
+        resize_panel(w, h);
+    memcpy(frame, fb, (size_t)w * (size_t)h * sizeof *fb);
+    recorder_frame(frame, w, h);
     view_redraw();
 }
 
-const uint16_t *view_emulated_frame(void)
+const uint16_t *view_emulated_frame(int *w, int *h)
 {
+    *w = emu_w;
+    *h = emu_h;
     return emu_frame;
 }
 
@@ -712,7 +741,7 @@ bool platform_save_image(const char *path, const uint16_t *pixels, int w, int h,
 
 bool platform_save_screenshot(const char *path)
 {
-    return platform_save_image(path, frame, PANEL_WIDTH, PANEL_HEIGHT, 1);
+    return platform_save_image(path, frame, view_panel_w, view_panel_h, 1);
 }
 
 void platform_set_app(const G3aInfo *info, const char *path, Model model)

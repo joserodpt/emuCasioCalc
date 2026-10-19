@@ -13,6 +13,15 @@ static const uint16_t OK[] = u"\\\\fls0\\EMUFILES.txt";
 static int step, failed_step;
 static int got; /* value seen at the failing step */
 
+/* Monochrome builds (fx-9860G) have no colours */
+#if GINT_RENDER_RGB
+#define OK_COLOR C_GREEN
+#define FAIL_COLOR C_RED
+#else
+#define OK_COLOR C_BLACK
+#define FAIL_COLOR C_BLACK
+#endif
+
 #define CHECK(cond, value) do { step++; if(!(cond)) { failed_step = step; got = (value); return 1; } } while(0)
 
 static int run(void)
@@ -63,9 +72,9 @@ int main(void)
 
 	dclear(C_WHITE);
 	if(rc == 0)
-		dtext(10, 10, C_GREEN, "files: ok (10 steps)");
+		dtext(10, 10, OK_COLOR, "files: ok (10 steps)");
 	else
-		dprint(10, 10, C_RED, "files: step %d failed (got %d)", failed_step, got);
+		dprint(10, 10, FAIL_COLOR, "files: step %d failed (got %d)", failed_step, got);
 	dupdate();
 	getkey();
 	return 0;

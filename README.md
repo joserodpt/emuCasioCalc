@@ -4,14 +4,15 @@
 
 # emuCasioFxCG
 
-**An emulator for Casio fx-CG50 / fx-CG10 / fx-CG20 (Prizm) add-ins, on Linux and macOS**
+**An emulator for Casio fx-CG50 / fx-CG10 / fx-CG20 (Prizm) add-ins, and gint add-ins for the monochrome fx-9860G models, on Linux and macOS**
 
 Runs `.g3a` add-ins on a PC: OS-based ones (libfxcg / PrizmSDK) and gint
-ones (fxSDK), with hot reload, GIF recording, scripted demos, the on-screen
-keyboard, Casio's own fonts from your OS dump, and a live view of a real
-calculator's screen over USB.
+ones (fxSDK), plus monochrome `.g1a` gint add-ins for the fx-9860GII and
+fx-9750GIII / Graph 35+E II, with hot reload, GIF recording, scripted
+demos, the on-screen keyboard, Casio's own fonts from your OS dump, and a
+live view of a real calculator's screen over USB.
 
-![Calculator](https://img.shields.io/badge/calculator-fx--CG50%20%7C%20CG10%20%7C%20CG20-1f6feb)
+![Calculator](https://img.shields.io/badge/calculator-fx--CG50%20%7C%20CG10%20%7C%20CG20%20%7C%20fx--9860G-1f6feb)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-555555)
 ![Language](https://img.shields.io/badge/language-C11-555555)
 ![Built with](https://img.shields.io/badge/built%20with-SDL3-8a2be2)
@@ -34,6 +35,7 @@ code on an interpreter and handles two kinds of add-ins:
 |---|---|
 | **OS-based** (libfxcg / PrizmSDK) | Whenever the add-in calls the OS (jumps to `0x80020070` with a syscall number in `r0`), that syscall is implemented on the host instead (high-level emulation). **193 of the 273** OS functions known to the [libfxcg](https://github.com/Jonimoose/libfxcg) SDK are implemented; [`TODO.md`](TODO.md) lists the rest, by how likely add-ins are to need them. |
 | **gint** (most modern Planète Casio add-ins, built with the fxSDK) | gint takes over the hardware, so the emulator models the parts of the SH7305 it drives: interrupt controller, timers, RTC, DMA, key scan interface, clock registers, exceptions and the R61524 display controller. |
+| **gint, monochrome** (`.g1a`, `fxsdk build-fx`) | The SH4-based fx-9860G models have the same SH7305, with a 128x64 T6K11 display (both of its versions) and 512 kB of RAM; gint's grey engine shows four shades. The few OS functions gint calls there (memory, files, timers, keys) are implemented. |
 
 | Feature | |
 |---|---|
@@ -44,7 +46,7 @@ code on an interpreter and handles two kinds of add-ins:
 | **Copy add-in to calculator** | Sends the running `.g3a` to a calculator in USB Flash mode, then ejects it |
 | **Casio's fonts** | Read from a dump of your calculator's OS, so text looks as on the calculator |
 | **On-screen keyboard** | The fx-CG50's keys, with SHIFT and ALPHA functions; click to press |
-| **Models and timing** | fx-CG50 or fx-CG10/20 (detected), realistic or fast timing, 10%-400% speed |
+| **Models and timing** | fx-CG50 or fx-CG10/20 (detected), fx-9860GII or fx-9750GIII for `.g1a`, realistic or fast timing, 10%-400% speed |
 | **Languages** | The OS messages in English, Spanish, German, French, Portuguese and Chinese |
 
 ## Building and running
@@ -344,7 +346,7 @@ app grid and Alt-Tab show it. `--export-icon F.png` saves the icon at
 ## Models and timing
 
 <details>
-<summary><b>Models</b>: fx-CG50 or fx-CG10/20, detected per add-in</summary>
+<summary><b>Models</b>: fx-CG50 or fx-CG10/20, detected per add-in; the monochrome fx-9860G models for .g1a</summary>
 <br>
 
 The fx-CG10, fx-CG20 and fx-CG50 share the CPU, the display and the add-in
@@ -361,6 +363,26 @@ clock (58.98 MHz vs 117.96 MHz CPU). The emulator can be either:
 
 The model and the reason it was picked appear in the window title, in
 Add-in info and on the terminal.
+
+**Monochrome models** (`.g1a` add-ins, gint only): the SH4-based fx-9860G
+models run gint add-ins built with `fxsdk build-fx`. They have the same
+SH7305 as the fx-CG50, a 128x64 1-bit display and 512 kB of RAM, with the
+CPU at 29.49 MHz. Two can be emulated (Emulation > Model, or `--model`):
+
+- **fx-9860GII** (`fx9860g2`, the default for `.g1a`): the T6K11 display as
+  gint's driver documents it, OS 2.05.
+- **fx-9750GIII / fx-9860GIII / Graph 35+E II** (`fx9750g3`): the newer
+  display, which takes other commands, and OS 3.60, which gint reads to
+  tell the model (and to use its Fugue file system).
+
+The add-in is mapped whole at `0x00300000` (its code starts after the
+0x200-byte header), add-in RAM is 32 kB behind `0x08100000` (gint keeps its
+stack, VBR and heap there), and the OS's calls go to `0x80010070`. The grey
+engine works by flickering between two pictures; the emulated display
+counts how long each pixel is dark between two frames of the window, so it
+shows the four shades, as the slow LCD does. The window, screenshots and
+recordings use the 128x64 screen (recordings at 4x). Add-in info shows the
+g1a's 30x17 icon, inverted when selected as in the main menu.
 
 </details>
 
@@ -427,6 +449,7 @@ emuCasioFxCG/
 | `mem.c` | 4 kB page table over the 32-bit address space, MMIO devices, faults |
 | `sh7305.c` | On-chip peripherals: INTC, TMU/ETMU, RTC, DMA, KEYSC, CPG, MMU registers, UTLB arrays |
 | `r61524.c` | Display controller (396x224 panel) |
+| `t6k11.c` | Monochrome display controller (128x64, both versions), with grey from flicker |
 | `emu.c` | Builds the machine (memory map, devices), key script |
 | **`src/engine/os/`** | **High-level emulation of the Casio OS** |
 | `syscalls.c` | Syscall table and system calls (memory, strings, time, settings) |
@@ -456,7 +479,7 @@ emuCasioFxCG/
 | `ui_font.c` | The UI's text: Inter through stb_truetype, glyph atlases per size |
 | `app_icon.c`, `font.c` | The emulator's icon (drawn in code), the 8x8 font |
 | **`src/utils/`** | **Helpers** |
-| `g3a.c` | Reads a .g3a: header (name, icons...) and code, mapped at `0x00300000` |
+| `g3a.c` | Reads a .g3a or .g1a: header (name, icons...) and code, mapped at `0x00300000` |
 | `png.c` | PNG writer (palette or RGB, its own deflate) |
 | `gif.c` | Animated GIF writer: changed rectangles, transparency, median cut, LZW |
 | `keys.c` | Calculator keys: names, GetKey codes, key matrix positions |
@@ -493,8 +516,14 @@ Addresses on the fx-CG50 (fx-CG10/20 in brackets):
 add-ins. `tests/gint-hello` (display, keyboard, timers, RTC),
 `tests/gint-stress` (rendering through gint's DSP-loop blitters, heap, frame
 timing, and F1 for a deliberate address error that gint's panic screen must
-catch) and `tests/gint-files` (`Bfile_*` file operations) are fxSDK projects,
-and so is `tests/os-apps`: nine add-ins that call the OS syscalls group by
+catch) and `tests/gint-files` (`Bfile_*` file operations, built for both
+families) are fxSDK projects. For the monochrome models, `tests/gint-mono`
+(fx-9860G only: display, clocks, timers, RTC, keys, and F1 for the grey
+engine's four shades) and `tests/gint-dual` (one source built as a `.g1a`
+and a `.g3a`, its layout following `DWIDTH` x `DHEIGHT`) run on both
+monochrome models; they are built when gint is installed for the fx-9860G
+too (`fxsdk build-fx` and `fxsdk build-fx install` in gint's sources).
+`tests/os-apps` is an fxSDK project too: nine add-ins that call the OS syscalls group by
 group (system and dialogs, drawing, SHIFT/ALPHA, status bar, files, timers
 and keyboard, language, text, main memory and system), check the results and
 leave "ok" in a file of `\\fls0\`. When `fxsdk` is installed (on the PATH, or
@@ -528,6 +557,9 @@ Next steps:
 ## Known limits
 
 - MENU in a gint add-in returns to the add-in at once (there is no OS menu).
+- Monochrome models: gint add-ins only (OS-based fxlib add-ins would need
+  the fx-9860G OS's functions, of which only gint's few are implemented), and
+  only the SH4-based models (not the original SH3 fx-9860G or the Slim).
 - No sound.
 - Not planned: DSP arithmetic instructions, USB for add-ins, and an FPU
   (the SH7305 has none; add-ins use soft-float).

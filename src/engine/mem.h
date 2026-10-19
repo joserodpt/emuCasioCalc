@@ -36,6 +36,7 @@
 
 /* Magic addresses the CPU loop intercepts instead of executing. */
 #define SYSCALL_ENTRY 0x80020070u  /* jump here with the syscall number in r0 */
+#define SYSCALL_ENTRY_FX 0x80010070u /* the same on the fx-9860G models */
 #define EXIT_ADDR     0xDEAD0000u  /* PR when main() starts: returning here ends the run */
 #define CALL_RETURN   0xDEAD0004u  /* PR of a function called by cpu_call() */
 

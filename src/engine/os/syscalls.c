@@ -624,6 +624,37 @@ static const Syscall SYSCALLS[] = {
     {0x1F46, "sys_realloc", sc_realloc},
 };
 
+/* The fx-9860G OS (0x80010070), monochrome models: what gint calls
+ * (src/kernel/syscalls.S, GINT_OS_FX). The functions take the same
+ * arguments as their fx-CG counterparts above. */
+static const Syscall SYSCALLS_FX[] = {
+    {0x0118, "Timer_Install", sc_timer_install},
+    {0x0119, "Timer_Deinstall", sc_timer_deinstall},
+    {0x011A, "Timer_Start", sc_timer_start},
+    {0x011B, "Timer_Stop", sc_timer_stop},
+    {0x0135, "GetVRAMAddress", sc_get_vram_address}, /* the OS's 1 kB monochrome VRAM */
+    {0x0236, "Reset", sc_restart},
+    {0x0241, "Keyboard_ClrBuffer", sc_nothing},
+    {0x0247, "GetKeyWait", sc_get_key_wait_os},
+    {0x0248, "PutKeyCode", sc_put_keycode},
+    {0x03F4, "PowerOff", sc_nothing},          /* off and on again at once */
+    {0x042C, "Bfile_OpenFile", sc_bfile_open},
+    {0x042D, "Bfile_CloseFile", sc_bfile_close},
+    {0x042F, "Bfile_GetFileSize", sc_bfile_size},
+    {0x0431, "Bfile_SeekFile", sc_bfile_seek},
+    {0x0432, "Bfile_ReadFile", sc_bfile_read},
+    {0x0434, "Bfile_CreateEntry", sc_bfile_create},
+    {0x0435, "Bfile_WriteFile", sc_bfile_write},
+    {0x0439, "Bfile_DeleteEntry", sc_bfile_delete},
+    {0x043B, "Bfile_FindFirst", sc_bfile_find_first},
+    {0x043C, "Bfile_FindNext", sc_bfile_find_next},
+    {0x043D, "Bfile_FindClose", sc_bfile_find_close},
+    {0x0494, "SetQuitHandler", sc_nothing},    /* no OS menu to quit through */
+    {0x0ACC, "free", sc_free},
+    {0x0ACD, "malloc", sc_malloc},
+    {0x0E6D, "realloc", sc_realloc},
+};
+
 /* Stack arguments; near the top of the stack they may not exist. */
 static uint32_t stack_arg(Emu *emu, int index)
 {
@@ -639,25 +670,36 @@ static void dispatch(Cpu *cpu, void *user)
     for (int i = 4; i < SYSCALL_ARGS; i++)
         args[i] = stack_arg(emu, i - 4);
 
-    for (size_t i = 0; i < sizeof SYSCALLS / sizeof SYSCALLS[0]; i++) {
-        if (SYSCALLS[i].number != number)
+    /* Each OS has its entry point and its numbers */
+    bool fx = model_mono(emu->model);
+    const Syscall *table = fx ? SYSCALLS_FX : SYSCALLS;
+    size_t count = fx ? sizeof SYSCALLS_FX / sizeof SYSCALLS_FX[0] : sizeof SYSCALLS / sizeof SYSCALLS[0];
+    if (cpu->pc != (fx ? SYSCALL_ENTRY_FX : SYSCALL_ENTRY)) {
+        cpu_report(cpu, "call to the %s OS's syscall entry 0x%08X on the %s (syscall 0x%04X), from 0x%08X",
+                   fx ? "fx-CG" : "fx-9860G", cpu->pc, model_name(emu->model), number, cpu->pr);
+        cpu->state = CPU_ERROR;
+        return;
+    }
+
+    for (size_t i = 0; i < count; i++) {
+        if (table[i].number != number)
             continue;
         if (emu->trace)
             printf("%9.3f ms  syscall %04X %-24s (%08X, %08X, %08X, %08X)\n",
-                   (double)cpu->instructions * 1000 / sh7305_iphi_hz(&emu->hw), number, SYSCALLS[i].name,
+                   (double)cpu->instructions * 1000 / sh7305_iphi_hz(&emu->hw), number, table[i].name,
                    args[0], args[1], args[2], args[3]);
         sc_spend(emu, SYSCALL_CYCLES);
-        cpu->r[0] = SYSCALLS[i].fn(emu, args);
+        cpu->r[0] = table[i].fn(emu, args);
         cpu->pc = cpu->pr;
         if (emu->mem.fault) {
-            cpu_report(cpu, "syscall %04X %s: bad address 0x%08X", number, SYSCALLS[i].name,
+            cpu_report(cpu, "syscall %04X %s: bad address 0x%08X", number, table[i].name,
                     emu->mem.fault_addr);
             cpu->state = CPU_ERROR;
         }
         return;
     }
-    cpu_report(cpu, "unimplemented syscall 0x%04X (r4=%08X r5=%08X r6=%08X r7=%08X), called from 0x%08X",
-            number, args[0], args[1], args[2], args[3], cpu->pr);
+    cpu_report(cpu, "unimplemented %ssyscall 0x%04X (r4=%08X r5=%08X r6=%08X r7=%08X), called from 0x%08X",
+            fx ? "fx-9860G " : "", number, args[0], args[1], args[2], args[3], cpu->pr);
     cpu->state = CPU_ERROR;
 }
 

@@ -53,7 +53,7 @@ static char *read_text(const char *path)
 static void usage(const char *argv0)
 {
     fprintf(stderr,
-            "usage: %s [options] [addin.g3a]\n"
+            "usage: %s [options] [addin.g3a or .g1a]\n"
             "  (without an add-in, the window opens empty: use File > Open)\n"
             "  (the window remembers its zoom, font, model, speed... between runs;\n"
             "  these options only change them for one run)\n"
@@ -78,7 +78,9 @@ static void usage(const char *argv0)
             "  --icon F           save the add-in's menu icon to F (.bmp)\n"
             "  --info             open the add-in information window at start\n"
             "  --model M          calculator to emulate: auto (default, detected from the\n"
-            "                     add-in), cg20 (fx-CG10/20) or cg50 (fx-CG50)\n"
+            "                     add-in), cg20 (fx-CG10/20) or cg50 (fx-CG50) for .g3a\n"
+            "                     add-ins, fx9860g2 (fx-9860GII) or fx9750g3 (fx-9750GIII,\n"
+            "                     Graph 35+E II) for .g1a ones\n"
             "  --speed S          window speed in percent (10-400, default 100) or max\n"
             "  --timing T         realistic (default: OS calls, memory and DMA take\n"
             "                     the time they would on the calculator) or fast\n"
@@ -108,11 +110,11 @@ static void show_welcome(void)
     display_text_big(vram, 4 * BIG_CELL_W, 3 * BIG_CELL_H, "No add-in", 0x0000, 0xFFFF, true);
     display_text_mini(vram, 4 * BIG_CELL_W, 5 * BIG_CELL_H, "File > Open (Ctrl+O)", 0x0000, 0xFFFF, true,
                       LCD_WIDTH, true);
-    display_text_mini(vram, 4 * BIG_CELL_W, 5 * BIG_CELL_H + MINI_CELL_H + 4, "to load a .g3a", 0x0000, 0xFFFF,
+    display_text_mini(vram, 4 * BIG_CELL_W, 5 * BIG_CELL_H + MINI_CELL_H + 4, "to load a .g3a or .g1a", 0x0000, 0xFFFF,
                       true, LCD_WIDTH, true);
     r61524_reset(&lcd);
     r61524_blit_vram(&lcd, vram);
-    platform_present(lcd.fb);
+    platform_present(lcd.fb, PANEL_WIDTH, PANEL_HEIGHT);
     platform_status("No add-in");
 }
 
@@ -160,7 +162,10 @@ static void show_error(Emu *emu)
         display_text_small(vram, x, y, lines[i], 0x0000);
     display_text_small(vram, x, y + 8, "Emulation > Reset, or File > Open", 0x7BEF);
     r61524_blit_vram(&emu->lcd, vram);
-    emu_present(emu);
+    if (model_mono(emu->model)) /* shown on the colour screen: it has room for the text */
+        platform_present(emu->lcd.fb, PANEL_WIDTH, PANEL_HEIGHT);
+    else
+        emu_present(emu);
 }
 
 /* The model to emulate for an add-in: the detected one unless the user
@@ -168,8 +173,10 @@ static void show_error(Emu *emu)
 static Model pick_model(const G3aInfo *info)
 {
     switch (platform_model_choice()) {
-    case CHOICE_CG20: return MODEL_CG20;
-    case CHOICE_CG50: return MODEL_CG50;
+    case CHOICE_CG20: return info->g1a ? info->model : MODEL_CG20;
+    case CHOICE_CG50: return info->g1a ? info->model : MODEL_CG50;
+    case CHOICE_FX9860G2: return info->g1a ? MODEL_FX9860G2 : info->model;
+    case CHOICE_FX9750G3: return info->g1a ? MODEL_FX9750G3 : info->model;
     default: return info->model;
     }
 }
@@ -203,9 +210,10 @@ static bool load(Emu *emu, const Options *opt, const char *path, G3aInfo *info, 
     g3a_close(&file);
     if (!ok)
         return false;
-    printf("loaded %s: %u bytes of code, running as %s (%s%s)\n", path, file.size - G3A_HEADER_SIZE,
-           model_name(model), platform_model_choice() == CHOICE_AUTO ? "" : "chosen; detected: ",
-           platform_model_choice() == CHOICE_AUTO ? info->model_reason : model_name(info->model));
+    bool chosen = model != info->model;
+    printf("loaded %s: %u bytes of code, running as %s (%s%s)\n", path, file.size - g3a_header_size(info),
+           model_name(model), chosen ? "chosen; detected: " : "",
+           chosen ? model_name(info->model) : info->model_reason);
     platform_set_app(info, path, model);
     emu->battery_cv = platform_battery();
     emu->language = platform_language();
@@ -362,6 +370,10 @@ int main(int argc, char **argv)
             platform_set_model_choice(CHOICE_CG20);
         } else if (!strcmp(model, "cg50")) {
             platform_set_model_choice(CHOICE_CG50);
+        } else if (!strcmp(model, "fx9860g2")) {
+            platform_set_model_choice(CHOICE_FX9860G2);
+        } else if (!strcmp(model, "fx9750g3") || !strcmp(model, "g35pe2")) {
+            platform_set_model_choice(CHOICE_FX9750G3);
         } else {
             usage(argv[0]);
             return 2;

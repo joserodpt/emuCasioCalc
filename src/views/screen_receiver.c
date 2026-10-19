@@ -629,7 +629,9 @@ static void finish(void)
     thread = NULL;
     SDL_SetAtomicInt(&state, R_OFF);
     view_paused = was_paused;
-    view_show_frame(view_emulated_frame());
+    int w, h;
+    const uint16_t *fb = view_emulated_frame(&w, &h);
+    view_show_frame(fb, w, h);
 }
 
 void receiver_start(void)
@@ -678,7 +680,7 @@ void receiver_poll(void)
         memcpy(shown, panel, sizeof shown);
         SDL_SetAtomicInt(&frame_new, 0);
         SDL_UnlockMutex(lock);
-        view_show_frame(shown);
+        view_show_frame(shown, PANEL_WIDTH, PANEL_HEIGHT);
     }
     if (SDL_GetAtomicInt(&note_new)) {
         char msg[sizeof note];

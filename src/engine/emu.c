@@ -36,10 +36,16 @@
 #define UNCACHED_READ_CYCLES  12
 #define UNCACHED_WRITE_CYCLES 4
 
+/*
+ * fx-9860GII / fx-9750GIII: 512 kB of RAM at 0x08000000. gint keeps its
+ * stack, VBR and heap in the add-in's static RAM (32 kB behind 0x08100000,
+ * its size read from the MMU); the OS's 1 kB VRAM and our sys_malloc heap
+ * are elsewhere in RAM. The CPU runs at 29.49 MHz (Pphi 14.75 MHz).
+ */
 static const Layout LAYOUTS[] = {
     [MODEL_CG50] = {
         .ram_phys = 0x0C000000u, .ram_size = 0x00800000u,
-        .uram_phys = 0x0C200000u,
+        .uram_phys = 0x0C200000u, .uram_size = URAM_SIZE,
         .vram = P2(0x0C000000u),
         .vram2 = P2(0x0C030000u),
         .stack_top = P1(0x0C180000u),
@@ -49,7 +55,7 @@ static const Layout LAYOUTS[] = {
     },
     [MODEL_CG20] = {
         .ram_phys = 0x08000000u, .ram_size = 0x00200000u,
-        .uram_phys = 0x08180000u,
+        .uram_phys = 0x08180000u, .uram_size = URAM_SIZE,
         .vram = P2(0x08000000u),
         .vram2 = P2(0x08030000u),
         .stack_top = P1(0x08170000u),
@@ -57,11 +63,36 @@ static const Layout LAYOUTS[] = {
         .mcs = P1(0x08180000u),
         .frqcr = 0x0F102203u,
     },
+    [MODEL_FX9860G2] = {
+        .ram_phys = 0x08000000u, .ram_size = 0x00080000u,
+        .uram_phys = 0x08070000u, .uram_size = 0x00008000u,
+        .vram = P1(0x08001000u), .vram2 = P1(0x08001400u),
+        .stack_top = P1(0x08080000u),
+        .heap_base = P1(0x08010000u), .heap_size = 0x00030000u,
+        .mcs = P1(0x08040000u),
+        .frqcr = 0x0F202203u,
+        .os_version = "02.05.2201",
+    },
+    [MODEL_FX9750G3] = {
+        .ram_phys = 0x08000000u, .ram_size = 0x00080000u,
+        .uram_phys = 0x08070000u, .uram_size = 0x00008000u,
+        .vram = P1(0x08001000u), .vram2 = P1(0x08001400u),
+        .stack_top = P1(0x08080000u),
+        .heap_base = P1(0x08010000u), .heap_size = 0x00030000u,
+        .mcs = P1(0x08040000u),
+        .frqcr = 0x0F202203u,
+        .os_version = "03.60.0200",
+    },
 };
 
 const char *model_name(Model model)
 {
-    return model == MODEL_CG20 ? "fx-CG10/20" : "fx-CG50";
+    switch (model) {
+    case MODEL_CG20: return "fx-CG10/20";
+    case MODEL_FX9860G2: return "fx-9860GII";
+    case MODEL_FX9750G3: return "fx-9750GIII";
+    default: return "fx-CG50";
+    }
 }
 
 const Layout *model_layout(Model model)
@@ -112,7 +143,7 @@ bool emu_init(Emu *emu, Model model)
     mem_map(mem, 0, ADDIN_BASE, low, true);
     mem_map_phys(mem, l->ram_phys, l->ram_size, emu->ram, true);
     /* Add-in static RAM: a U0 view of part of the physical RAM. */
-    mem_map(mem, URAM_BASE, URAM_SIZE, emu->ram + (l->uram_phys - l->ram_phys), true);
+    mem_map(mem, URAM_BASE, l->uram_size, emu->ram + (l->uram_phys - l->ram_phys), true);
     /* On-chip memories: IL RAM, X/Y RAM, RS memory. */
     if (!mem_add_ram(mem, 0xE5200000u, 0x4000, true) ||
         !mem_add_ram(mem, 0xE5000000u, 0x20000, true) ||
@@ -120,9 +151,18 @@ bool emu_init(Emu *emu, Model model)
         return false;
 
     r61524_reset(&emu->lcd);
-    if (!sh7305_init(&emu->hw, &emu->cpu, mem, &emu->lcd, clock_start ? clock_start : (int64_t)time(NULL), l->frqcr))
+    bool mono = model_mono(model);
+    if (!sh7305_init(&emu->hw, &emu->cpu, mem, mono ? NULL : &emu->lcd,
+                     clock_start ? clock_start : (int64_t)time(NULL), l->frqcr))
         return false;
-    sh7305_add_mapping(&emu->hw, URAM_BASE, l->uram_phys, URAM_SIZE);
+    if (mono) {
+        t6k11_reset(&emu->mono, &emu->cpu.instructions);
+        if (!t6k11_map(&emu->mono, mem))
+            return false;
+    }
+    if (l->os_version) /* the OS header gint reads (OS 3.x: the newer display) */
+        memcpy(emu->rom + 0x10020, l->os_version, strlen(l->os_version));
+    sh7305_add_mapping(&emu->hw, URAM_BASE, l->uram_phys, l->uram_size);
 
     emu->vram = emu->ram + ((l->vram & 0x1FFFFFFFu) - l->ram_phys);
     emu->vram2 = emu->ram + ((l->vram2 & 0x1FFFFFFFu) - l->ram_phys);
@@ -167,7 +207,7 @@ void emu_free(Emu *emu)
 
 void emu_start(Emu *emu)
 {
-    cpu_reset(&emu->cpu, &emu->mem, ADDIN_BASE, emu->layout->stack_top);
+    cpu_reset(&emu->cpu, &emu->mem, emu->entry ? emu->entry : ADDIN_BASE, emu->layout->stack_top);
     emu->cpu.r[4] = 1; /* isappli: started from the main menu */
     emu->cpu.r[5] = 0; /* optnum */
 }
@@ -290,7 +330,9 @@ bool emu_parse_script(Emu *emu, const char *text)
 static void take_shot(Emu *emu, const ScriptStep *step)
 {
     const char *path = emu->script_paths + step->path;
-    if (platform_save_image(path, emu->lcd.fb, PANEL_WIDTH, PANEL_HEIGHT, step->scale)) {
+    int w, h;
+    const uint16_t *fb = emu_screen(emu, &w, &h);
+    if (platform_save_image(path, fb, w, h, step->scale)) {
         printf("script: saved %s\n", path);
     } else {
         fprintf(stderr, "script: could not save %s\n", path);
@@ -484,8 +526,29 @@ bool emu_script_finished(const Emu *emu, uint64_t after_ms)
 void emu_present(Emu *emu)
 {
     platform_clock(emu->cpu.instructions / cycles_per_ms(emu));
+    if (model_mono(emu->model)) {
+        if (!emu->mono.dirty)
+            return;
+        t6k11_render(&emu->mono, emu->mono_fb);
+        platform_present(emu->mono_fb, MONO_WIDTH, MONO_HEIGHT);
+        return;
+    }
     if (!emu->lcd.dirty)
         return;
-    platform_present(emu->lcd.fb);
+    platform_present(emu->lcd.fb, PANEL_WIDTH, PANEL_HEIGHT);
     emu->lcd.dirty = false;
+}
+
+const uint16_t *emu_screen(Emu *emu, int *w, int *h)
+{
+    if (model_mono(emu->model)) {
+        if (emu->mono.dirty)
+            t6k11_render(&emu->mono, emu->mono_fb);
+        *w = MONO_WIDTH;
+        *h = MONO_HEIGHT;
+        return emu->mono_fb;
+    }
+    *w = PANEL_WIDTH;
+    *h = PANEL_HEIGHT;
+    return emu->lcd.fb;
 }

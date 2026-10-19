@@ -112,6 +112,38 @@ static void detect_model(const unsigned char *code, uint32_t size, const char *d
     }
 }
 
+/* A g1a's header: the names, version and date, and the icon (rows of 4
+ * bytes, bit 7 leftmost, 1 = dark), drawn 3x; selected, it is inverted as
+ * in the main menu. */
+static void read_info_g1a(const unsigned char *buf, long size, G3aInfo *info)
+{
+    header_string(info->name, sizeof info->name, buf + 0x1D4, 8);
+    header_string(info->internal, sizeof info->internal, buf + 0x020, 8);
+    for (int i = 0; i < G3A_LABELS; i++)
+        snprintf(info->labels[i], sizeof info->labels[i], "%s", info->name);
+    header_string(info->version, sizeof info->version, buf + 0x030, 10);
+    header_string(info->date, sizeof info->date, buf + 0x03C, 14);
+    info->size = (uint32_t)size;
+    info->has_icon = false;
+    enum { K = 3, X0 = (G3A_ICON_W - G1A_ICON_W * K) / 2, Y0 = (G3A_ICON_H - G1A_ICON_H * K) / 2 };
+    for (int i = 0; i < G3A_ICON_W * G3A_ICON_H; i++) {
+        info->icon[i] = 0xFFFF;
+        info->icon_sel[i] = 0x0000;
+    }
+    for (int y = 0; y < G1A_ICON_H; y++)
+        for (int x = 0; x < G1A_ICON_W; x++) {
+            bool dark = buf[0x04C + 4 * y + x / 8] & (0x80 >> (x & 7));
+            if (dark)
+                info->has_icon = true;
+            for (int dy = 0; dy < K; dy++)
+                for (int dx = 0; dx < K; dx++) {
+                    int p = (Y0 + y * K + dy) * G3A_ICON_W + X0 + x * K + dx;
+                    info->icon[p] = dark ? 0x0000 : 0xFFFF;
+                    info->icon_sel[p] = dark ? 0xFFFF : 0x0000;
+                }
+        }
+}
+
 /* Looks for GetKey control-key codes (KEY_CTRL_*, 30000 and up) as 16-bit
  * constants. Character codes are small numbers that would match anything,
  * so they are not looked for. */
@@ -129,6 +161,12 @@ static uint64_t detect_keys(const unsigned char *code, uint32_t size)
     return used;
 }
 
+/* g1a files have the add-in type 0xF3 after the magic (inverted too). */
+static bool is_g1a(const unsigned char *buf, long size)
+{
+    return size > 9 && buf[8] == (unsigned char)~0xF3u;
+}
+
 bool g3a_read(const char *path, G3aFile *file)
 {
     memset(file, 0, sizeof *file);
@@ -140,8 +178,8 @@ bool g3a_read(const char *path, G3aFile *file)
     fseek(f, 0, SEEK_END);
     long size = ftell(f);
     fseek(f, 0, SEEK_SET);
-    if (size <= G3A_HEADER_SIZE || size > G3A_HEADER_SIZE + (long)ADDIN_MAX) {
-        fprintf(stderr, "%s: not a g3a add-in we can load (%ld bytes)\n", path, size);
+    if (size <= G1A_HEADER_SIZE || size > G3A_HEADER_SIZE + (long)ADDIN_MAX) {
+        fprintf(stderr, "%s: not an add-in we can load (%ld bytes)\n", path, size);
         fclose(f);
         return false;
     }
@@ -155,12 +193,27 @@ bool g3a_read(const char *path, G3aFile *file)
     fclose(f);
 
     if (memcmp(buf, MAGIC, sizeof MAGIC) != 0)
-        fprintf(stderr, "%s: warning: g3a magic not found, loading anyway\n", path);
+        fprintf(stderr, "%s: warning: g3a/g1a magic not found, loading anyway\n", path);
     file->data = buf;
     file->size = (uint32_t)size;
-    read_info(buf, size, &file->info);
-    detect_model(buf + G3A_HEADER_SIZE, file->size - G3A_HEADER_SIZE, file->info.date, &file->info);
-    file->info.keys_used = detect_keys(buf + G3A_HEADER_SIZE, file->size - G3A_HEADER_SIZE);
+    if (is_g1a(buf, size)) {
+        file->info.g1a = true;
+        read_info_g1a(buf, size, &file->info);
+        /* Nothing in a g1a tells the two apart; the older display is the
+         * common case (Emulation > Model chooses the other). */
+        file->info.model = MODEL_FX9860G2;
+        snprintf(file->info.model_reason, sizeof file->info.model_reason, "a monochrome .g1a add-in");
+    } else if (size <= G3A_HEADER_SIZE) {
+        fprintf(stderr, "%s: not an add-in we can load (%ld bytes)\n", path, size);
+        free(buf);
+        file->data = NULL;
+        return false;
+    } else {
+        read_info(buf, size, &file->info);
+        detect_model(buf + G3A_HEADER_SIZE, file->size - G3A_HEADER_SIZE, file->info.date, &file->info);
+    }
+    uint32_t head = g3a_header_size(&file->info);
+    file->info.keys_used = detect_keys(buf + head, file->size - head);
     return true;
 }
 
@@ -172,10 +225,13 @@ void g3a_close(G3aFile *file)
 
 bool g3a_map(Emu *emu, const G3aFile *file)
 {
-    uint32_t code_size = file->size - G3A_HEADER_SIZE;
+    /* A g1a is mapped whole: its code is linked to run at 0x00300200 */
+    uint32_t skip = file->info.g1a ? 0 : G3A_HEADER_SIZE;
+    uint32_t code_size = file->size - skip;
     /* Map whole 64 kB pages, like the OS's TLB entries. */
     uint32_t mapped = (code_size + 0xFFFF) & ~0xFFFFu;
-    memcpy(emu->rom + ADDIN_PHYS - ROM_PHYS, file->data + G3A_HEADER_SIZE, code_size);
+    memcpy(emu->rom + ADDIN_PHYS - ROM_PHYS, file->data + skip, code_size);
+    emu->entry = ADDIN_BASE + (file->info.g1a ? G1A_HEADER_SIZE : 0);
     /* Writable: some add-ins patch their own constant data (Tetrizm writes
      * a digit into a string before drawing it) and run on the calculator.
      * Writes only change this in-memory copy, not the file. */

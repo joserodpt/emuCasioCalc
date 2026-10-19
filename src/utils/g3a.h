@@ -7,6 +7,9 @@
 #include "emu.h"
 
 #define G3A_HEADER_SIZE 0x7000
+#define G1A_HEADER_SIZE 0x200   /* .g1a: fx-9860G add-ins (fxSDK's fxgxa/g1a.h) */
+#define G1A_ICON_W 30
+#define G1A_ICON_H 17
 #define G3A_ICON_W 92
 #define G3A_ICON_H 64
 /* The languages of the header's labels, in order (the last two unused) */
@@ -14,8 +17,11 @@
 extern const char *const G3A_LANGS[G3A_LABELS];
 
 /* What the OS knows about an add-in, from the g3a header (offsets from
- * fxSDK's fxgxa/g3a.h). Icons are host-endian RGB565. */
+ * fxSDK's fxgxa/g3a.h), or the g1a one (fxgxa/g1a.h: no language labels,
+ * a 30x17 monochrome icon, drawn here 3x in the icon's 92x64). Icons are
+ * host-endian RGB565. */
 typedef struct {
+    bool g1a;               /* a monochrome .g1a add-in */
     char name[17];          /* 0x040 */
     char internal[12];      /* 0x060, "@NAME" */
     /* 0x06B: the name in the main menu for each language (G3A_LANGS),
@@ -47,13 +53,19 @@ typedef struct {
     G3aInfo info;
 } G3aFile;
 
-/* Reads the file and its header, and guesses the model. Checksums are not
- * verified. Release with g3a_close. */
+/* Reads the file (.g3a or .g1a) and its header, and guesses the model.
+ * Checksums are not verified. Release with g3a_close. */
 bool g3a_read(const char *path, G3aFile *file);
 void g3a_close(G3aFile *file);
 
-/* Puts the code after the 0x7000-byte header into ROM, mapped at
- * ADDIN_BASE (writable: see g3a.c). */
+/* Puts the add-in into ROM, mapped at ADDIN_BASE (writable: see g3a.c):
+ * a g3a's code after its 0x7000-byte header, or a whole g1a, header
+ * included (its code starts at 0x00300200). Sets emu->entry. */
 bool g3a_map(Emu *emu, const G3aFile *file);
+/* The header's size: where the code starts in the file. */
+static inline uint32_t g3a_header_size(const G3aInfo *info)
+{
+    return info->g1a ? G1A_HEADER_SIZE : G3A_HEADER_SIZE;
+}
 
 #endif

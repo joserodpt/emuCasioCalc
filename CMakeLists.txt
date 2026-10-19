@@ -24,7 +24,7 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 # The hardware core has no SDL, so the CPU tests stay headless.
 add_library(emucore STATIC
-  src/engine/cpu.c src/engine/mem.c src/engine/sh7305.c src/engine/r61524.c)
+  src/engine/cpu.c src/engine/mem.c src/engine/sh7305.c src/engine/r61524.c src/engine/t6k11.c)
 target_include_directories(emucore PUBLIC src/engine)
 
 # The emulator's UI font (assets/fonts/Inter-Medium.ttf), embedded as C.
@@ -96,23 +96,35 @@ if(FXSDK)
   get_filename_component(FXSDK_CMAKE "${FXSDK_BIN}/../lib/cmake/fxsdk" ABSOLUTE)
   set(FXSDK_ENV ${CMAKE_COMMAND} -E env "PATH=${FXSDK_BIN}:$ENV{PATH}")
 
-  function(gint_addin name g3a)
-    set(src ${CMAKE_SOURCE_DIR}/tests/${name})
+  # gint_addin(<name> <output> [<toolchain> [<source folder>]]): builds
+  # tests/<source folder, default name> into <build>/<name>, for the fx-CG
+  # (FXCG50, the default) or the fx-9860G (FX9860G).
+  function(gint_addin name out)
+    set(toolchain FXCG50)
+    set(srcname ${name})
+    if(ARGC GREATER 2)
+      set(toolchain ${ARGV2})
+    endif()
+    if(ARGC GREATER 3)
+      set(srcname ${ARGV3})
+    endif()
+    set(src ${CMAKE_SOURCE_DIR}/tests/${srcname})
     set(bin ${CMAKE_BINARY_DIR}/${name})
     add_custom_command(
-      OUTPUT ${bin}/${g3a}
+      OUTPUT ${bin}/${out}
       COMMAND ${FXSDK_ENV} ${CMAKE_COMMAND} -S ${src} -B ${bin}
               -DCMAKE_MODULE_PATH=${FXSDK_CMAKE}
-              -DCMAKE_TOOLCHAIN_FILE=${FXSDK_CMAKE}/FXCG50.cmake
+              -DCMAKE_TOOLCHAIN_FILE=${FXSDK_CMAKE}/${toolchain}.cmake
               -DFXSDK_CMAKE_MODULE_PATH=${FXSDK_CMAKE}
       COMMAND ${FXSDK_ENV} ${CMAKE_COMMAND} --build ${bin}
       DEPENDS ${src}/CMakeLists.txt ${src}/src/main.c
-      COMMENT "Building ${g3a} with the fxSDK")
-    add_custom_target(${name} ALL DEPENDS ${bin}/${g3a})
+      COMMENT "Building ${out} with the fxSDK")
+    add_custom_target(${name} ALL DEPENDS ${bin}/${out})
   endfunction()
   gint_addin(gint-hello GintHello.g3a)
   gint_addin(gint-stress GintStress.g3a)
   gint_addin(gint-files GintFiles.g3a)
+  gint_addin(gint-dual-cg GintDual.g3a FXCG50 gint-dual)
 
   add_test(NAME gint_hello
     COMMAND emucasiofxcg --headless --keys EXE,MENU,7,EXIT --screenshot gint-hello.bmp gint-hello/GintHello.g3a
@@ -137,6 +149,41 @@ if(FXSDK)
     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_BINARY_DIR}/gint-files
             sh -c "rm -rf storage && $<TARGET_FILE:emucasiofxcg> --headless --keys EXE GintFiles.g3a && grep -q ok storage/fls0/EMUFILES.txt")
   set_tests_properties(gint_panic PROPERTIES PASS_REGULAR_EXPRESSION "misaligned write at 0x08100001.*key script finished")
+  # The dual add-in's colour build (its monochrome one is below).
+  add_test(NAME gint_dual_cg
+    COMMAND emucasiofxcg --headless --keys RIGHT,DOWN,EXIT gint-dual-cg/GintDual.g3a
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+  set_tests_properties(gint_dual_cg PROPERTIES PASS_REGULAR_EXPRESSION "running as fx-CG50.*add-in exited")
+
+  # Monochrome add-ins (.g1a), when gint is installed for the fx-9860G too
+  # (fxsdk build-fx install in gint's sources).
+  execute_process(COMMAND ${FXSDK_ENV} ${FXSDK} path lib OUTPUT_VARIABLE fxsdk_lib OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(EXISTS "${fxsdk_lib}/libgint-fx.a")
+    gint_addin(gint-mono GintMono.g1a FX9860G)
+    gint_addin(gint-dual-fx GintDual.g1a FX9860G gint-dual)
+    gint_addin(gint-files-fx GintFiles.g1a FX9860G gint-files)
+    add_test(NAME gint_mono
+      COMMAND emucasiofxcg --headless --keys "wait 500,7,F1,wait 500,shot gint-mono.png,EXE,EXIT" gint-mono/GintMono.g1a
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+    set_tests_properties(gint_mono PROPERTIES PASS_REGULAR_EXPRESSION "running as fx-9860GII.*saved gint-mono.png.*add-in exited")
+    # The newer display (version 2) and OS 3.x
+    add_test(NAME gint_mono_g3
+      COMMAND emucasiofxcg --headless --model fx9750g3 --keys 7,EXIT gint-mono/GintMono.g1a
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+    set_tests_properties(gint_mono_g3 PROPERTIES PASS_REGULAR_EXPRESSION "running as fx-9750GIII.*add-in exited")
+    add_test(NAME gint_dual_fx
+      COMMAND emucasiofxcg --headless --keys RIGHT,DOWN,EXIT gint-dual-fx/GintDual.g1a
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+    set_tests_properties(gint_dual_fx PROPERTIES PASS_REGULAR_EXPRESSION "running as fx-9860GII.*add-in exited")
+    # Bfile_* through the world switch, on both monochrome OSes (CASIOWIN, Fugue)
+    foreach(m fx9860g2 fx9750g3)
+      add_test(NAME gint_files_${m}
+        COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_BINARY_DIR}/gint-files-fx
+                sh -c "rm -rf storage && $<TARGET_FILE:emucasiofxcg> --headless --model ${m} --keys EXE GintFiles.g1a && grep -q ok storage/fls0/EMUFILES.txt")
+    endforeach()
+  else()
+    message(STATUS "gint for fx-9860G not installed: monochrome test add-ins skipped")
+  endif()
 
   # OS syscall test add-ins (tests/os-apps): one fxSDK project, one .g3a per
   # group of syscalls. Each run starts with empty storage and must leave

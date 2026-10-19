@@ -16,7 +16,8 @@ typedef enum {
     A_FONT_CLASSIC, A_FONT_SPLEEN, A_FONT_UNIFONT, A_FONT_CASIO, /* consecutive, as FONT_STYLE_* */
     A_ZOOM1, A_ZOOM2, A_ZOOM3, A_ZOOM4, A_ZOOM5, A_ZOOM6, /* consecutive */
     A_KEYS, A_ABOUT,
-    A_MODEL_AUTO, A_MODEL_CG20, A_MODEL_CG50, A_TIMING_REAL, A_TIMING_FAST,
+    A_MODEL_AUTO, A_MODEL_CG20, A_MODEL_CG50, A_MODEL_FX9860G2, A_MODEL_FX9750G3, /* consecutive, as ModelChoice */
+    A_TIMING_REAL, A_TIMING_FAST,
     A_FASTER, A_SLOWER, A_NORMAL_SPEED, A_CUSTOM_SPEED,
     A_BATTERY_FULL, A_BATTERY_HALF, A_BATTERY_LOW, A_BATTERY_EMPTY, /* consecutive, as BATTERY_LEVEL_CV */
     A_LANG_EN, A_LANG_ES, A_LANG_DE, A_LANG_FR, A_LANG_PT, A_LANG_ZH, /* consecutive, as LANG_* */
@@ -50,6 +51,8 @@ static const Item EMU_ITEMS[] = {
     {"Model: automatic", "", A_MODEL_AUTO},
     {"Model: fx-CG10/20", "", A_MODEL_CG20},
     {"Model: fx-CG50", "", A_MODEL_CG50},
+    {"Model: fx-9860GII (.g1a)", "", A_MODEL_FX9860G2},
+    {"Model: fx-9750GIII / Graph 35+E II (.g1a)", "", A_MODEL_FX9750G3},
     {"", "", A_SEPARATOR},
     {"Timing: realistic", "", A_TIMING_REAL},
     {"Timing: fast", "", A_TIMING_FAST},
@@ -193,7 +196,7 @@ static bool checked(Action a)
 {
     if (a >= A_ZOOM1 && a <= A_ZOOM6)
         return view_zoom() == (int)(a - A_ZOOM1) + 1;
-    if (a >= A_MODEL_AUTO && a <= A_MODEL_CG50)
+    if (a >= A_MODEL_AUTO && a <= A_MODEL_FX9750G3)
         return view_model_choice == (ModelChoice)(a - A_MODEL_AUTO);
     if (a == A_NORMAL_SPEED || a == A_CUSTOM_SPEED)
         return view_show_speed == (a == A_CUSTOM_SPEED);
@@ -660,7 +663,9 @@ static void toggle_recording(void)
         return;
     }
     timestamped(path, sizeof path, "recording", "gif");
-    if (!recorder_start(path, view_last_frame())) {
+    int w, h;
+    const uint16_t *fb = view_last_frame(&w, &h);
+    if (!recorder_start(path, fb, w, h)) {
         snprintf(msg, sizeof msg, "Could not create %s", path);
         view_flash_status(msg);
     }
@@ -680,7 +685,8 @@ static const char *open_folder(char buf[PATH_MAX])
 
 static void run_action(Action a)
 {
-    static const SDL_DialogFileFilter FILTERS[] = {{"Casio fx-CG add-ins", "g3a"}, {"All files", "*"}};
+    static const SDL_DialogFileFilter FILTERS[] = {{"Casio add-ins (fx-CG, fx-9860G)", "g3a;g1a"},
+                                                   {"All files", "*"}};
     static const SDL_DialogFileFilter DUMPS[] = {{"OS dumps", "bin"}, {"All files", "*"}};
     char path[256], folder[PATH_MAX];
     switch (a) {
@@ -758,7 +764,7 @@ static void run_action(Action a)
     case A_ABOUT:
         about_window_open();
         break;
-    case A_MODEL_AUTO: case A_MODEL_CG20: case A_MODEL_CG50: {
+    case A_MODEL_AUTO: case A_MODEL_CG20: case A_MODEL_CG50: case A_MODEL_FX9860G2: case A_MODEL_FX9750G3: {
         ModelChoice c = (ModelChoice)(a - A_MODEL_AUTO);
         if (c != view_model_choice) {
             view_model_choice = c;

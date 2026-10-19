@@ -179,6 +179,17 @@ Casio's own apps are not emulated: `APP_RUNMAT` (1A03), `APP_Program` (1945),
   commands. Projector mode is untested. So are the `1RC3` / `1RM2` frame
   formats; the fx-CG50 sends `1RC2`. The ScreenR(XP) mode, which streams
   over plain USB bulk (`07cf:6101`), isn't handled.
+- **Monochrome models** (`.g1a`): gint add-ins on the SH4-based models run
+  (tests/gint-mono, gint-dual, gint-files). Not done yet:
+  - OS-based (fxlib) add-ins: the fx-9860G OS's functions (0x80010070),
+    beyond the 25 gint calls, starting with the display and GetKey ones.
+  - The SH3-based models (original fx-9860G, Slim): another chip (SH7705 /
+    SH7355) with other timers, interrupt controller and keyboard ports.
+  - gint's fxlink frames in the mono and grey formats (Show calculator's
+    screen shows only RGB565 ones), and its `fxg3a` builds (monochrome
+    code on an fx-CG) are untested.
+  - The on-screen keyboard draws the fx-CG50's keys; the fx-9860GII's are
+    in the same places, but labelled a little differently.
 
 ## From the OS dump (next)
 

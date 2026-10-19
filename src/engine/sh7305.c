@@ -496,7 +496,8 @@ static void pfc_write(void *ctx, uint32_t addr, uint32_t value, int size)
 {
     Sh7305 *hw = ctx;
     be_write(hw->bk_pfc + OFF(addr), value, size);
-    hw->lcd->rs = hw->bk_pfc[PRDR] >> 4 & 1;
+    if (hw->lcd)
+        hw->lcd->rs = hw->bk_pfc[PRDR] >> 4 & 1;
 }
 
 static uint32_t cpg_read(void *ctx, uint32_t addr, int size)
@@ -771,7 +772,8 @@ bool sh7305_init(Sh7305 *hw, Cpu *cpu, Memory *mem, R61524 *lcd, int64_t rtc_bas
     wr32(hw->bk_ccn, 0x30, PVR_SH7305);
     wr32(hw->bk_ccn, 0x44, PRR_SH7305);
     hw->bk_pfc[PRDR] = 0x10;
-    lcd->rs = true;
+    if (lcd)
+        lcd->rs = true;
 
     static const struct {
         uint32_t base, size;
@@ -790,12 +792,12 @@ bool sh7305_init(Sh7305 *hw, Cpu *cpu, Memory *mem, R61524 *lcd, int64_t rtc_bas
         {CPUOPM_PAGE, PAGE_SIZE, cpuopm_read, cpuopm_write},
         {UTLB_ADDR, UTLB_SPAN, utlb_read, NULL},
         {UTLB_DATA, UTLB_SPAN, utlb_read, NULL},
-        {P2(LCD_PHYS), PAGE_SIZE, lcd_read, lcd_write},
     };
     for (size_t i = 0; i < sizeof DEVICES / sizeof DEVICES[0]; i++)
         if (!mem_add_mmio(mem, DEVICES[i].base, DEVICES[i].size, DEVICES[i].read, DEVICES[i].write, hw))
             return false;
-    return true;
+    /* The colour display; monochrome models have their own (t6k11.c) */
+    return !lcd || mem_add_mmio(mem, P2(LCD_PHYS), PAGE_SIZE, lcd_read, lcd_write, hw);
 }
 
 void sh7305_add_mapping(Sh7305 *hw, uint32_t vaddr, uint32_t paddr, uint32_t size)

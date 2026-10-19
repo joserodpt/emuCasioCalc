@@ -9,15 +9,26 @@
 #include "mem.h"
 #include "r61524.h"
 #include "sh7305.h"
+#include "t6k11.h"
 
-/* The calculators we can be. Same CPU, display and add-in format; they
- * differ in where RAM is, how much there is, and the clock. */
+/* The calculators we can be. All have the SH7305 (SH4AL-DSP).
+ * - Colour (.g3a add-ins, 396x224 R61524 display): they differ in where RAM
+ *   is, how much there is, and the clock.
+ * - Monochrome (.g1a add-ins, 128x64 T6K11 display, 512 kB of RAM, gint
+ *   add-ins only): the fx-9860GII and the newer fx-9750GIII, whose display
+ *   takes other commands and whose OS (3.x) gint tells by its version. */
 typedef enum {
-    MODEL_CG50,  /* fx-CG50 (2017) */
-    MODEL_CG20,  /* fx-CG10 / fx-CG20 ("Prizm", 2011) */
+    MODEL_CG50,     /* fx-CG50 (2017) */
+    MODEL_CG20,     /* fx-CG10 / fx-CG20 ("Prizm", 2011) */
+    MODEL_FX9860G2, /* fx-9860GII SH4 / Graph 75+ (2011) */
+    MODEL_FX9750G3, /* fx-9750GIII / fx-9860GIII / Graph 35+E II (2019) */
 } Model;
 
 const char *model_name(Model model);
+static inline bool model_mono(Model model)
+{
+    return model == MODEL_FX9860G2 || model == MODEL_FX9750G3;
+}
 
 /* Where things are on a model. Addresses are what the CPU sees. */
 typedef enum { ALPHA_OFF, ALPHA_ONCE, ALPHA_LOCK } KeyAlpha;
@@ -56,13 +67,14 @@ typedef struct {
 
 typedef struct {
     uint32_t ram_phys, ram_size;   /* physical RAM */
-    uint32_t uram_phys;            /* add-in static RAM behind URAM_BASE */
+    uint32_t uram_phys, uram_size; /* add-in static RAM behind URAM_BASE */
     uint32_t vram;                 /* GetVRAMAddress, at the start of RAM */
     uint32_t vram2;                /* GetSecondaryVRAMAddress (SaveVRAM_1), after it */
     uint32_t stack_top;            /* r15 when the add-in starts */
     uint32_t heap_base, heap_size; /* our sys_malloc arena */
     uint32_t mcs;                  /* MCS_GetMainMemoryStart: unused RAM (no MCS image there) */
     uint32_t frqcr;                /* clock setup the OS leaves (CPG FRQCR) */
+    const char *os_version;        /* at 0x80010020 (monochrome models: gint reads it) */
 } Layout;
 
 const Layout *model_layout(Model model);
@@ -75,7 +87,10 @@ typedef struct {
     Cpu cpu;
     Memory mem;
     Sh7305 hw;
-    R61524 lcd;
+    R61524 lcd;           /* colour models' display */
+    T6k11 mono;           /* monochrome models' display */
+    uint16_t mono_fb[MONO_WIDTH * MONO_HEIGHT]; /* its last render, RGB565 */
+    uint32_t entry;       /* where the add-in starts */
     uint8_t *rom, *ram;
     uint8_t *vram;        /* OS VRAM (GetVRAMAddress), in RAM */
     uint8_t *vram2;       /* secondary VRAM (SaveVRAM_1 / LoadVRAM_1), in RAM */
@@ -205,5 +220,8 @@ bool emu_script_finished(const Emu *emu, uint64_t after_ms);
 
 /* Shows the panel if it changed (and tells the window the emulated time). */
 void emu_present(Emu *emu);
+/* The screen as it is now (RGB565, *w x *h): the colour panel, or the
+ * monochrome one rendered. */
+const uint16_t *emu_screen(Emu *emu, int *w, int *h);
 
 #endif

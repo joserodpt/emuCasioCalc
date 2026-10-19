@@ -14,9 +14,11 @@
 
 #define SETTINGS_FILE "settings.ini"
 
+/* The zoom of the colour screen (what the window opens with): with the
+ * monochrome one shown, the colour zoom that fills the same width. */
 static int get_zoom(void)
 {
-    int z = view_zoom();
+    int z = view_panel_w == PANEL_WIDTH ? view_zoom() : 0;
     if (!z) /* in between: the zoom below */
         z = (int)(view_screen.w / PANEL_WIDTH);
     return z < 1 ? 1 : z > 6 ? 6 : z;
@@ -67,7 +69,7 @@ static const struct {
     {"keyboard", get_keyboard, set_keyboard, 0, 1},
     {"font", get_font, set_font, 0, FONT_STYLE_COUNT - 1},
     {"language", get_language, set_language, 0, LANG_COUNT - 1},
-    {"model", get_model, set_model, CHOICE_AUTO, CHOICE_CG50},
+    {"model", get_model, set_model, CHOICE_AUTO, CHOICE_FX9750G3},
     {"realistic_timing", get_realistic, set_realistic, 0, 1},
     {"speed", get_speed, set_speed, 0, 400}, /* percent, 0 = as fast as possible */
     {"speed_row", get_speed_row, set_speed_row, 0, 1}, /* after speed, which sets it too */

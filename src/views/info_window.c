@@ -211,7 +211,7 @@ static void redraw(void)
     char why[160];
     if (!have)
         why[0] = '\0';
-    else if (view_model_choice == CHOICE_AUTO)
+    else if (view_model == app->model)
         snprintf(why, sizeof why, "Model detected automatically: %s.", app->model_reason);
     else
         snprintf(why, sizeof why, "Model chosen in Emulation > Model (detected: %s, %s).",

@@ -39,8 +39,9 @@ bool platform_load_settings(void);
 bool platform_init(int scale, bool headless);
 void platform_shutdown(void);
 
-/* fb is the panel: PANEL_WIDTH x PANEL_HEIGHT, host-endian RGB565. */
-void platform_present(const uint16_t *fb);
+/* fb is the screen, w x h host-endian RGB565: the colour panel
+ * (PANEL_WIDTH x PANEL_HEIGHT) or a monochrome one (128 x 64). */
+void platform_present(const uint16_t *fb, int w, int h);
 /* The screen at 1x, as a PNG (.png) or a BMP. */
 bool platform_save_screenshot(const char *path);
 /* --record: records the screen as an animated GIF from the first frame
@@ -64,8 +65,10 @@ void platform_clock(uint64_t emu_ms);
 void platform_set_app(const G3aInfo *info, const char *path, Model model);
 
 /* Emulation > Model: be the model detected for each add-in, or force one.
- * Changing it reloads the add-in (CMD_RESET). */
-typedef enum { CHOICE_AUTO, CHOICE_CG20, CHOICE_CG50 } ModelChoice;
+ * A colour model applies to .g3a add-ins and a monochrome one to .g1a
+ * ones; the others keep theirs. Changing it reloads the add-in
+ * (CMD_RESET). */
+typedef enum { CHOICE_AUTO, CHOICE_CG20, CHOICE_CG50, CHOICE_FX9860G2, CHOICE_FX9750G3 } ModelChoice;
 ModelChoice platform_model_choice(void);
 
 /* The toolbar's speed slider: emulated time / real time (1 = real time),

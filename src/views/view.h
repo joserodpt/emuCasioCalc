@@ -14,6 +14,7 @@ extern bool view_headless;
 extern int view_text_scale;     /* UI text size, see TEXT_SCALE */
 extern float view_ui_scale;     /* the desktop's scaling (2 at 200%), from SDL */
 extern SDL_FRect view_screen;   /* where the calculator screen is drawn, in window pixels */
+extern int view_panel_w, view_panel_h; /* the screen's size in pixels: 396x224, or 128x64 */
 extern Command view_pending;    /* command waiting for the main loop */
 extern bool view_paused;
 extern G3aInfo view_app;        /* the add-in being run */
@@ -128,22 +129,23 @@ bool view_key_held(int k);
 void view_show_keypad_panel(bool show);
 
 /* recorder.c: File > Record GIF */
-/* Starts recording to path, from the frame fb (NULL: from the next frame
- * shown). */
-bool recorder_start(const char *path, const uint16_t *fb);
+/* Starts recording to path, from the frame fb, w x h (NULL: from the next
+ * frame shown). The recording keeps that size: frames of another size
+ * (another model) are left out. */
+bool recorder_start(const char *path, const uint16_t *fb, int w, int h);
 /* Writes the file; its path and the recording's length. False if it
  * wasn't recording, or the file couldn't be written. */
 bool recorder_stop(char *path, size_t cap, uint64_t *ms);
 bool recorder_active(void);
 uint64_t recorder_elapsed_ms(void);
 /* A frame the window shows. */
-void recorder_frame(const uint16_t *fb);
+void recorder_frame(const uint16_t *fb, int w, int h);
 /* The emulated time: without a window, recordings are timed by it. */
 void recorder_clock(uint64_t emu_ms);
 /* Regularly: keeps the elapsed time on the menu bar current. */
 void recorder_tick(void);
-/* window.c: the screen as last shown (PANEL_WIDTH x PANEL_HEIGHT). */
-const uint16_t *view_last_frame(void);
+/* window.c: the screen as last shown, *w x *h. */
+const uint16_t *view_last_frame(int *w, int *h);
 
 /* screen_receiver.c: File > Show calculator's screen (a real calculator in
  * Screen Receiver or Projector mode, by USB; Linux). While it runs the
@@ -155,8 +157,8 @@ bool receiver_active(void);
 void receiver_poll(void);
 /* window.c: shows a frame that isn't the emulator's (recorded too), and
  * the emulator's last one, which comes back after. */
-void view_show_frame(const uint16_t *fb);
-const uint16_t *view_emulated_frame(void);
+void view_show_frame(const uint16_t *fb, int w, int h);
+const uint16_t *view_emulated_frame(int *w, int *h);
 
 /* settings.c: what the window remembers between runs */
 /* The setting saved for key, or fallback if there is none. */
