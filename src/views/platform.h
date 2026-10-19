@@ -55,6 +55,14 @@ bool platform_save_bmp(const char *path, const uint16_t *pixels, int w, int h);
 /* The same as a PNG if path ends in .png, else a BMP, each pixel as
  * scale x scale pixels. */
 bool platform_save_image(const char *path, const uint16_t *pixels, int w, int h, int scale);
+/* Sound: the serial port's TX pin (engine/audio.c), played on the default
+ * output device (Emulation > Sound) and, with --audio-out, written to a
+ * WAV file. platform_sound takes the samples of the emulated time just
+ * run; speed is the speed slider's (the pitch follows it, 0 = silent). */
+bool platform_sound_record(const char *path);
+bool platform_sound_wanted(void);
+void platform_sound(const float *pcm, int n, double speed);
+
 /* The emulated time in ms, as the screen is shown: recordings without a
  * window are timed by it. */
 void platform_clock(uint64_t emu_ms);

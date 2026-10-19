@@ -70,6 +70,8 @@ static void usage(const char *argv0)
             "                     instead of now: runs show the same time\n"
             "  --screenshot F     save the last frame to F (.png or .bmp) on exit\n"
             "  --window-shot F    save the whole window (menus, keyboard) to F (.bmp) on exit\n"
+            "  --audio-out F      write the sound of the link port's TX pin (the jack) to\n"
+            "                     F, a .wav file (48 kHz), in emulated time\n"
             "  --record F         record the screen to F (an animated .gif) until the window\n"
             "                     closes; headless, until the run ends, in emulated time\n"
             "  --export-icon F    save the emulator's icon to F (.png, 1024 x 1024) and quit\n"
@@ -223,6 +225,16 @@ static bool load(Emu *emu, const Options *opt, const char *path, G3aInfo *info, 
     return true;
 }
 
+/* Hands the sound of the time just run to the window and --audio-out. */
+static void play_sound(Emu *emu, double speed)
+{
+    float pcm[2048];
+    int n;
+    audio_flush(&emu->hw.audio, emu->cpu.instructions);
+    while ((n = audio_take(&emu->hw.audio, pcm, 2048)) > 0)
+        platform_sound(pcm, n, speed);
+}
+
 /* Runs until the add-in stops or a menu command needs the main loop.
  * Returns true if the window was closed or a command is waiting. */
 static bool run(Emu *emu, bool headless)
@@ -244,7 +256,9 @@ static bool run(Emu *emu, bool headless)
         emu->battery_cv = platform_battery();
         emu->language = platform_language();
         display_set_font_style(platform_font());
+        audio_enable(&emu->hw.audio, platform_sound_wanted());
         emu_run(emu, (uint64_t)hz / 1000 * SLICE_MS);
+        play_sound(emu, platform_paused() ? 0 : platform_speed());
         if (!platform_poll(down))
             return true;
         emu_update_keys(emu, down);
@@ -290,7 +304,7 @@ int main(int argc, char **argv)
     const char *path = NULL, *screenshot = NULL, *window_shot = NULL, *icon = NULL;
     bool show_info = false;
     const char *model = NULL, *timing = NULL, *speed = NULL, *battery = NULL, *language = NULL, *font = NULL;
-    const char *os_dump = NULL, *record = NULL;
+    const char *os_dump = NULL, *record = NULL, *audio_out = NULL;
     bool keyboard = false;
     static Emu emu;
     static G3aInfo info;
@@ -342,6 +356,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--screenshot") && i + 1 < argc) screenshot = argv[++i];
         else if (!strcmp(argv[i], "--window-shot") && i + 1 < argc) window_shot = argv[++i];
         else if (!strcmp(argv[i], "--record") && i + 1 < argc) record = argv[++i];
+        else if (!strcmp(argv[i], "--audio-out") && i + 1 < argc) audio_out = argv[++i];
         else if (!strcmp(argv[i], "--icon") && i + 1 < argc) icon = argv[++i];
         else if (!strcmp(argv[i], "--info")) show_info = true;
         else if (!strcmp(argv[i], "--model") && i + 1 < argc) model = argv[++i];
@@ -451,6 +466,10 @@ int main(int argc, char **argv)
         return 1;
     if (record && !platform_record(record)) {
         fprintf(stderr, "could not create %s\n", record);
+        return 1;
+    }
+    if (audio_out && !platform_sound_record(audio_out)) {
+        fprintf(stderr, "could not create %s\n", audio_out);
         return 1;
     }
     static char current[1024]; /* the add-in Reset reloads, "" if none yet */

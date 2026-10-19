@@ -17,7 +17,7 @@ typedef enum {
     A_ZOOM1, A_ZOOM2, A_ZOOM3, A_ZOOM4, A_ZOOM5, A_ZOOM6, /* consecutive */
     A_KEYS, A_ABOUT,
     A_MODEL_AUTO, A_MODEL_CG20, A_MODEL_CG50, A_MODEL_FX9860G2, A_MODEL_FX9750G3, /* consecutive, as ModelChoice */
-    A_TIMING_REAL, A_TIMING_FAST,
+    A_TIMING_REAL, A_TIMING_FAST, A_SOUND,
     A_FASTER, A_SLOWER, A_NORMAL_SPEED, A_CUSTOM_SPEED,
     A_BATTERY_FULL, A_BATTERY_HALF, A_BATTERY_LOW, A_BATTERY_EMPTY, /* consecutive, as BATTERY_LEVEL_CV */
     A_LANG_EN, A_LANG_ES, A_LANG_DE, A_LANG_FR, A_LANG_PT, A_LANG_ZH, /* consecutive, as LANG_* */
@@ -56,6 +56,8 @@ static const Item EMU_ITEMS[] = {
     {"", "", A_SEPARATOR},
     {"Timing: realistic", "", A_TIMING_REAL},
     {"Timing: fast", "", A_TIMING_FAST},
+    {"", "", A_SEPARATOR},
+    {"Sound (from the link port)", "", A_SOUND},
     {"", "", A_SEPARATOR},
     {"Speed: normal (100%)", "Ctrl+0", A_NORMAL_SPEED},
     {"Speed: custom...", "", A_CUSTOM_SPEED},
@@ -204,6 +206,8 @@ static bool checked(Action a)
         return view_realistic == (a == A_TIMING_REAL);
     if (a == A_AUTO_RELOAD)
         return view_auto_reload;
+    if (a == A_SOUND)
+        return view_sound;
     if (a == A_KEYPAD)
         return view_show_keypad;
     if (a == A_RECORD)
@@ -790,6 +794,7 @@ static void run_action(Action a)
     case A_CUSTOM_SPEED: view_show_speed_row(true); break;
     case A_TIMING_REAL: view_realistic = true; break;
     case A_TIMING_FAST: view_realistic = false; break;
+    case A_SOUND: view_sound = !view_sound; break;
     case A_LANG_EN: case A_LANG_ES: case A_LANG_DE: case A_LANG_FR: case A_LANG_PT: case A_LANG_ZH:
         view_language = (int)(a - A_LANG_EN);
         info_window_refresh(); /* the icon shows the name in that language */

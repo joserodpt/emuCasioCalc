@@ -38,6 +38,10 @@ extern int view_language;       /* LANG_* */
 extern bool view_auto_reload;   /* File > Reload when the file changes */
 extern bool view_show_keypad;   /* View > Keyboard: the on-screen keys */
 extern int view_font;           /* View > Font: FONT_STYLE_* */
+/* sound.c: Emulation > Sound plays the TX pin; sound_stop() closes the
+ * device and finishes the --audio-out file. */
+extern bool view_sound;
+void sound_stop(void);
 /* Copies an OS dump's OS part where the next runs load it from
  * (platform_kept_os_dump). */
 bool view_keep_os_dump(const char *src);

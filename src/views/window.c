@@ -636,6 +636,7 @@ void platform_shutdown(void)
         printf("saved %s (%.1f s)\n", path, (double)ms / 1000);
     if (!view_headless)
         settings_save();
+    sound_stop();
     receiver_stop();
     info_window_close();
     about_window_close();

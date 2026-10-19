@@ -54,6 +54,8 @@ static int get_speed_row(void) { return view_show_speed; }
 static void set_speed_row(int v) { view_show_speed = v; }
 static int get_battery(void) { return view_battery_cv; }
 static void set_battery(int v) { view_battery_cv = v; }
+static int get_sound(void) { return view_sound; }
+static void set_sound(int v) { view_sound = v; }
 static int get_reload(void) { return view_auto_reload; }
 static void set_reload(int v) { view_auto_reload = v; }
 
@@ -75,6 +77,7 @@ static const struct {
     {"speed_row", get_speed_row, set_speed_row, 0, 1}, /* after speed, which sets it too */
     {"battery", get_battery, set_battery, 300, 600},
     {"reload", get_reload, set_reload, 0, 1},
+    {"sound", get_sound, set_sound, 0, 1},
 };
 #define SETTING_COUNT ((int)(sizeof SETTINGS / sizeof SETTINGS[0]))
 

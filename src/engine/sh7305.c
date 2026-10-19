@@ -1,5 +1,6 @@
 #include "sh7305.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -12,6 +13,7 @@
 #define KEYSC_PAGE  0xA44B0000u
 #define PFC_PAGE    0xA4050000u
 #define CPG_PAGE    0xA4150000u
+#define SCIF_PAGE   0xA4410000u
 #define DMA_PAGE    0xFE008000u
 #define CCN_PAGE    0xFF000000u
 #define CPUOPM_PAGE 0xFF2F0000u
@@ -519,6 +521,191 @@ static void cpg_write(void *ctx, uint32_t addr, uint32_t value, int size)
     schedule(hw);
 }
 
+/*---------------------------------------------------------------------------
+ * SCIF: the serial port's transmitter, for the sound of its TX pin
+ * (audio.c). Nothing is received: there is no cable.
+ *
+ * The TX pin is the UART's while SCSCR.TE is set: idle high, and each byte
+ * written to SCFTDR goes out after those before it, start bit first, at the
+ * baud rate. With TE clear and SCSPTR.SPB2IO set, it follows SCSPTR.SPB2DT
+ * (as on the SH7730: gint's description of this SCIF leaves SCSPTR out).
+ *
+ * Bytes are sent as they are written: their bits are handed to audio.c at
+ * the cycles they would leave, and SCFDR counts the ones not gone yet. The
+ * OS's driver (Serial_Open, Serial_Write) is high-level: it sets the baud
+ * rate here and queues its bytes the same way, up to its 256-byte buffer.
+ *-------------------------------------------------------------------------*/
+
+#define SCSMR   0x00
+#define SCBRR   0x04
+#define SCSCR   0x08
+#define SCFTDR  0x0C
+#define SCFSR   0x10
+#define SCFCR   0x18
+#define SCFDR   0x1C
+#define SCSPTR  0x20
+#define SCSMR_CHR  0x0040u
+#define SCSMR_PE   0x0020u
+#define SCSMR_OE   0x0010u
+#define SCSMR_STOP 0x0008u
+#define SCSCR_TE   0x0020u
+#define SCFSR_TEND 0x0040u
+#define SCFSR_TDFE 0x0020u
+#define SCFCR_TFRST 0x0004u
+#define SPB2IO 0x0002u
+#define SPB2DT 0x0001u
+#define SCIF_FIFO 16
+#define OS_SERIAL_BUFFER 256
+#define SCIF_DEFAULT_BAUD 9600
+
+static uint16_t scif_reg(const Sh7305 *hw, uint32_t off)
+{
+    return (uint16_t)be_read(hw->bk_scif + off, 2);
+}
+
+static uint32_t scif_baud(const Sh7305 *hw)
+{
+    if (!hw->scif_brr_set) /* set up by the OS: the baud rate it was asked for */
+        return hw->scif_baud ? hw->scif_baud : SCIF_DEFAULT_BAUD;
+    /* SCBRR = Pphi / (32 * 4^CKS * baud) - 1 */
+    uint64_t pphi = sh7305_iphi_hz(hw) >> pphi_shift(hw);
+    unsigned cks = scif_reg(hw, SCSMR) & 3;
+    uint64_t div = (uint64_t)32 << (2 * cks);
+    uint64_t baud = pphi / (div * ((uint64_t)hw->bk_scif[SCBRR] + 1));
+    return baud ? (uint32_t)baud : 1;
+}
+
+/* CPU cycles per bit, and bits per byte (start, data, parity, stop). */
+static double scif_bit_cycles(const Sh7305 *hw)
+{
+    return (double)sh7305_iphi_hz(hw) / scif_baud(hw);
+}
+
+static int scif_frame_bits(const Sh7305 *hw)
+{
+    uint16_t smr = scif_reg(hw, SCSMR);
+    return 1 + (smr & SCSMR_CHR ? 7 : 8) + (smr & SCSMR_PE ? 1 : 0) + (smr & SCSMR_STOP ? 2 : 1);
+}
+
+/* Bytes queued that haven't finished leaving. */
+static int scif_pending(const Sh7305 *hw)
+{
+    double left = hw->scif_busy - (double)hw->cpu->instructions;
+    if (left <= 0)
+        return 0;
+    return (int)ceil(left / (scif_bit_cycles(hw) * scif_frame_bits(hw)));
+}
+
+static void scif_pin(Sh7305 *hw, uint64_t cycle, int level)
+{
+    audio_edge(&hw->audio, cycle, level, sh7305_iphi_hz(hw));
+}
+
+/* The pin when no byte is going out: high for the UART (and while the
+ * port is off), else what SCSPTR says. */
+static void scif_idle_pin(Sh7305 *hw)
+{
+    uint16_t scr = scif_reg(hw, SCSCR), sptr = scif_reg(hw, SCSPTR);
+    uint64_t now = hw->cpu->instructions;
+    if (!(scr & SCSCR_TE) && (sptr & SPB2IO))
+        scif_pin(hw, now, sptr & SPB2DT);
+    else if (hw->scif_busy <= (double)now)
+        scif_pin(hw, now, 1);
+}
+
+static void scif_send(Sh7305 *hw, uint8_t byte)
+{
+    uint16_t smr = scif_reg(hw, SCSMR);
+    double now = (double)hw->cpu->instructions, bit = scif_bit_cycles(hw);
+    double t = hw->scif_busy > now ? hw->scif_busy : now;
+    int data = smr & SCSMR_CHR ? 7 : 8, ones = 0;
+    int bits[13], n = 0;
+    bits[n++] = 0; /* start */
+    for (int i = 0; i < data; i++) {
+        bits[n] = byte >> i & 1;
+        ones += bits[n++];
+    }
+    if (smr & SCSMR_PE) /* even parity, or odd with OE */
+        bits[n++] = (ones & 1) ^ !!(smr & SCSMR_OE);
+    bits[n++] = 1; /* stop */
+    if (smr & SCSMR_STOP)
+        bits[n++] = 1;
+    for (int i = 0; i < n; i++)
+        scif_pin(hw, (uint64_t)(t + i * bit + 0.5), bits[i]);
+    hw->scif_busy = t + n * bit;
+}
+
+static uint32_t scif_read(void *ctx, uint32_t addr, int size)
+{
+    Sh7305 *hw = ctx;
+    int pending = scif_pending(hw);
+    int fifo = pending < SCIF_FIFO ? pending : SCIF_FIFO;
+    /* TFDC in bits 12:8; nothing received */
+    be_write(hw->bk_scif + SCFDR, (uint32_t)fifo << 8, 2);
+    /* TDFE: room in the FIFO (we don't model SCFCR's trigger level) */
+    uint16_t fsr = scif_reg(hw, SCFSR) & ~(SCFSR_TEND | SCFSR_TDFE);
+    if (fifo < SCIF_FIFO)
+        fsr |= SCFSR_TDFE;
+    if (!pending)
+        fsr |= SCFSR_TEND;
+    be_write(hw->bk_scif + SCFSR, fsr, 2);
+    return be_read(hw->bk_scif + OFF(addr), size);
+}
+
+static void scif_write(void *ctx, uint32_t addr, uint32_t value, int size)
+{
+    Sh7305 *hw = ctx;
+    uint32_t off = OFF(addr);
+    if (off == SCFTDR) {
+        /* A full FIFO loses the byte */
+        if ((scif_reg(hw, SCSCR) & SCSCR_TE) && scif_pending(hw) < SCIF_FIFO)
+            scif_send(hw, (uint8_t)value);
+        return;
+    }
+    if (off == SCFSR) { /* flags are cleared by writing 0 to them */
+        uint16_t fsr = scif_reg(hw, SCFSR) & (uint16_t)value;
+        be_write(hw->bk_scif + SCFSR, fsr, 2);
+        return;
+    }
+    be_write(hw->bk_scif + off, value, size);
+    if (off == SCBRR)
+        hw->scif_brr_set = true;
+    if (off == SCFCR && (value & SCFCR_TFRST)) /* what hasn't left yet is dropped */
+        hw->scif_busy = 0;
+    if (off == SCSCR || off == SCSPTR)
+        scif_idle_pin(hw);
+}
+
+void sh7305_serial_open(Sh7305 *hw, uint32_t baud)
+{
+    hw->scif_baud = baud;
+    hw->scif_brr_set = false;
+    be_write(hw->bk_scif + SCSMR, 0, 2); /* 8 bits, no parity, 1 stop bit */
+    be_write(hw->bk_scif + SCSCR, SCSCR_TE, 2);
+    scif_idle_pin(hw);
+}
+
+void sh7305_serial_close(Sh7305 *hw)
+{
+    hw->scif_busy = 0;
+    be_write(hw->bk_scif + SCSCR, 0, 2);
+    scif_idle_pin(hw);
+}
+
+int sh7305_serial_room(const Sh7305 *hw)
+{
+    int room = OS_SERIAL_BUFFER - scif_pending(hw);
+    return room > 0 ? room : 0;
+}
+
+bool sh7305_serial_send(Sh7305 *hw, uint8_t byte)
+{
+    if (sh7305_serial_room(hw) <= 0)
+        return false;
+    scif_send(hw, byte);
+    return true;
+}
+
 /* 0xFF000000: PTEH, PTEL, TTB, TEA (0x0C), MMUCR, TRA (0x20), EXPEVT (0x24),
  * INTEVT (0x28), PVR (0x30), PRR (0x44), PASCR, IRMCR... */
 static uint32_t ccn_read(void *ctx, uint32_t addr, int size)
@@ -774,6 +961,7 @@ bool sh7305_init(Sh7305 *hw, Cpu *cpu, Memory *mem, R61524 *lcd, int64_t rtc_bas
     wr32(hw->bk_ccn, 0x30, PVR_SH7305);
     wr32(hw->bk_ccn, 0x44, PRR_SH7305);
     hw->bk_pfc[PRDR] = 0x10;
+    audio_init(&hw->audio);
     if (lcd)
         lcd->rs = true;
 
@@ -789,6 +977,7 @@ bool sh7305_init(Sh7305 *hw, Cpu *cpu, Memory *mem, R61524 *lcd, int64_t rtc_bas
         {KEYSC_PAGE, PAGE_SIZE, keysc_read, keysc_write},
         {PFC_PAGE, PAGE_SIZE, pfc_read, pfc_write},
         {CPG_PAGE, PAGE_SIZE, cpg_read, cpg_write},
+        {SCIF_PAGE, PAGE_SIZE, scif_read, scif_write},
         {DMA_PAGE, PAGE_SIZE, dma_read, dma_write},
         {CCN_PAGE, PAGE_SIZE, ccn_read, ccn_write},
         {CPUOPM_PAGE, PAGE_SIZE, cpuopm_read, cpuopm_write},

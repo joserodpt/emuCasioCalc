@@ -330,11 +330,16 @@ static SC(sc_itoa)
     return a[1]; /* add-ins use the result as the string */
 }
 
-/* The serial port (3-pin link cable): we behave like a port with nothing
- * plugged in. Opening works, nothing ever arrives, what is sent is lost. */
+/* The serial port (3-pin link cable): nothing is plugged in, so nothing
+ * ever arrives. What is sent goes out of the emulated TX pin (sh7305.c),
+ * which the window plays as sound. */
+static const uint32_t SERIAL_BAUDS[10] = {300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200};
+
+/* Serial_Open(mode): mode[1] is the baud rate (0-9: 300 to 115200). */
 static SC(sc_serial_open)
 {
-    (void)a;
+    uint8_t baud = a[0] ? mem_read8(&emu->mem, a[0] + 1) : 9;
+    sh7305_serial_open(&emu->hw, SERIAL_BAUDS[baud < 10 ? baud : 9]);
     emu->serial_open = true;
     return 0;
 }
@@ -343,6 +348,7 @@ static SC(sc_serial_open)
 static SC(sc_serial_close)
 {
     (void)a;
+    sh7305_serial_close(&emu->hw);
     emu->serial_open = false;
     return 0;
 }
@@ -361,8 +367,8 @@ static SC(sc_serial_poll_rx)
 
 static SC(sc_serial_poll_tx)
 {
-    (void)emu; (void)a;
-    return 256; /* free space in the send buffer */
+    (void)a;
+    return (uint32_t)sh7305_serial_room(&emu->hw); /* free space in the send buffer */
 }
 
 /* Serial_Read(out, size, short *count): nothing to read. */
@@ -373,9 +379,17 @@ static SC(sc_serial_read)
     return 1; /* "no data" */
 }
 
+/* Serial_Write(data, size): 0, 2 if the buffer hasn't room for it all, 3
+ * if the port isn't open. */
 static SC(sc_serial_write)
 {
-    (void)emu; (void)a;
+    if (!emu->serial_open)
+        return 3;
+    int size = (int)a[1];
+    if (size > sh7305_serial_room(&emu->hw))
+        return 2;
+    for (int i = 0; i < size; i++)
+        sh7305_serial_send(&emu->hw, mem_read8(&emu->mem, a[0] + (uint32_t)i));
     return 0;
 }
 

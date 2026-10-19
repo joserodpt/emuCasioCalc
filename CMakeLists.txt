@@ -24,8 +24,9 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 # The hardware core has no SDL, so the CPU tests stay headless.
 add_library(emucore STATIC
-  src/engine/cpu.c src/engine/mem.c src/engine/sh7305.c src/engine/r61524.c src/engine/t6k11.c)
+  src/engine/cpu.c src/engine/mem.c src/engine/sh7305.c src/engine/audio.c src/engine/r61524.c src/engine/t6k11.c)
 target_include_directories(emucore PUBLIC src/engine)
+target_link_libraries(emucore PUBLIC m)
 
 # The emulator's UI font (assets/fonts/Inter-Medium.ttf), embedded as C.
 add_custom_command(
@@ -49,7 +50,7 @@ add_executable(emucasiocalc
   src/engine/os/syscalls.c src/engine/os/syscalls_text.c src/engine/os/syscalls_keys.c
   src/engine/os/syscalls_mcs.c src/engine/os/syscalls_bfile.c src/engine/os/syscalls_dialogs.c src/engine/os/syscalls_draw.c src/engine/os/syscalls_status.c src/engine/os/syscalls_time.c src/engine/os/syscalls_fx.c src/engine/os/sh3_keys.c src/engine/os/messages.c src/engine/os/syscalls_system.c src/engine/os/font_data.c
   src/engine/os/display.c src/engine/os/casio_font.c
-  src/views/window.c src/views/menubar.c src/views/info_window.c src/views/send_addin.c src/views/screen_receiver.c src/views/keypad.c src/views/about_window.c src/views/desktop.c src/views/font.c src/views/recorder.c src/views/settings.c
+  src/views/window.c src/views/menubar.c src/views/info_window.c src/views/send_addin.c src/views/screen_receiver.c src/views/keypad.c src/views/about_window.c src/views/desktop.c src/views/font.c src/views/recorder.c src/views/settings.c src/views/sound.c
   src/views/app_icon.c
   src/utils/g3a.c src/utils/keys.c src/utils/png.c src/utils/gif.c)
 target_include_directories(emucasiocalc PRIVATE src/engine/os src/views src/utils)

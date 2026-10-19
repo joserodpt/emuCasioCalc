@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "audio.h"
 #include "cpu.h"
 #include "mem.h"
 #include "r61524.h"
@@ -11,7 +12,8 @@
 /*
  * SH7305 on-chip peripherals, as far as gint needs them: interrupt
  * controller, timers (TMU, ETMU), RTC, DMA, key scan interface, clock
- * registers, the MMU/exception registers and the UTLB arrays.
+ * registers, the MMU/exception registers and the UTLB arrays, and the
+ * serial port's transmitter (its TX pin is the calculator's sound).
  *
  * References: gint's register definitions (include/gint/mpu/ in the gint sources), which
  * follow the SH7724 hardware manual where the SH7305 matches it.
@@ -67,6 +69,12 @@ typedef struct {
     bool keysc_used;        /* the add-in scans the keyboard itself (gint) */
     bool keysc_read;        /* ...and did since the last emu_update_keys() */
 
+    /* Serial port (SCIF): its TX pin, as sound. */
+    Audio audio;
+    uint32_t scif_baud;     /* the OS driver's (Serial_Open) */
+    bool scif_brr_set;      /* the add-in set SCBRR itself */
+    double scif_busy;       /* cycle the last byte queued has left */
+
     /* U0 mappings, reported through the UTLB address/data arrays. */
     Mapping maps[4];
     int map_count;
@@ -74,7 +82,7 @@ typedef struct {
     /* Register images of each device page (DMA registers live only here). */
     uint8_t bk_intc[PAGE_SIZE], bk_tmu[PAGE_SIZE], bk_etmu[PAGE_SIZE], bk_rtc[PAGE_SIZE];
     uint8_t bk_keysc[PAGE_SIZE], bk_pfc[PAGE_SIZE], bk_cpg[PAGE_SIZE], bk_dma[PAGE_SIZE];
-    uint8_t bk_ccn[PAGE_SIZE], bk_cpuopm[PAGE_SIZE];
+    uint8_t bk_ccn[PAGE_SIZE], bk_cpuopm[PAGE_SIZE], bk_scif[PAGE_SIZE];
 } Sh7305;
 
 /* frqcr: the clock setup the OS leaves (it sets the CPU speed). */
@@ -86,5 +94,13 @@ uint32_t sh7305_iphi_hz(const Sh7305 *hw);
 
 /* Cpu event handler: brings timers and the RTC up to date. */
 void sh7305_event(Cpu *cpu, void *user);
+
+/* The OS's serial driver (high-level): Serial_Open sets the baud rate and
+ * turns the transmitter on; Serial_Write queues bytes, up to the driver's
+ * 256-byte buffer (sh7305_serial_room: how many more fit). */
+void sh7305_serial_open(Sh7305 *hw, uint32_t baud);
+void sh7305_serial_close(Sh7305 *hw);
+int sh7305_serial_room(const Sh7305 *hw);
+bool sh7305_serial_send(Sh7305 *hw, uint8_t byte);
 
 #endif

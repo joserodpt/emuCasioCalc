@@ -41,6 +41,7 @@ code on an interpreter and handles two kinds of add-ins:
 |---|---|
 | **Hot reload** | Rebuild the add-in and it is loaded again on its own |
 | **Screen recording** | File > Record GIF, or `--record` headless from a key script |
+| **Sound** | What add-ins play through the 2.5 mm link jack (the serial port's TX pin), on your speakers or into a `.wav` with `--audio-out` |
 | **Scripted demos** | `--script`: keys, waits and screenshots, the same files every run |
 | **Show calculator's screen** | A real calculator's screen, live over USB (Screen Receiver mode or gint add-ins) |
 | **Copy add-in to calculator** | Sends the running `.g3a` to a calculator in USB Flash mode, then ejects it |
@@ -171,6 +172,33 @@ as browsers slow shorter ones down. Colours are exact for screens with up to
 255 of them, and reduced (median cut) beyond. `--record F.gif` records from
 the first frame until the window closes, or with `--headless` until the run
 ends.
+
+</details>
+
+<details>
+<summary><b>Sound</b>: the link jack's TX pin, on your speakers</summary>
+<br>
+
+The calculator has no speaker, but add-ins can play tones through the 3-pin
+link jack by switching the serial port's TX pin, either directly (SCSPTR,
+from a timer) or by streaming bytes through the UART as a 1-bit
+delta-sigma signal (like the
+[tone generator](https://github.com/joserodpt/casioCalcApps/tree/main/apps/tone-generator)).
+The emulator records each change of the pin at the CPU cycle it happens
+(bytes leave at the baud rate, and SCFDR counts the ones still waiting, as
+on the calculator) and plays the result as a resistor and capacitor on the
+jack would: averaged over each sample, low-passed at 15 kHz, without the
+3.3 V DC. Sine waves made with delta-sigma therefore have the same hiss as
+on the real thing.
+
+Emulation > Sound turns it off. At other speeds the pitch follows (half
+speed plays an octave lower), and at the fastest speed it is silent.
+`--audio-out F.wav` writes it to a 48 kHz WAV file, in emulated time, also
+headless:
+
+```sh
+./build/emucasiocalc --headless --audio-out tone.wav --keys "EXE,EXE,wait 2s,EXE,EXIT,EXIT" Tone.g3a
+```
 
 </details>
 
@@ -455,7 +483,8 @@ emuCasioCalc/
 | **`src/engine/`** | **The emulated machine** |
 | `cpu.c` | SH4AL-DSP integer interpreter: privileged mode, register banks, exceptions and interrupts through VBR, SLEEP, DSP repeat loops (DSP arithmetic not planned; the chip has no FPU) |
 | `mem.c` | 4 kB page table over the 32-bit address space, MMIO devices, faults |
-| `sh7305.c` | On-chip peripherals: INTC, TMU/ETMU, RTC, DMA, KEYSC, CPG, MMU registers, UTLB arrays |
+| `sh7305.c` | On-chip peripherals: INTC, TMU/ETMU, RTC, DMA, KEYSC, CPG, SCIF transmitter, MMU registers, UTLB arrays |
+| `audio.c` | The serial port's TX pin as sound: pin changes in cycles to 48 kHz PCM |
 | `r61524.c` | Display controller (396x224 panel) |
 | `t6k11.c` | Monochrome display controller (128x64, both versions), with grey from flicker |
 | `emu.c` | Builds the machine (memory map, devices), key script |
@@ -482,6 +511,7 @@ emuCasioCalc/
 | `keypad.c` | The on-screen keyboard (View > Keyboard) |
 | `desktop.c` | `--install-desktop` (launcher and icon theme), `--export-icon` |
 | `recorder.c` | File > Record GIF: frames as shown, their timing, the REC time |
+| `sound.c` | Emulation > Sound (SDL audio stream) and `--audio-out` WAV files |
 | `settings.c` | Settings remembered between runs (`settings.ini`) |
 | `about_window.c` | Help > About: version, what it emulates, credits, repository link |
 | `ui_font.c` | The UI's text: Inter through stb_truetype, glyph atlases per size |
@@ -569,7 +599,7 @@ Next steps:
   fx-9860G or the Slim), and of their OS's functions only the ones add-ins
   have needed so far (unimplemented ones stop the add-in with their number).
   PrintMini uses a 5x8 font (Casio's is smaller).
-- No sound.
+- Sound only from the link port's TX pin; nothing is ever received on it.
 - Not planned: DSP arithmetic instructions, USB for add-ins, and an FPU
   (the SH7305 has none; add-ins use soft-float).
 - Showing a calculator's screen works on Linux only for now.
