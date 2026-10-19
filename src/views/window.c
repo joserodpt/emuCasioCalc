@@ -11,6 +11,7 @@
 
 #define STATUS_MS    4000  /* how long a flashed status message stays */
 #define WIDE_TEXT_W  600   /* windows at least this wide get 2x menu text */
+#define TITLE_BAR_H  40    /* room left for the window's title bar, at most */
 
 SDL_Window *view_window;
 SDL_Renderer *view_renderer;
@@ -42,6 +43,7 @@ int view_font = 0; /* FONT_STYLE_CLASSIC */
 static SDL_Texture *screen;    /* the panel, 396 x 224 */
 static SDL_Texture *upscaled;  /* the panel at a whole scale, see draw_screen() */
 static int upscale;            /* its scale, 0 = not created */
+static float density = 1;      /* window pixels per window unit: 2 on a Retina Mac */
 static int window_w;
 static uint16_t frame[PANEL_WIDTH * PANEL_HEIGHT]; /* last presented frame, host RGB565 */
 static char status[320];
@@ -80,14 +82,22 @@ static int text_scale_for(int width)
 }
 
 /* The desktop's scaling for the window (or the main display before it
- * exists): 1 at 100%, 2 at 200%. */
+ * exists), in window units: 1 at 100%, 2 at 200%. Where the window has
+ * more pixels than units (macOS, Wayland), that part is left to the render
+ * scale, so the UI keeps its size and is drawn at the screen's resolution. */
 static void read_ui_scale(void)
 {
+    if (view_window) {
+        float d = SDL_GetWindowPixelDensity(view_window);
+        density = d >= 1 && d <= 4 ? d : 1;
+        SDL_SetRenderScale(view_renderer, density, density);
+    }
     if (ui_scale_forced > 0) {
         view_ui_scale = ui_scale_forced;
         return;
     }
-    float s = view_window ? SDL_GetWindowDisplayScale(view_window) : SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+    float s = view_window ? SDL_GetWindowDisplayScale(view_window) / density
+                          : SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
     view_ui_scale = s >= 1 && s <= 4 ? s : 1;
 }
 
@@ -158,10 +168,11 @@ int view_zoom(void)
  * size, without the uneven rows and columns of nearest-only scaling. */
 static void draw_screen(void)
 {
-    int k = (int)(view_screen.w / PANEL_WIDTH);
+    float w = view_screen.w * density; /* in window pixels */
+    int k = (int)(w / PANEL_WIDTH);
     if (k < 1)
         k = 1;
-    if ((float)(PANEL_WIDTH * k) == view_screen.w) { /* exact: one nearest blit */
+    if ((float)(PANEL_WIDTH * k) == w) { /* exact: one nearest blit */
         SDL_RenderTexture(view_renderer, screen, NULL, &view_screen);
         return;
     }
@@ -199,14 +210,21 @@ void view_redraw(void)
     SDL_RenderPresent(view_renderer);
 }
 
+/* The window's size for the screen at zoom `scale`. */
+static void window_size(int scale, int *w, int *h)
+{
+    *w = PANEL_WIDTH * scale + keypad_width(PANEL_HEIGHT * scale);
+    int before = view_text_scale;
+    view_text_scale = text_scale_for(*w);
+    *h = BAR_H + PANEL_HEIGHT * scale; /* the bar at that width */
+    view_text_scale = before;
+}
+
 void view_set_scale(int scale)
 {
-    int w = PANEL_WIDTH * scale + keypad_width(PANEL_HEIGHT * scale);
-    int before = view_text_scale;
-    view_text_scale = text_scale_for(w);
-    int bar = BAR_H; /* at that width */
-    view_text_scale = before;
-    SDL_SetWindowSize(view_window, w, bar + PANEL_HEIGHT * scale);
+    int w, h;
+    window_size(scale, &w, &h);
+    SDL_SetWindowSize(view_window, w, h);
     SDL_SyncWindow(view_window);
     update_layout();
 }
@@ -409,7 +427,11 @@ static int handle_event(const SDL_Event *e)
         view_redraw();
         break;
     case SDL_EVENT_WINDOW_RESIZED:
-    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+        update_layout();
+        view_redraw();
+        break;
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: /* also when it moves to a screen of another density */
+        read_ui_scale();
         update_layout();
         view_redraw();
         break;
@@ -476,10 +498,18 @@ static void housekeeping(void)
         view_redraw();
 }
 
-/* The window's icon, at a few sizes for the desktop to pick from. */
+/* The window's icon, at a few sizes for the desktop to pick from (the
+ * Dock's, on macOS). */
 static void set_window_icon(void)
 {
+#ifdef __APPLE__
+    /* SDL gives the Dock every size as a 1x image, and on a Retina screen it
+     * takes the one with the slot's size in points and stretches it. One
+     * large image is scaled down instead: sharp up to a magnified Dock. */
+    static const int SIZES[] = {512};
+#else
     static const int SIZES[] = {256, 128, 64, 48, 32, 16};
+#endif
     SDL_Surface *main = NULL;
     for (size_t i = 0; i < sizeof SIZES / sizeof SIZES[0]; i++) {
         int n = SIZES[i];
@@ -519,13 +549,23 @@ bool platform_init(int scale, bool headless)
     if (headless)
         return true;
     read_ui_scale();
-    int w = PANEL_WIDTH * scale + keypad_width(PANEL_HEIGHT * scale);
+    /* The largest zoom up to `scale` that fits the screen, title bar
+     * included: a bigger window would be shrunk by the desktop (a laptop's
+     * at 4x on macOS), leaving the screen at an uneven zoom. */
+    int w, h;
+    SDL_Rect usable;
+    bool bounds = SDL_GetDisplayUsableBounds(SDL_GetPrimaryDisplay(), &usable);
+    window_size(scale, &w, &h);
+    while (bounds && scale > 1 && (w > usable.w || h + TITLE_BAR_H > usable.h))
+        window_size(--scale, &w, &h);
     view_text_scale = text_scale_for(w);
-    if (!SDL_CreateWindowAndRenderer("emuCasioFxCG", w, BAR_H + PANEL_HEIGHT * scale, SDL_WINDOW_RESIZABLE,
-                                     &view_window, &view_renderer)) {
+    if (!SDL_CreateWindowAndRenderer("emuCasioFxCG", w, h,
+                                     SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY, &view_window,
+                                     &view_renderer)) {
         fprintf(stderr, "SDL window: %s\n", SDL_GetError());
         return false;
     }
+    read_ui_scale(); /* again, now the window's density is known */
     set_window_icon();
     screen = SDL_CreateTexture(view_renderer, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING, PANEL_WIDTH,
                                PANEL_HEIGHT);

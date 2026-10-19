@@ -261,20 +261,23 @@ void info_window_open(void)
         return;
     if (!win) {
         scale = view_ui_scale;
-        if (!SDL_CreateWindowAndRenderer("Add-in information", (int)(INFO_W * scale), (int)(window_height() * scale), 0,
+        if (!SDL_CreateWindowAndRenderer("Add-in information", (int)(INFO_W * scale), (int)(window_height() * scale), SDL_WINDOW_HIGH_PIXEL_DENSITY,
                                          &win, &ren)) {
             fprintf(stderr, "info window: %s\n", SDL_GetError());
             return;
         }
-        SDL_SetRenderScale(ren, scale, scale);
+        float d = SDL_GetWindowPixelDensity(win); /* 2 on a Retina Mac */
+        SDL_SetRenderScale(ren, scale * d, scale * d);
         icons[0] = icon_texture(view_app.icon);
         icons[1] = icon_texture(view_app.icon_sel);
+#ifndef __APPLE__ /* there it would replace the emulator's icon in the Dock */
         if (view_have_app && view_app.has_icon) {
             SDL_Surface *s = SDL_CreateSurfaceFrom(G3A_ICON_W, G3A_ICON_H, SDL_PIXELFORMAT_RGB565, view_app.icon,
                                                    G3A_ICON_W * 2);
             SDL_SetWindowIcon(win, s);
             SDL_DestroySurface(s);
         }
+#endif
     }
     SDL_RaiseWindow(win);
     redraw();

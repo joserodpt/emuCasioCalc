@@ -144,18 +144,21 @@ void about_window_open(void)
         return;
     if (!win) {
         scale = view_ui_scale;
-        if (!SDL_CreateWindowAndRenderer("About emuCasioFxCG", (int)(ABOUT_W * scale), (int)(ABOUT_H * scale), 0, &win,
+        if (!SDL_CreateWindowAndRenderer("About emuCasioFxCG", (int)(ABOUT_W * scale), (int)(ABOUT_H * scale), SDL_WINDOW_HIGH_PIXEL_DENSITY, &win,
                                          &ren)) {
             fprintf(stderr, "about window: %s\n", SDL_GetError());
             return;
         }
-        SDL_SetRenderScale(ren, scale, scale);
+        float d = SDL_GetWindowPixelDensity(win); /* 2 on a Retina Mac */
+        SDL_SetRenderScale(ren, scale * d, scale * d);
         static uint32_t pixels[APP_ICON_SIZE * APP_ICON_SIZE];
         app_icon_pixels(pixels);
         SDL_Surface *s = SDL_CreateSurfaceFrom(APP_ICON_SIZE, APP_ICON_SIZE, SDL_PIXELFORMAT_ARGB8888, pixels,
                                                APP_ICON_SIZE * 4);
         if (s) {
+#ifndef __APPLE__ /* there it is the Dock's icon, already set (and sharper) */
             SDL_SetWindowIcon(win, s);
+#endif
             icon = SDL_CreateTextureFromSurface(ren, s);
             SDL_SetTextureScaleMode(icon, SDL_SCALEMODE_LINEAR);
             SDL_DestroySurface(s);
