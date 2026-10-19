@@ -381,11 +381,14 @@ CPU at 29.49 MHz. Two can be emulated (Emulation > Model, or `--model`):
   tell the model (and to use its Fugue file system).
 
 The add-in is mapped whole at `0x00300000` (its code starts after the
-0x200-byte header), add-in RAM is 32 kB behind `0x08100000` (gint keeps its
-stack, VBR and heap there), and the OS's calls go to `0x80010070`. The grey
-engine works by flickering between two pictures; the emulated display
-counts how long each pixel is dark between two frames of the window, so it
-shows the four shades, as the slow LCD does. The window, screenshots and
+0x200-byte header), add-in RAM is 128 kB behind `0x08100000` (from
+physical `0x0801C000`, as on the calculator; gint keeps its stack, VBR and
+heap there), and the OS's calls go to `0x80010070`. The grey engine works
+by flickering between two pictures (a cycle of about 11.6 ms); the
+emulated display shows a pixel that keeps switching as the share of its
+last cycle it was dark, so the four shades are steady, as on the slow LCD,
+whenever the window happens to draw. Pixels that don't keep switching show
+what they are, so black and white change at once. The window, screenshots and
 recordings use the 128x64 screen (recordings at 4x). Add-in info shows the
 g1a's 30x17 icon, inverted when selected as in the main menu.
 

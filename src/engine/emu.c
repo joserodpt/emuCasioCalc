@@ -158,7 +158,7 @@ bool emu_init(Emu *emu, Model model)
                      clock_start ? clock_start : (int64_t)time(NULL), l->frqcr))
         return false;
     if (mono) {
-        t6k11_reset(&emu->mono, &emu->cpu.instructions);
+        t6k11_reset(&emu->mono, &emu->cpu.instructions, sh7305_iphi_hz(&emu->hw));
         if (!t6k11_map(&emu->mono, mem) || !sh3_keys_map(emu))
             return false;
     }
@@ -531,8 +531,9 @@ void emu_present(Emu *emu)
     if (model_mono(emu->model)) {
         if (!emu->mono.dirty)
             return;
-        t6k11_render(&emu->mono, emu->mono_fb);
-        platform_present(emu->mono_fb, MONO_WIDTH, MONO_HEIGHT);
+        if (t6k11_render(&emu->mono, emu->mono_fb) || !emu->mono_shown)
+            platform_present(emu->mono_fb, MONO_WIDTH, MONO_HEIGHT);
+        emu->mono_shown = true;
         return;
     }
     if (!emu->lcd.dirty)

@@ -90,6 +90,7 @@ typedef struct {
     R61524 lcd;           /* colour models' display */
     T6k11 mono;           /* monochrome models' display */
     uint16_t mono_fb[MONO_WIDTH * MONO_HEIGHT]; /* its last render, RGB565 */
+    bool mono_shown;      /* mono_fb went to the window once */
     uint32_t entry;       /* where the add-in starts */
     uint8_t *rom, *ram;
     uint8_t *vram;        /* OS VRAM (GetVRAMAddress), in RAM */

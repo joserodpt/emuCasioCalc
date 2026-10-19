@@ -12,24 +12,34 @@
 
 enum { V1_DISPLAY = 0, V1_COUNTER = 1, V1_ADDRESS = 4, V1_DATA = 7, V2_ADDRESS = 8, V2_DATA = 10 };
 
-void t6k11_reset(T6k11 *lcd, const uint64_t *now)
+void t6k11_reset(T6k11 *lcd, const uint64_t *now, uint32_t hz)
 {
     memset(lcd, 0, sizeof *lcd);
     lcd->now = now;
+    lcd->grey_max = (uint64_t)hz * GREY_MAX_MS / 1000;
     lcd->counter = 1; /* column up, what gint uses */
-    lcd->since = *now;
     lcd->dirty = true; /* a first, blank render */
-    lcd->still = true;
 }
 
-/* Pixel p turns dark (on) or light at the current time. */
+/* Pixel p turns dark (on) or light now. Turning dark after a dark-light
+ * pair closes a cycle: its length and dark part give the pixel's shade. */
 static void set_pixel(T6k11 *lcd, int p, bool on)
 {
     uint64_t now = *lcd->now;
-    if (on)
-        lcd->dark_from[p] = now;
-    else
-        lcd->dark[p] += now - lcd->dark_from[p];
+    if (!on) {
+        lcd->fall[p] = now;
+        return;
+    }
+    if (lcd->rise[p] && lcd->fall[p] > lcd->rise[p]) {
+        uint64_t period = now - lcd->rise[p];
+        if (period <= lcd->grey_max) {
+            lcd->period[p] = (uint32_t)period;
+            lcd->dark_len[p] = (uint32_t)(lcd->fall[p] - lcd->rise[p]);
+        } else {
+            lcd->period[p] = 0; /* a slow blink, not grey */
+        }
+    }
+    lcd->rise[p] = now;
 }
 
 /* 8 pixels at a row and column byte. */
@@ -38,15 +48,6 @@ static void put_cell(T6k11 *lcd, int row, int col, uint8_t byte)
     uint8_t *cell = &lcd->pixels[row][col];
     uint8_t changed = *cell ^ byte;
     if (changed) {
-        if (!lcd->dirty || lcd->still) { /* the picture was still: time starts counting now */
-            lcd->still = false;
-            uint64_t now = *lcd->now;
-            lcd->since = now;
-            for (int p = 0; p < MONO_WIDTH * MONO_HEIGHT; p++) {
-                lcd->dark[p] = 0;
-                lcd->dark_from[p] = now;
-            }
-        }
         int p0 = row * MONO_WIDTH + col * 8;
         for (int i = 0; i < 8; i++)
             if (changed & (0x80 >> i))
@@ -134,28 +135,29 @@ bool t6k11_map(T6k11 *lcd, Memory *mem)
            mem_add_mmio(mem, P2(MONO_PHYS_CMD), PAGE_SIZE, port_read, port_write, lcd);
 }
 
-void t6k11_render(T6k11 *lcd, uint16_t *out)
+bool t6k11_render(T6k11 *lcd, uint16_t *out)
 {
-    uint64_t now = *lcd->now, span = now - lcd->since;
-    bool grey = false;
+    uint64_t now = *lcd->now;
+    bool grey = false, changed = false;
     for (int y = 0; y < MONO_HEIGHT; y++)
         for (int x = 0; x < MONO_WIDTH; x++) {
             int p = y * MONO_WIDTH + x;
             bool on = lcd->pixels[y][x >> 3] & (0x80 >> (x & 7));
-            uint64_t dark = lcd->dark[p] + (on ? now - lcd->dark_from[p] : 0);
-            unsigned level = span ? (unsigned)(dark * 255 / span) : on ? 255 : 0; /* 255 = dark */
-            if (level > 255)
-                level = 255;
-            if (level && level < 255)
+            uint64_t last = lcd->rise[p] > lcd->fall[p] ? lcd->rise[p] : lcd->fall[p];
+            uint32_t period = lcd->period[p];
+            unsigned level = on ? 255 : 0; /* 255 = dark */
+            if (period && now - last <= 2 * (uint64_t)period) { /* still switching: grey */
+                level = (unsigned)((uint64_t)lcd->dark_len[p] * 255 / period);
                 grey = true;
+            }
             unsigned r = LIGHT_R + (DARK_R - LIGHT_R) * (int)level / 255;
             unsigned g = LIGHT_G + (DARK_G - LIGHT_G) * (int)level / 255;
             unsigned b = LIGHT_B + (DARK_B - LIGHT_B) * (int)level / 255;
-            out[p] = (uint16_t)((r >> 3) << 11 | (g >> 2) << 5 | b >> 3);
-            lcd->dark[p] = 0;
-            lcd->dark_from[p] = now;
+            uint16_t c = (uint16_t)((r >> 3) << 11 | (g >> 2) << 5 | b >> 3);
+            changed |= out[p] != c;
+            out[p] = c;
         }
-    lcd->since = now;
-    /* Shades come from flicker: render again until it stops. */
+    /* Grey pixels: render again, to see them stop. */
     lcd->dirty = grey;
+    return changed;
 }
