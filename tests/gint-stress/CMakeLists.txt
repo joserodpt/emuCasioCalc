@@ -1,7 +1,7 @@
-# gint stress test for emuCasioFxCG: CPU-heavy rendering, DSP repeat loops
+# gint stress test for emuCasioCalc: CPU-heavy rendering, DSP repeat loops
 # (image blits), timers, and a deliberate exception for the panic screen.
 #   fxsdk build-cg        (from this folder; output: build-cg/GintStress.g3a)
-# The emuCasioFxCG build also builds it when the fxSDK is installed.
+# The emuCasioCalc build also builds it when the fxSDK is installed.
 
 cmake_minimum_required(VERSION 3.15)
 project(GintStress)

@@ -26,7 +26,7 @@ static int got; /* value seen at the failing step */
 
 static int run(void)
 {
-	char data[16] = "emuCasioFxCG ok", back[20];
+	char data[16] = "emuCasioCalc ok", back[20];
 	int size = 16, fd, rc;
 
 	BFile_Remove(TEST);

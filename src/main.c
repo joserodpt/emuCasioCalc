@@ -106,7 +106,7 @@ static void show_welcome(void)
     static R61524 lcd;
     display_fill(vram, 0xFFFF);
     display_rect(vram, 0, 0, LCD_WIDTH - 1, STATUS_HEIGHT - 1, 0x2A69);
-    display_text_mini(vram, 8, 3, "emuCasioFxCG", 0xFFFF, 0x2A69, true, LCD_WIDTH, true);
+    display_text_mini(vram, 8, 3, "emuCasioCalc", 0xFFFF, 0x2A69, true, LCD_WIDTH, true);
     display_text_big(vram, 4 * BIG_CELL_W, 3 * BIG_CELL_H, "No add-in", 0x0000, 0xFFFF, true);
     display_text_mini(vram, 4 * BIG_CELL_W, 5 * BIG_CELL_H, "File > Open (Ctrl+O)", 0x0000, 0xFFFF, true,
                       LCD_WIDTH, true);

@@ -1,10 +1,10 @@
-/* OsSyscalls: tests OS system-info and dialog syscalls (emuCasioFxCG).
+/* OsSyscalls: tests OS system-info and dialog syscalls (emuCasioCalc).
 
    Each syscall is called from the OS world (gint_world_switch), like a
    libfxcg add-in would. Results are shown on screen; if every check passes,
    \\fls0\OSTEST.txt is written with "ok", else with the first failing check.
 
-   The dialogs need keys, in this order (emuCasioFxCG: --keys ...):
+   The dialogs need keys, in this order (emuCasioCalc: --keys ...):
      DOWN,DOWN,EXE      ColorIndexDialog1 -> 2 (3rd colour)
      DOWN,EXE           same, colour 2 disabled -> skips to 2 again
      EXIT               same, cancelled -> 0xFF

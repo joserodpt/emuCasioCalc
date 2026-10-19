@@ -1,4 +1,4 @@
-/* DrawSyscalls: tests OS drawing and memory/string syscalls (emuCasioFxCG).
+/* DrawSyscalls: tests OS drawing and memory/string syscalls (emuCasioCalc).
 
    Each syscall is called from the OS world (gint_world_switch), like a
    libfxcg add-in would, and checked by reading pixels back. If every check

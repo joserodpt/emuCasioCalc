@@ -1,11 +1,11 @@
-/* Language: tests the message language syscalls (emuCasioFxCG).
+/* Language: tests the message language syscalls (emuCasioCalc).
 
    From the OS world (gint_world_switch), like a libfxcg add-in. The
    language is learnt as add-ins do: LocalizeMessage1(1) gives its name.
    If every check passes, \\fls0\LANGTEST.txt is written with "ok", else
    with the first failing check.
 
-   Run with German and these keys (emuCasioFxCG):
+   Run with German and these keys (emuCasioCalc):
      --language de --keys DOWN,EXE,EXIT,UP,EXE,F6
    DOWN,EXE,EXIT   the System language screen: French, then back
    UP,EXE,F6       the wizard's language screen: German again, then Next */

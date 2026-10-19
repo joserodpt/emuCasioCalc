@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="assets/icon.png" width="96" alt="emuCasioFxCG icon">
+<img src="assets/icon.png" width="96" alt="emuCasioCalc icon">
 
-# emuCasioFxCG
+# emuCasioCalc
 
 **An emulator for Casio fx-CG50 / fx-CG10 / fx-CG20 (Prizm) add-ins, and gint add-ins for the monochrome fx-9860G models, on Linux and macOS**
 
@@ -18,11 +18,11 @@ live view of a real calculator's screen over USB.
 ![Built with](https://img.shields.io/badge/built%20with-SDL3-8a2be2)
 ![Syscalls](https://img.shields.io/badge/syscalls-193%20of%20273%20(71%25)-2ea44f)
 
-<img src="https://raw.githubusercontent.com/joserodpt/casioPrizmApps/main/apps/circuit/screenshots/demo.gif" width="32%" alt="Circuit running in the emulator">
-<img src="https://raw.githubusercontent.com/joserodpt/casioPrizmApps/main/apps/electronics/screenshots/demo.gif" width="32%" alt="Electronics running in the emulator">
-<img src="https://raw.githubusercontent.com/joserodpt/casioPrizmApps/main/apps/base-n/screenshots/demo.gif" width="32%" alt="Base-N running in the emulator">
+<img src="https://raw.githubusercontent.com/joserodpt/casioCalcApps/main/apps/circuit/screenshots/demo.gif" width="32%" alt="Circuit running in the emulator">
+<img src="https://raw.githubusercontent.com/joserodpt/casioCalcApps/main/apps/electronics/screenshots/demo.gif" width="32%" alt="Electronics running in the emulator">
+<img src="https://raw.githubusercontent.com/joserodpt/casioCalcApps/main/apps/base-n/screenshots/demo.gif" width="32%" alt="Base-N running in the emulator">
 
-<sub>Add-ins from <a href="https://github.com/joserodpt/casioPrizmApps">casioPrizmApps</a>, recorded headless by the emulator from a key script.</sub>
+<sub>Add-ins from <a href="https://github.com/joserodpt/casioCalcApps">casioCalcApps</a>, recorded headless by the emulator from a key script.</sub>
 
 </div>
 
@@ -69,17 +69,17 @@ ctest --test-dir build --output-on-failure
 <br>
 
 ```sh
-./build/emucasiofxcg build/hello.g3a            # window; ESC = EXIT key
-./build/emucasiofxcg --trace some-addin.g3a     # log every syscall
-./build/emucasiofxcg --trace-hw some-addin.g3a  # log exceptions, DMA, unmodelled I/O
-./build/emucasiofxcg --headless --keys EXE,EXIT --screenshot out.bmp some-addin.g3a
-./build/emucasiofxcg --icon icon.bmp some-addin.g3a     # also save the add-in's menu icon
-./build/emucasiofxcg --info some-addin.g3a              # open the add-in info window at start
-./build/emucasiofxcg --model cg20 some-addin.g3a        # force the fx-CG10/20 (default: detect)
-./build/emucasiofxcg --timing fast some-addin.g3a       # no OS/memory/DMA delays (default: realistic)
-./build/emucasiofxcg --speed 50 some-addin.g3a          # half speed (10-400, or max)
-./build/emucasiofxcg --record demo.gif some-addin.g3a   # record the screen until the window closes
-./build/emucasiofxcg --headless --script demo.txt --record demo.gif some-addin.g3a  # a scripted demo
+./build/emucasiocalc build/hello.g3a            # window; ESC = EXIT key
+./build/emucasiocalc --trace some-addin.g3a     # log every syscall
+./build/emucasiocalc --trace-hw some-addin.g3a  # log exceptions, DMA, unmodelled I/O
+./build/emucasiocalc --headless --keys EXE,EXIT --screenshot out.bmp some-addin.g3a
+./build/emucasiocalc --icon icon.bmp some-addin.g3a     # also save the add-in's menu icon
+./build/emucasiocalc --info some-addin.g3a              # open the add-in info window at start
+./build/emucasiocalc --model cg20 some-addin.g3a        # force the fx-CG10/20 (default: detect)
+./build/emucasiocalc --timing fast some-addin.g3a       # no OS/memory/DMA delays (default: realistic)
+./build/emucasiocalc --speed 50 some-addin.g3a          # half speed (10-400, or max)
+./build/emucasiocalc --record demo.gif some-addin.g3a   # record the screen until the window closes
+./build/emucasiocalc --headless --script demo.txt --record demo.gif some-addin.g3a  # a scripted demo
 ```
 
 Also: `--keyboard` (show the on-screen keyboard), `--window-shot F` (save the
@@ -194,7 +194,7 @@ shot "small one.png"  # quotes for names with spaces
 ```
 
 ```sh
-./build/emucasiofxcg --headless --clock "2026-01-01 12:00" --script demo.txt --record demo.gif addin.g3a
+./build/emucasiocalc --headless --clock "2026-01-01 12:00" --script demo.txt --record demo.gif addin.g3a
 ```
 
 Steps run in order, on the emulated clock: `wait N` (ms, or `2s`, `1.5s`)
@@ -234,7 +234,7 @@ meanwhile.
 **gint add-ins** can be shown too, if they open their USB link and send
 frames (`usb_open` with `usb_ff_bulk`, then
 `dupdate_set_hook(GINT_CALL(usb_fxlink_videocapture, 0))`, or a hook that
-doesn't wait as casioPrizmApps' `usb_screen.c` does): starting one ends
+doesn't wait as casioCalcApps' `usb_screen.c` does): starting one ends
 Screen Receiver mode, and the calculator comes back as gint's fxlink device,
 whose "video" messages are shown.
 
@@ -286,9 +286,9 @@ View > Font (or `--font`): the OS text (PrintXY, PrintMini...) is drawn with
 Classic (the default: an 8x8 font scaled to the OS's sizes), Spleen (bitmap
 fonts of the OS's sizes), Unifont, or Casio's own fonts. Those aren't
 included: they are read from a dump of your calculator's OS, made with the
-FirmDump add-in (casioPrizmApps, `scripts/firmdump-recv.md`). File > Load OS
+FirmDump add-in (casioCalcApps, `scripts/firmdump-recv.md`). File > Load OS
 dump reads one (the OS or ROM dump), switches to Font: Casio and keeps the
-dump's OS part in `~/.local/share/emuCasioFxCG/` for the next runs;
+dump's OS part in `~/.local/share/emuCasioCalc/` for the next runs;
 `--os-dump F` uses F for one run. The dump's own glyph lookups (syscalls
 0x01E8-0x01EB) run on a private CPU to find each character's bitmap, so
 every character the OS draws comes out as on the calculator, whatever the OS
@@ -430,7 +430,7 @@ the command line.
 ## Project layout
 
 ```
-emuCasioFxCG/
+emuCasioCalc/
 ├── src/
 │   ├── main.c        command line, main loop (runs the add-in, Open/Reset/Quit)
 │   ├── engine/       the emulated machine: CPU, memory, SH7305, display
@@ -605,5 +605,5 @@ protocols. Help > About lists the credits too.
 <div align="center">
 Made by <a href="https://github.com/joserodpt">joserodpt</a> with
 <a href="https://www.libsdl.org/">SDL3</a>. Add-ins to try it with:
-<a href="https://github.com/joserodpt/casioPrizmApps">casioPrizmApps</a>.
+<a href="https://github.com/joserodpt/casioCalcApps">casioCalcApps</a>.
 </div>

@@ -8,6 +8,10 @@
 #include "platform.h"
 
 /* window.c: the main window and the state the menus act on */
+/* view_pref_dir(): The per-user folder for settings and the kept OS dump
+ * (moving the old emuCasioFxCG one's files the first time); SDL_free it. */
+char *view_pref_dir(void);
+
 extern SDL_Window *view_window;
 extern SDL_Renderer *view_renderer;
 extern bool view_headless;

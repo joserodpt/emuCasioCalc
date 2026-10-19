@@ -90,7 +90,7 @@ bool desktop_install(const char *run)
     fprintf(f,
             "[Desktop Entry]\n"
             "Type=Application\n"
-            "Name=emuCasioFxCG\n"
+            "Name=emuCasioCalc\n"
             "Comment=Emulator for Casio fx-CG graphing calculator add-ins\n"
             "Exec=\"%s\" %%f\n"
             "Icon=%s\n"

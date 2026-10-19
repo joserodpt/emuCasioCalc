@@ -4,7 +4,7 @@ emulator before a real SH toolchain is installed.
 
 It enables colour, draws a pattern straight into VRAM, prints two lines with
 PrintXY and loops on GetKey until EXIT. Not a valid add-in for the real
-calculator (no checksum, name or icons), only for emuCasioFxCG.
+calculator (no checksum, name or icons), only for emuCasioCalc.
 
 usage: make_hello_g3a.py OUT.g3a
 """
@@ -170,7 +170,7 @@ def build():
     for name, value in [("K_WIDTH", 384), ("K_HEIGHT", 216), ("K_EXIT", 30002)]:
         asm.label(name)
         asm.word(value)
-    for name, text in [("MSG_HELLO", "  Hi from emuCasioFxCG!"), ("MSG_EXIT", "  Press EXIT to quit")]:
+    for name, text in [("MSG_HELLO", "  Hi from emuCasioCalc!"), ("MSG_EXIT", "  Press EXIT to quit")]:
         asm.align(4)
         asm.label(name)
         asm.asciz(text)

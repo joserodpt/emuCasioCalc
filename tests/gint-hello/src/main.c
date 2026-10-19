@@ -19,7 +19,7 @@ static void draw(int key, int presses)
 {
 	dclear(C_WHITE);
 	drect(0, 0, DWIDTH - 1, 20, C_RGB(4, 10, 20));
-	dtext(4, 5, C_WHITE, "gint on emuCasioFxCG");
+	dtext(4, 5, C_WHITE, "gint on emuCasioCalc");
 
 	for(int i = 0; i < 6; i++)
 		drect(10 + 30 * i, 40, 35 + 30 * i, 70, C_RGB(31 - 5 * i, 5 * i, 16));

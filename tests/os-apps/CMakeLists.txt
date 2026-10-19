@@ -1,9 +1,9 @@
-# OS syscall test add-ins for emuCasioFxCG: each calls a group of syscalls
+# OS syscall test add-ins for emuCasioCalc: each calls a group of syscalls
 # from the OS world (gint_world_switch), like a libfxcg add-in, checks the
 # results and leaves "ok" (or the first failing check) in a file of
 # \\fls0\. Build with the fxSDK:
 #   fxsdk build-cg        (from this folder; output: build-cg/*.g3a)
-# The emuCasioFxCG build also builds them when the fxSDK is installed, and
+# The emuCasioCalc build also builds them when the fxSDK is installed, and
 # CTest runs them (see ../../CMakeLists.txt for the keys each one needs).
 
 cmake_minimum_required(VERSION 3.15)

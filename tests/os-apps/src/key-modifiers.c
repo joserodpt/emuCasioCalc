@@ -1,10 +1,10 @@
-/* KeyModifiers: tests SHIFT and ALPHA in the OS GetKey (emuCasioFxCG).
+/* KeyModifiers: tests SHIFT and ALPHA in the OS GetKey (emuCasioCalc).
 
    GetKey is called from the OS world (gint_world_switch), like a libfxcg
    add-in would, and each code it returns is checked. If all match,
    \\fls0\KEYTEST.txt is written with "ok", else with the first mismatch.
 
-   Keys, in this order (emuCasioFxCG: --keys ...; fx-CG50):
+   Keys, in this order (emuCasioCalc: --keys ...; fx-CG50):
      ALPHA,7                 'M'
      SHIFT,EXIT              QUIT
      SHIFT,ALPHA,XOT,LOG,DP  alpha lock: 'A' 'B' ' '

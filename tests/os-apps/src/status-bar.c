@@ -1,11 +1,11 @@
-/* StatusBar: tests the OS status area syscalls (emuCasioFxCG).
+/* StatusBar: tests the OS status area syscalls (emuCasioCalc).
 
    Each syscall is called from the OS world (gint_world_switch), like a
    libfxcg add-in would, and checked by reading VRAM back. If every check
    passes, \\fls0\STATTEST.txt is written with "ok", else with the first
    failing check.
 
-   Run with the battery low and these keys (emuCasioFxCG):
+   Run with the battery low and these keys (emuCasioCalc):
      --battery low --keys ALPHA,7
    ALPHA,7 goes to GetKey (it returns 'M' and draws the ALPHA indicator). */
 

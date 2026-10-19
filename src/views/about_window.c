@@ -10,7 +10,7 @@
 #define ABOUT_W   600
 #define ABOUT_H   462
 #define MARGIN    28
-#define GITHUB    "github.com/joserodpt/emuCasioFxCG"
+#define GITHUB    "github.com/joserodpt/emuCasioCalc"
 #define GITHUB_URL "https://" GITHUB
 
 extern const char EMU_BUILD_TIME[], EMU_BUILD_COMMIT[]; /* build_info.c */
@@ -71,7 +71,7 @@ static void redraw(void)
         SDL_RenderTexture(ren, icon, NULL, &icon_box);
     float x = MARGIN + 72 + 20;
     color(20, 20, 24);
-    text(x, MARGIN + 2, "emuCasioFxCG", 30);
+    text(x, MARGIN + 2, "emuCasioCalc", 30);
     char version[128];
     snprintf(version, sizeof version, "Version %s (%s), built %s", EMU_VERSION, EMU_BUILD_COMMIT, EMU_BUILD_TIME);
     color(110, 110, 116);
@@ -145,7 +145,7 @@ void about_window_open(void)
         return;
     if (!win) {
         scale = view_ui_scale;
-        if (!SDL_CreateWindowAndRenderer("About emuCasioFxCG", (int)(ABOUT_W * scale), (int)(ABOUT_H * scale), SDL_WINDOW_HIGH_PIXEL_DENSITY, &win,
+        if (!SDL_CreateWindowAndRenderer("About emuCasioCalc", (int)(ABOUT_W * scale), (int)(ABOUT_H * scale), SDL_WINDOW_HIGH_PIXEL_DENSITY, &win,
                                          &ren)) {
             fprintf(stderr, "about window: %s\n", SDL_GetError());
             return;

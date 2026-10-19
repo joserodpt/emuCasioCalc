@@ -1,7 +1,7 @@
-# gint test add-in for the monochrome fx-9860G models (emuCasioFxCG). Build
+# gint test add-in for the monochrome fx-9860G models (emuCasioCalc). Build
 # with the fxSDK:
 #   fxsdk build-fx        (from this folder; output: build-fx/GintMono.g1a)
-# The emuCasioFxCG build also builds it when the fxSDK has gint for fx-9860G.
+# The emuCasioCalc build also builds it when the fxSDK has gint for fx-9860G.
 
 cmake_minimum_required(VERSION 3.15)
 project(GintMono)

@@ -20,7 +20,7 @@ typedef enum {
 } Command;
 
 /* The app's identifier: window class, launcher and icon file names. */
-#define APP_ID "emucasiofxcg"
+#define APP_ID "emucasiocalc"
 
 /* desktop.c: --export-icon writes the icon as a size x size PNG;
  * --install-desktop adds the icon to the user's icon theme and a launcher

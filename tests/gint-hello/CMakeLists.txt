@@ -1,6 +1,6 @@
-# gint smoke test for emuCasioFxCG. Build with the fxSDK:
+# gint smoke test for emuCasioCalc. Build with the fxSDK:
 #   fxsdk build-cg        (from this folder; output: build-cg/GintHello.g3a)
-# The emuCasioFxCG build also builds it when the fxSDK is installed.
+# The emuCasioCalc build also builds it when the fxSDK is installed.
 
 cmake_minimum_required(VERSION 3.15)
 project(GintHello)

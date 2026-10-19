@@ -1,6 +1,6 @@
 # TODO
 
-What emuCasioFxCG still lacks. The syscall list is measured against
+What emuCasioCalc still lacks. The syscall list is measured against
 [libfxcg](https://github.com/Jonimoose/libfxcg)'s stubs: 193 of its 273 syscalls
 are implemented, 80 are left. Add-ins only use a small part of them, so the
 groups are ordered by how likely real add-ins are to need them.

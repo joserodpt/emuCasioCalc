@@ -1,12 +1,12 @@
 /* TimeKeys: tests the OS timer, RTC, delay and keyboard syscalls
-   (emuCasioFxCG).
+   (emuCasioCalc).
 
    From the OS world (gint_world_switch), like a libfxcg add-in. Timer
    handlers are plain functions the OS calls like interrupts. If every check
    passes, \\fls0\TIMETEST.txt is written with "ok", else with the first
    failing check.
 
-   Keys (emuCasioFxCG: --keys 7,MENU; the screen asks for them): 7 for the
+   Keys (emuCasioCalc: --keys 7,MENU; the screen asks for them): 7 for the
    GetKey with a timer running, MENU for GetKey with the return to the main
    menu disabled.
    Everything else is injected with Keyboard_PutKeycode. */

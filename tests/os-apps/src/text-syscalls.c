@@ -1,11 +1,11 @@
 /* TextSyscalls: tests the text and multi-byte string syscalls
-   (emuCasioFxCG).
+   (emuCasioCalc).
 
    From the OS world (gint_world_switch), like a libfxcg add-in; drawing is
    checked by reading VRAM back. If every check passes, \\fls0\TEXTTEST.txt
    is written with "ok", else with the first failing check.
 
-   Keys (emuCasioFxCG: --keys RIGHT,RIGHT,EXE): the character dialog,
+   Keys (emuCasioCalc: --keys RIGHT,RIGHT,EXE): the character dialog,
    choosing its third character (r, 0xCD). */
 
 #include <gint/display.h>

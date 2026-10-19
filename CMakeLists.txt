@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(emuCasioFxCG VERSION 1.0 LANGUAGES C)
+project(emuCasioCalc VERSION 1.0 LANGUAGES C)
 
 # Shown in Help > About: the version, and (build_info.c, written at each
 # build) the build's date and time and git commit.
@@ -41,7 +41,7 @@ add_custom_target(build_info
   BYPRODUCTS ${CMAKE_BINARY_DIR}/build_info.c
   COMMENT "Recording the build's date and commit")
 
-add_executable(emucasiofxcg
+add_executable(emucasiocalc
   src/main.c
   ${CMAKE_BINARY_DIR}/build_info.c
   src/views/ui_font.c ${CMAKE_BINARY_DIR}/ui_font_ttf.c
@@ -52,9 +52,9 @@ add_executable(emucasiofxcg
   src/views/window.c src/views/menubar.c src/views/info_window.c src/views/send_addin.c src/views/screen_receiver.c src/views/keypad.c src/views/about_window.c src/views/desktop.c src/views/font.c src/views/recorder.c src/views/settings.c
   src/views/app_icon.c
   src/utils/g3a.c src/utils/keys.c src/utils/png.c src/utils/gif.c)
-target_include_directories(emucasiofxcg PRIVATE src/engine/os src/views src/utils)
-target_link_libraries(emucasiofxcg PRIVATE emucore SDL3::SDL3 m)
-add_dependencies(emucasiofxcg build_info)
+target_include_directories(emucasiocalc PRIVATE src/engine/os src/views src/utils)
+target_link_libraries(emucasiocalc PRIVATE emucore SDL3::SDL3 m)
+add_dependencies(emucasiocalc build_info)
 
 # Hand-assembled smoke-test add-in.
 add_custom_command(
@@ -68,22 +68,22 @@ add_executable(test_cpu tests/test_cpu.c)
 target_link_libraries(test_cpu PRIVATE emucore)
 add_test(NAME cpu COMMAND test_cpu)
 add_test(NAME hello
-  COMMAND emucasiofxcg --headless --keys EXE,EXIT --screenshot hello.bmp hello.g3a
+  COMMAND emucasiocalc --headless --keys EXE,EXIT --screenshot hello.bmp hello.g3a
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 # No build date, no old addresses: detected as an fx-CG50 add-in; also runs as fx-CG10/20.
 add_test(NAME hello_model
-  COMMAND emucasiofxcg --headless --keys EXIT hello.g3a
+  COMMAND emucasiocalc --headless --keys EXIT hello.g3a
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 set_tests_properties(hello_model PROPERTIES PASS_REGULAR_EXPRESSION "running as fx-CG50 \\(no build date")
 add_test(NAME hello_cg20
-  COMMAND emucasiofxcg --headless --model cg20 --keys EXE,EXIT hello.g3a
+  COMMAND emucasiocalc --headless --model cg20 --keys EXE,EXIT hello.g3a
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 set_tests_properties(hello_cg20 PROPERTIES PASS_REGULAR_EXPRESSION "running as fx-CG10/20.*add-in exited")
 
 # A script: waits, screenshots (PNG, 2x) and a recording timed by the
 # emulated clock (4 s: the waits, also the one after the add-in exits).
 add_test(NAME script
-  COMMAND emucasiofxcg --headless --clock "2026-01-01 12:00"
+  COMMAND emucasiocalc --headless --clock "2026-01-01 12:00"
           --keys "wait 2s, shot script.png, EXE, wait 1s, EXIT, wait 1s" --record script.gif hello.g3a
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 set_tests_properties(script PROPERTIES PASS_REGULAR_EXPRESSION "script: saved script.png.*saved script.gif \\(4.0 s\\)")
@@ -127,31 +127,31 @@ if(FXSDK)
   gint_addin(gint-dual-cg GintDual.g3a FXCG50 gint-dual)
 
   add_test(NAME gint_hello
-    COMMAND emucasiofxcg --headless --keys EXE,MENU,7,EXIT --screenshot gint-hello.bmp gint-hello/GintHello.g3a
+    COMMAND emucasiocalc --headless --keys EXE,MENU,7,EXIT --screenshot gint-hello.bmp gint-hello/GintHello.g3a
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
   set_tests_properties(gint_hello PROPERTIES PASS_REGULAR_EXPRESSION "running as fx-CG50.*add-in exited")
   # gint's fx-CG10/20 code path (other RAM layout, half the clock).
   add_test(NAME gint_hello_cg20
-    COMMAND emucasiofxcg --headless --model cg20 --keys EXE,MENU,7,EXIT gint-hello/GintHello.g3a
+    COMMAND emucasiocalc --headless --model cg20 --keys EXE,MENU,7,EXIT gint-hello/GintHello.g3a
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
   set_tests_properties(gint_hello_cg20 PROPERTIES PASS_REGULAR_EXPRESSION "running as fx-CG10/20.*add-in exited")
   add_test(NAME gint_stress
-    COMMAND emucasiofxcg --headless --keys EXE --screenshot gint-stress.bmp gint-stress/GintStress.g3a
+    COMMAND emucasiocalc --headless --keys EXE --screenshot gint-stress.bmp gint-stress/GintStress.g3a
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
   set_tests_properties(gint_stress PROPERTIES PASS_REGULAR_EXPRESSION "add-in exited")
   # F1 makes a misaligned write: gint must catch it and show its panic screen.
   add_test(NAME gint_panic
-    COMMAND emucasiofxcg --headless --keys SHIFT,SHIFT,SHIFT,SHIFT,SHIFT,SHIFT,SHIFT,SHIFT,F1
+    COMMAND emucasiocalc --headless --keys SHIFT,SHIFT,SHIFT,SHIFT,SHIFT,SHIFT,SHIFT,SHIFT,F1
             --screenshot gint-panic.bmp gint-stress/GintStress.g3a
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
   # Bfile_* syscalls through gint's world switch; leaves storage/fls0/EMUFILES.txt.
   add_test(NAME gint_files
     COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_BINARY_DIR}/gint-files
-            sh -c "rm -rf storage && $<TARGET_FILE:emucasiofxcg> --headless --keys EXE GintFiles.g3a && grep -q ok storage/fls0/EMUFILES.txt")
+            sh -c "rm -rf storage && $<TARGET_FILE:emucasiocalc> --headless --keys EXE GintFiles.g3a && grep -q ok storage/fls0/EMUFILES.txt")
   set_tests_properties(gint_panic PROPERTIES PASS_REGULAR_EXPRESSION "misaligned write at 0x08100001.*key script finished")
   # The dual add-in's colour build (its monochrome one is below).
   add_test(NAME gint_dual_cg
-    COMMAND emucasiofxcg --headless --keys RIGHT,DOWN,EXIT gint-dual-cg/GintDual.g3a
+    COMMAND emucasiocalc --headless --keys RIGHT,DOWN,EXIT gint-dual-cg/GintDual.g3a
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
   set_tests_properties(gint_dual_cg PROPERTIES PASS_REGULAR_EXPRESSION "running as fx-CG50.*add-in exited")
 
@@ -163,23 +163,23 @@ if(FXSDK)
     gint_addin(gint-dual-fx GintDual.g1a FX9860G gint-dual)
     gint_addin(gint-files-fx GintFiles.g1a FX9860G gint-files)
     add_test(NAME gint_mono
-      COMMAND emucasiofxcg --headless --keys "wait 500,7,F1,wait 500,shot gint-mono.png,EXE,EXIT" gint-mono/GintMono.g1a
+      COMMAND emucasiocalc --headless --keys "wait 500,7,F1,wait 500,shot gint-mono.png,EXE,EXIT" gint-mono/GintMono.g1a
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
     set_tests_properties(gint_mono PROPERTIES PASS_REGULAR_EXPRESSION "running as fx-9860GII.*saved gint-mono.png.*add-in exited")
     # The newer display (version 2) and OS 3.x
     add_test(NAME gint_mono_g3
-      COMMAND emucasiofxcg --headless --model fx9750g3 --keys 7,EXIT gint-mono/GintMono.g1a
+      COMMAND emucasiocalc --headless --model fx9750g3 --keys 7,EXIT gint-mono/GintMono.g1a
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
     set_tests_properties(gint_mono_g3 PROPERTIES PASS_REGULAR_EXPRESSION "running as fx-9750GIII.*add-in exited")
     add_test(NAME gint_dual_fx
-      COMMAND emucasiofxcg --headless --keys RIGHT,DOWN,EXIT gint-dual-fx/GintDual.g1a
+      COMMAND emucasiocalc --headless --keys RIGHT,DOWN,EXIT gint-dual-fx/GintDual.g1a
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
     set_tests_properties(gint_dual_fx PROPERTIES PASS_REGULAR_EXPRESSION "running as fx-9860GII.*add-in exited")
     # Bfile_* through the world switch, on both monochrome OSes (CASIOWIN, Fugue)
     foreach(m fx9860g2 fx9750g3)
       add_test(NAME gint_files_${m}
         COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_BINARY_DIR}/gint-files-fx
-                sh -c "rm -rf storage && $<TARGET_FILE:emucasiofxcg> --headless --model ${m} --keys EXE GintFiles.g1a && grep -q ok storage/fls0/EMUFILES.txt")
+                sh -c "rm -rf storage && $<TARGET_FILE:emucasiocalc> --headless --model ${m} --keys EXE GintFiles.g1a && grep -q ok storage/fls0/EMUFILES.txt")
     endforeach()
   else()
     message(STATUS "gint for fx-9860G not installed: monochrome test add-ins skipped")
@@ -213,7 +213,7 @@ if(FXSDK)
     string(REPLACE ";" " " opts "${ARGN}")
     add_test(NAME ${name}
       COMMAND sh -c "rm -rf '${dir}' && mkdir -p '${dir}' && cd '${dir}' && \
-                     '$<TARGET_FILE:emucasiofxcg>' --headless ${opts} '${CMAKE_BINARY_DIR}/os-apps/${g3a}.g3a' && \
+                     '$<TARGET_FILE:emucasiocalc>' --headless ${opts} '${CMAKE_BINARY_DIR}/os-apps/${g3a}.g3a' && \
                      cat storage/fls0/${marker} && grep -q '^ok' storage/fls0/${marker}")
   endfunction()
   os_test(os_system_dialogs OsSyscalls OSTEST.txt --keys DOWN,DOWN,EXE,DOWN,EXE,EXIT,EXIT)

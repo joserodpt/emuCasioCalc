@@ -1,7 +1,7 @@
-# gint file system test for emuCasioFxCG (Bfile_* syscalls through the world switch). Build with the fxSDK:
+# gint file system test for emuCasioCalc (Bfile_* syscalls through the world switch). Build with the fxSDK:
 #   fxsdk build-cg        (from this folder; output: build-cg/GintFiles.g3a)
 #   fxsdk build-fx        (the same for the fx-9860G: build-fx/GintFiles.g1a)
-# The emuCasioFxCG build also builds it when the fxSDK is installed.
+# The emuCasioCalc build also builds it when the fxSDK is installed.
 
 cmake_minimum_required(VERSION 3.15)
 project(GintFiles)

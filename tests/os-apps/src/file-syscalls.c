@@ -1,4 +1,4 @@
-/* FileSyscalls: tests the storage file syscalls (emuCasioFxCG).
+/* FileSyscalls: tests the storage file syscalls (emuCasioCalc).
 
    From the OS world (gint_world_switch), like a libfxcg add-in: makes a
    folder \\fls0\FTEST with a few files, lists it with Bfile_FindFirst /

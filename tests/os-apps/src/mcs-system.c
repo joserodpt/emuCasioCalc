@@ -1,5 +1,5 @@
 /* McsSystem: tests the main memory (MCS) and system syscalls
-   (emuCasioFxCG).
+   (emuCasioCalc).
 
    From the OS world (gint_world_switch), like a libfxcg add-in. If every
    check passes, \\fls0\MCSTEST.txt is written with "ok", else with the

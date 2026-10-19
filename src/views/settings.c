@@ -83,9 +83,40 @@ static bool has[SETTING_COUNT];
 static int start[SETTING_COUNT];
 static char folder[1024];
 
+/* The emulator's per-user folder (SDL's "pref" folder): settings and the
+ * kept OS dump. It was named after emuCasioFxCG, the emulator's old name:
+ * the first time, that folder's files move here, so nothing is lost. */
+char *view_pref_dir(void)
+{
+    static bool checked;
+    char *dir = SDL_GetPrefPath("", "emuCasioCalc");
+    if (!dir || checked)
+        return dir;
+    checked = true;
+
+    /* The old folder is next to the new one: same path, old name */
+    static const char NEW[] = "emuCasioCalc", OLD[] = "emuCasioFxCG";
+    size_t n = strlen(dir), k = sizeof NEW - 1;
+    if (n < k + 1 || strncmp(dir + n - k - 1, NEW, k))
+        return dir;
+    char old[1024], from[1100], to[1100];
+    snprintf(old, sizeof old, "%.*s%s%s", (int)(n - k - 1), dir, OLD, dir + n - 1);
+    if (!SDL_GetPathInfo(old, NULL))
+        return dir;
+    static const char *const files[] = {SETTINGS_FILE, "os-dump.bin"};
+    for (size_t i = 0; i < sizeof files / sizeof *files; i++) {
+        snprintf(from, sizeof from, "%s%s", old, files[i]);
+        snprintf(to, sizeof to, "%s%s", dir, files[i]);
+        if (SDL_GetPathInfo(from, NULL) && !SDL_GetPathInfo(to, NULL))
+            SDL_RenamePath(from, to);
+    }
+    SDL_RemovePath(old); /* only goes if it is now empty */
+    return dir;
+}
+
 static bool settings_path(char *path, size_t cap)
 {
-    char *dir = SDL_GetPrefPath("", "emuCasioFxCG");
+    char *dir = view_pref_dir();
     if (!dir)
         return false;
     snprintf(path, cap, "%s%s", dir, SETTINGS_FILE);
@@ -157,7 +188,7 @@ void settings_save(void)
     FILE *f = fopen(tmp, "w");
     if (!f)
         return;
-    fprintf(f, "# emuCasioFxCG's settings, written when its window closes\n");
+    fprintf(f, "# emuCasioCalc's settings, written when its window closes\n");
     for (int i = 0; i < SETTING_COUNT; i++) {
         int v = SETTINGS[i].get();
         if (has[i] && v == start[i] && start[i] != loaded[i])

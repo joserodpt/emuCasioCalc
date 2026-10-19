@@ -1,7 +1,7 @@
-# gint test add-in built for both families from one source (emuCasioFxCG):
+# gint test add-in built for both families from one source (emuCasioCalc):
 #   fxsdk build-fx        -> build-fx/GintDual.g1a (fx-9860G, monochrome)
 #   fxsdk build-cg        -> build-cg/GintDual.g3a (fx-CG, colour)
-# The emuCasioFxCG build builds both when the fxSDK has gint for them.
+# The emuCasioCalc build builds both when the fxSDK has gint for them.
 
 cmake_minimum_required(VERSION 3.15)
 project(GintDual)

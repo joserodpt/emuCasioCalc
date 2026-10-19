@@ -267,13 +267,13 @@ void platform_set_font(int style)
 }
 
 /* File > Load OS dump keeps the dump's OS part here, for the next runs
- * (~/.local/share/emuCasioFxCG/ on Linux). */
+ * (~/.local/share/emuCasioCalc/ on Linux). */
 #define KEPT_OS_DUMP "os-dump.bin"
 #define OS_PART      0x00800000 /* the OS; the rest of a ROM dump is the user's storage */
 
 static bool kept_os_dump_path(char *path, size_t cap)
 {
-    char *dir = SDL_GetPrefPath("", "emuCasioFxCG");
+    char *dir = view_pref_dir();
     if (!dir)
         return false;
     snprintf(path, cap, "%s%s", dir, KEPT_OS_DUMP);
@@ -564,7 +564,7 @@ bool platform_init(int scale, bool headless)
         SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
     /* The app's identity: its window class, which the desktop matches with
      * the launcher --install-desktop writes (and its icon). */
-    SDL_SetAppMetadata("emuCasioFxCG", EMU_VERSION, APP_ID);
+    SDL_SetAppMetadata("emuCasioCalc", EMU_VERSION, APP_ID);
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
         return false;
@@ -593,7 +593,7 @@ bool platform_init(int scale, bool headless)
     while (bounds && scale > 1 && (w > usable.w || h + TITLE_BAR_H > usable.h))
         window_size(--scale, &w, &h);
     view_text_scale = text_scale_for(w);
-    if (!SDL_CreateWindowAndRenderer("emuCasioFxCG", w, h,
+    if (!SDL_CreateWindowAndRenderer("emuCasioCalc", w, h,
                                      SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY, &view_window,
                                      &view_renderer)) {
         fprintf(stderr, "SDL window: %s\n", SDL_GetError());
@@ -753,7 +753,7 @@ void platform_set_app(const G3aInfo *info, const char *path, Model model)
     if (view_headless)
         return;
     char title[64];
-    snprintf(title, sizeof title, "%s - %s - emuCasioFxCG", view_app.name[0] ? view_app.name : "add-in",
+    snprintf(title, sizeof title, "%s - %s - emuCasioCalc", view_app.name[0] ? view_app.name : "add-in",
              model_name(model));
     SDL_SetWindowTitle(view_window, title);
     platform_set_key_mode(false, 0);
