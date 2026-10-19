@@ -32,9 +32,10 @@ static void set_pixel(T6k11 *lcd, int p, bool on)
         lcd->dark[p] += now - lcd->dark_from[p];
 }
 
-static void write_data(T6k11 *lcd, uint8_t byte)
+/* 8 pixels at a row and column byte. */
+static void put_cell(T6k11 *lcd, int row, int col, uint8_t byte)
 {
-    uint8_t *cell = &lcd->pixels[lcd->row & (MONO_HEIGHT - 1)][lcd->col & (MONO_WIDTH / 8 - 1)];
+    uint8_t *cell = &lcd->pixels[row][col];
     uint8_t changed = *cell ^ byte;
     if (changed) {
         if (!lcd->dirty || lcd->still) { /* the picture was still: time starts counting now */
@@ -46,13 +47,18 @@ static void write_data(T6k11 *lcd, uint8_t byte)
                 lcd->dark_from[p] = now;
             }
         }
-        int p0 = (lcd->row & (MONO_HEIGHT - 1)) * MONO_WIDTH + (lcd->col & (MONO_WIDTH / 8 - 1)) * 8;
+        int p0 = row * MONO_WIDTH + col * 8;
         for (int i = 0; i < 8; i++)
             if (changed & (0x80 >> i))
                 set_pixel(lcd, p0 + i, byte & (0x80 >> i));
         *cell = byte;
         lcd->dirty = true;
     }
+}
+
+static void write_data(T6k11 *lcd, uint8_t byte)
+{
+    put_cell(lcd, lcd->row & (MONO_HEIGHT - 1), lcd->col & (MONO_WIDTH / 8 - 1), byte);
     if (lcd->reg == V2_DATA || lcd->counter == 1)
         lcd->col = (lcd->col + 1) & (MONO_WIDTH / 8 - 1);
     else if (lcd->counter == 0)
@@ -108,6 +114,18 @@ static void port_write(void *ctx, uint32_t addr, uint32_t value, int size)
         else
             lcd->reg = b;
     }
+}
+
+void t6k11_show(T6k11 *lcd, const uint8_t *vram)
+{
+    for (int row = 0; row < MONO_HEIGHT; row++)
+        for (int col = 0; col < MONO_WIDTH / 8; col++)
+            put_cell(lcd, row, col, vram[row * (MONO_WIDTH / 8) + col]);
+}
+
+void t6k11_read(const T6k11 *lcd, uint8_t *vram)
+{
+    memcpy(vram, lcd->pixels, MONO_VRAM_SIZE);
 }
 
 bool t6k11_map(T6k11 *lcd, Memory *mem)

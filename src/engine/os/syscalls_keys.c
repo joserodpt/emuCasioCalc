@@ -54,6 +54,27 @@ static int key_at(int col, int row)
     return -1;
 }
 
+void sc_os_matrix(int k, int *col, int *row)
+{
+    os_matrix(k, col, row);
+}
+
+bool sc_key_held_at(Emu *emu, int col, int row)
+{
+    emu->polls_keys = true;
+    sc_spend(emu, KEY_POLL_CYCLES);
+    int k = key_at(col, row);
+    return k >= 0 && emu->key_down[k];
+}
+
+int sc_key_held(Emu *emu, int *col, int *row)
+{
+    int k = held_key(emu);
+    if (k >= 0)
+        os_matrix(k, col, row);
+    return k;
+}
+
 /* Takes injected key i out of the queue. */
 static void inject_take(Emu *emu, int i)
 {
@@ -94,6 +115,10 @@ static void set_mode(Emu *emu, bool shift, KeyAlpha alpha)
  * the lock. SHIFT AC/ON switches the calculator off: here, nothing. */
 static void show(Emu *emu)
 {
+    if (model_mono(emu->model)) { /* the monochrome OS: no status bar */
+        fx_show_vram(emu);
+        return;
+    }
     if (emu->getkey_status)
         status_area_draw(emu);
     r61524_blit_vram(&emu->lcd, emu->vram);

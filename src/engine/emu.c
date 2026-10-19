@@ -37,9 +37,11 @@
 #define UNCACHED_WRITE_CYCLES 4
 
 /*
- * fx-9860GII / fx-9750GIII: 512 kB of RAM at 0x08000000. gint keeps its
- * stack, VBR and heap in the add-in's static RAM (32 kB behind 0x08100000,
- * its size read from the MMU); the OS's 1 kB VRAM and our sys_malloc heap
+ * fx-9860GII / fx-9750GIII: 512 kB of RAM at 0x08000000. The add-in's
+ * static RAM is behind 0x08100000 from physical 0x0801C000, as on the
+ * calculator (fxlib maps more of it with Hmem_SetMMU, 1 kB pages from
+ * there); 128 kB here. gint keeps its stack, VBR and heap in it (its size
+ * read from the MMU). The OS's 1 kB VRAM, our sys_malloc heap and the stack
  * are elsewhere in RAM. The CPU runs at 29.49 MHz (Pphi 14.75 MHz).
  */
 static const Layout LAYOUTS[] = {
@@ -65,21 +67,21 @@ static const Layout LAYOUTS[] = {
     },
     [MODEL_FX9860G2] = {
         .ram_phys = 0x08000000u, .ram_size = 0x00080000u,
-        .uram_phys = 0x08070000u, .uram_size = 0x00008000u,
-        .vram = P1(0x08001000u), .vram2 = P1(0x08001400u),
+        .uram_phys = 0x0801C000u, .uram_size = 0x00020000u,
+        .vram = P1(0x08004000u), .vram2 = P1(0x08004400u),
         .stack_top = P1(0x08080000u),
-        .heap_base = P1(0x08010000u), .heap_size = 0x00030000u,
-        .mcs = P1(0x08040000u),
+        .heap_base = P1(0x08040000u), .heap_size = 0x00030000u,
+        .mcs = P1(0x08070000u),
         .frqcr = 0x0F202203u,
         .os_version = "02.05.2201",
     },
     [MODEL_FX9750G3] = {
         .ram_phys = 0x08000000u, .ram_size = 0x00080000u,
-        .uram_phys = 0x08070000u, .uram_size = 0x00008000u,
-        .vram = P1(0x08001000u), .vram2 = P1(0x08001400u),
+        .uram_phys = 0x0801C000u, .uram_size = 0x00020000u,
+        .vram = P1(0x08004000u), .vram2 = P1(0x08004400u),
         .stack_top = P1(0x08080000u),
-        .heap_base = P1(0x08010000u), .heap_size = 0x00030000u,
-        .mcs = P1(0x08040000u),
+        .heap_base = P1(0x08040000u), .heap_size = 0x00030000u,
+        .mcs = P1(0x08070000u),
         .frqcr = 0x0F202203u,
         .os_version = "03.60.0200",
     },
@@ -157,7 +159,7 @@ bool emu_init(Emu *emu, Model model)
         return false;
     if (mono) {
         t6k11_reset(&emu->mono, &emu->cpu.instructions);
-        if (!t6k11_map(&emu->mono, mem))
+        if (!t6k11_map(&emu->mono, mem) || !sh3_keys_map(emu))
             return false;
     }
     if (l->os_version) /* the OS header gint reads (OS 3.x: the newer display) */

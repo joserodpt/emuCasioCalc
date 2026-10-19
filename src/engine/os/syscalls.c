@@ -625,21 +625,60 @@ static const Syscall SYSCALLS[] = {
 };
 
 /* The fx-9860G OS (0x80010070), monochrome models: what gint calls
- * (src/kernel/syscalls.S, GINT_OS_FX). The functions take the same
- * arguments as their fx-CG counterparts above. */
+ * (src/kernel/syscalls.S, GINT_OS_FX) and what fxlib add-ins need, from
+ * Simon Lothar's list (see syscalls_fx.c). The shared functions take the
+ * same arguments as their fx-CG counterparts above. */
 static const Syscall SYSCALLS_FX[] = {
+    {0x0013, "GlibAddinAplExecutionCheck", sc_fx_glib_execution_check},
+    {0x0014, "GlibGetAddinLibInf", sc_fx_glib_lib_info},
+    {0x0015, "GlibGetOSVersionInfo", sc_fx_os_version},
+    {0x001B, "DD_Clear", sc_fx_dd_clear},
+    {0x0024, "Bdisp_GetDisp_DD", sc_fx_get_disp_dd},
+    {0x0028, "Bdisp_PutDisp_DD", sc_fx_putdisp_dd},
+    {0x0030, "Bdisp_DrawLineVRAM", sc_fx_draw_line_vram},
+    {0x0031, "Bdisp_ClearLineVRAM", sc_fx_clear_line_vram},
+    {0x0039, "RTC_Reset", sc_rtc_reset},
+    {0x003A, "RTC_GetTime", sc_rtc_get_time},
+    {0x003B, "RTC_GetTicks", sc_rtc_get_ticks},
+    {0x003C, "RTC_Elapsed_ms", sc_rtc_elapsed_ms},
     {0x0118, "Timer_Install", sc_timer_install},
     {0x0119, "Timer_Deinstall", sc_timer_deinstall},
     {0x011A, "Timer_Start", sc_timer_start},
     {0x011B, "Timer_Stop", sc_timer_stop},
     {0x0135, "GetVRAMAddress", sc_get_vram_address}, /* the OS's 1 kB monochrome VRAM */
+    {0x0142, "Bdisp_AllClr_DD", sc_fx_allclr_dd},
+    {0x0143, "Bdisp_AllClr_VRAM", sc_fx_allclr_vram},
+    {0x0144, "Bdisp_AllClr_DDVRAM", sc_fx_allclr_ddvram},
+    {0x0145, "Bdisp_GetDisp_VRAM", sc_fx_get_disp_vram},
+    {0x0146, "Bdisp_SetPoint_VRAM", sc_fx_setpoint_vram},
+    {0x0147, "Bdisp_SetPoint_DD", sc_fx_setpoint_dd},
+    {0x0148, "Bdisp_SetPoint_DDVRAM", sc_fx_setpoint_ddvram},
+    {0x0149, "Bdisp_GetPoint_VRAM", sc_fx_getpoint_vram},
+    {0x014A, "Bdisp_AreaClr_DD", sc_fx_areaclr_dd},
+    {0x014B, "Bdisp_AreaClr_VRAM", sc_fx_areaclr_vram},
+    {0x014C, "Bdisp_AreaClr_DDVRAM", sc_fx_areaclr_ddvram},
+    {0x014D, "Bdisp_AreaReverseVRAM", sc_fx_area_reverse_vram},
+    {0x0150, "PrintXY", sc_fx_print_xy},
     {0x0236, "Reset", sc_restart},
+    {0x023E, "RTC_SetDateTime", sc_rtc_set_date_time},
     {0x0241, "Keyboard_ClrBuffer", sc_nothing},
+    {0x0242, "Bkey_Set_RepeatTime", sc_nothing},  /* no key repeat here */
+    {0x0244, "Bkey_Set_RepeatTime_Default", sc_nothing},
+    {0x0245, "Keyboard_EnableAutoRepeat", sc_nothing},
+    {0x0246, "Keyboard_DisableAutoRepeat", sc_nothing},
     {0x0247, "GetKeyWait", sc_get_key_wait_os},
     {0x0248, "PutKeyCode", sc_put_keycode},
+    {0x024A, "Keyboard_IsAnyKeyDown", sc_fx_any_key_down},
+    {0x024B, "Keyboard_IsSpecialKeyDown", sc_fx_key_down_at},
+    {0x024C, "Keyboard_IsSpecialKeyDown", sc_fx_key_down_at},
+    {0x024D, "Keyboard_KeyDown", sc_fx_key_down},
+    {0x03ED, "Interrupt_SetOrClrStatusFlags", sc_nothing},
     {0x03F4, "PowerOff", sc_nothing},          /* off and on again at once */
+    {0x03FA, "Hmem_SetMMU", sc_fx_set_mmu},
+    {0x0420, "OS_inner_Sleep", sc_wait_ms},
     {0x042C, "Bfile_OpenFile", sc_bfile_open},
     {0x042D, "Bfile_CloseFile", sc_bfile_close},
+    {0x042E, "Bfile_GetMediaFree", sc_bfile_media_free},
     {0x042F, "Bfile_GetFileSize", sc_bfile_size},
     {0x0431, "Bfile_SeekFile", sc_bfile_seek},
     {0x0432, "Bfile_ReadFile", sc_bfile_read},
@@ -649,10 +688,30 @@ static const Syscall SYSCALLS_FX[] = {
     {0x043B, "Bfile_FindFirst", sc_bfile_find_first},
     {0x043C, "Bfile_FindNext", sc_bfile_find_next},
     {0x043D, "Bfile_FindClose", sc_bfile_find_close},
+    {0x0462, "GetAppName", sc_get_app_name},
     {0x0494, "SetQuitHandler", sc_nothing},    /* no OS menu to quit through */
+    {0x0807, "locate", sc_locate},
+    {0x0808, "Print", sc_fx_print},
+    {0x0809, "PrintRev", sc_fx_print_rev},
+    {0x080A, "PrintC", sc_fx_print_c},
+    {0x080B, "PrintRevC", sc_fx_print_rev_c},
+    {0x0813, "SaveDisp", sc_fx_save_disp},
+    {0x0814, "RestoreDisp", sc_fx_restore_disp},
+    {0x0829, "MCS_CreateDirectory", sc_mcs_create_dir},
+    {0x082B, "MCSPutVar2", sc_mcs_put_var2},
+    {0x0830, "MCSOvwDat2", sc_mcs_ovw_dat2},
+    {0x0836, "MCSDelVar2", sc_mcs_del_var2},
+    {0x0840, "MCSGetDlen2", sc_mcs_get_dlen2},
+    {0x0841, "MCSGetData1", sc_mcs_get_data1},
+    {0x0844, "MCSGetCapa", sc_mcs_get_capa},
+    {0x090F, "GetKey", sc_get_key},
+    {0x0910, "PutKey", sc_fx_put_key},
+    {0x09AD, "PrintXY", sc_fx_print_xy},
     {0x0ACC, "free", sc_free},
     {0x0ACD, "malloc", sc_malloc},
+    {0x0C4F, "PrintMini", sc_fx_print_mini},
     {0x0E6D, "realloc", sc_realloc},
+    {0x1032, "Keyboard_KeycodeTable", sc_fx_keycode_table},
 };
 
 /* Stack arguments; near the top of the stack they may not exist. */

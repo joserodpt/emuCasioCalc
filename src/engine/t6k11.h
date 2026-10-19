@@ -26,6 +26,7 @@
  */
 #define MONO_WIDTH  128
 #define MONO_HEIGHT 64
+#define MONO_VRAM_SIZE (MONO_WIDTH * MONO_HEIGHT / 8) /* the OS's VRAM: rows of 16 bytes */
 #define MONO_PHYS_SEL 0x14000000u /* RS = 0 */
 #define MONO_PHYS_CMD 0x14010000u /* RS = 1 */
 
@@ -44,6 +45,11 @@ typedef struct {
 } T6k11;
 
 void t6k11_reset(T6k11 *lcd, const uint64_t *now);
+/* What the OS's Bdisp_PutDisp_DD does: shows a 1 kB VRAM (rows of 16
+ * bytes, bit 7 leftmost, 1 = dark). */
+void t6k11_show(T6k11 *lcd, const uint8_t *vram);
+/* The inverse (Bdisp_GetDisp_DD): what the panel shows, as a VRAM. */
+void t6k11_read(const T6k11 *lcd, uint8_t *vram);
 /* Maps the two ports (P2) on mem. */
 bool t6k11_map(T6k11 *lcd, Memory *mem);
 /* The picture since the last render, as RGB565: each pixel the shade of

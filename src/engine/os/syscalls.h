@@ -10,6 +10,9 @@ void syscalls_install(Emu *emu);
  * (UINT64_MAX if none runs); runs the handlers that are due; lets cycles
  * of time pass, running handlers when they are due. */
 uint64_t timers_next_due(const Emu *emu);
+/* sh3_keys.c: the SH3 keyboard ports and watchdog that old SDK add-ins
+ * scan the keyboard with (monochrome models). */
+bool sh3_keys_map(Emu *emu);
 void timers_fire_due(Emu *emu);
 void time_advance(Emu *emu, uint64_t cycles);
 

@@ -28,6 +28,51 @@ void msgbox_close(Emu *emu);            /* puts VRAM back */
  * closed; the add-in then stops, as with GetKey. */
 int sc_wait_key(Emu *emu);
 
+/* syscalls_keys.c: whether the key at an OS matrix position (columns 7..2
+ * left to right, rows 2..10 bottom to top, AC/on (1, 1)) is held, and the
+ * first key held (its KEYS index and position, or -1). Both count as a key
+ * poll. */
+bool sc_key_held_at(Emu *emu, int col, int row);
+void sc_os_matrix(int k, int *col, int *row); /* KEYS[k]'s position */
+int sc_key_held(Emu *emu, int *col, int *row);
+
+/* syscalls_fx.c: the monochrome models' OS (fx-9860G) */
+void fx_show_vram(Emu *emu);  /* Bdisp_PutDisp_DD: the 1 kB VRAM to the display */
+SC(sc_fx_glib_execution_check);
+SC(sc_fx_glib_lib_info);
+SC(sc_fx_os_version);
+SC(sc_fx_set_mmu);
+SC(sc_fx_dd_clear);
+SC(sc_fx_get_disp_dd);
+SC(sc_fx_putdisp_dd);
+SC(sc_fx_draw_line_vram);
+SC(sc_fx_clear_line_vram);
+SC(sc_fx_allclr_dd);
+SC(sc_fx_allclr_vram);
+SC(sc_fx_allclr_ddvram);
+SC(sc_fx_get_disp_vram);
+SC(sc_fx_setpoint_vram);
+SC(sc_fx_setpoint_dd);
+SC(sc_fx_setpoint_ddvram);
+SC(sc_fx_getpoint_vram);
+SC(sc_fx_areaclr_dd);
+SC(sc_fx_areaclr_vram);
+SC(sc_fx_areaclr_ddvram);
+SC(sc_fx_area_reverse_vram);
+SC(sc_fx_print_xy);
+SC(sc_fx_print_mini);
+SC(sc_fx_print);
+SC(sc_fx_print_rev);
+SC(sc_fx_print_c);
+SC(sc_fx_print_rev_c);
+SC(sc_fx_save_disp);
+SC(sc_fx_restore_disp);
+SC(sc_fx_key_down_at);
+SC(sc_fx_any_key_down);
+SC(sc_fx_key_down);
+SC(sc_fx_put_key);
+SC(sc_fx_keycode_table);
+
 /* Reads a NUL-terminated string from emulated memory. */
 void sc_string(Emu *emu, uint32_t addr, char *out, size_t cap);
 

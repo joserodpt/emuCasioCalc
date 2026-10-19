@@ -35,7 +35,7 @@ code on an interpreter and handles two kinds of add-ins:
 |---|---|
 | **OS-based** (libfxcg / PrizmSDK) | Whenever the add-in calls the OS (jumps to `0x80020070` with a syscall number in `r0`), that syscall is implemented on the host instead (high-level emulation). **193 of the 273** OS functions known to the [libfxcg](https://github.com/Jonimoose/libfxcg) SDK are implemented; [`TODO.md`](TODO.md) lists the rest, by how likely add-ins are to need them. |
 | **gint** (most modern Planète Casio add-ins, built with the fxSDK) | gint takes over the hardware, so the emulator models the parts of the SH7305 it drives: interrupt controller, timers, RTC, DMA, key scan interface, clock registers, exceptions and the R61524 display controller. |
-| **gint, monochrome** (`.g1a`, `fxsdk build-fx`) | The SH4-based fx-9860G models have the same SH7305, with a 128x64 T6K11 display (both of its versions) and 512 kB of RAM; gint's grey engine shows four shades. The few OS functions gint calls there (memory, files, timers, keys) are implemented. |
+| **Monochrome** (`.g1a`: gint ones from `fxsdk build-fx`, and Casio SDK / fxlib ones) | The SH4-based fx-9860G models have the same SH7305, with a 128x64 T6K11 display (both of its versions) and 512 kB of RAM; gint's grey engine shows four shades. Their OS's functions are implemented as on the fx-CG, starting with what gint and a few classic SDK games use (display, text, keys, files, timers, RTC, main memory), and the SH3 keyboard ports and watchdog that old SDK add-ins scan the keys with. |
 
 | Feature | |
 |---|---|
@@ -364,8 +364,13 @@ clock (58.98 MHz vs 117.96 MHz CPU). The emulator can be either:
 The model and the reason it was picked appear in the window title, in
 Add-in info and on the terminal.
 
-**Monochrome models** (`.g1a` add-ins, gint only): the SH4-based fx-9860G
-models run gint add-ins built with `fxsdk build-fx`. They have the same
+**Monochrome models** (`.g1a` add-ins): the SH4-based fx-9860G models run
+gint add-ins built with `fxsdk build-fx`, and add-ins built with Casio's SDK
+(fxlib), whose OS calls are implemented one by one as for the fx-CG
+(`syscalls_fx.c`, from Simon Lothar's documentation of the fx-9860G
+syscalls). Old SDK add-ins read the keyboard through the SH3 chip's ports
+and watchdog, as the first fx-9860G had them (they hang on real SH4
+calculators unless patched); those are emulated too (`sh3_keys.c`). They have the same
 SH7305 as the fx-CG50, a 128x64 1-bit display and 512 kB of RAM, with the
 CPU at 29.49 MHz. Two can be emulated (Emulation > Model, or `--model`):
 
@@ -557,9 +562,10 @@ Next steps:
 ## Known limits
 
 - MENU in a gint add-in returns to the add-in at once (there is no OS menu).
-- Monochrome models: gint add-ins only (OS-based fxlib add-ins would need
-  the fx-9860G OS's functions, of which only gint's few are implemented), and
-  only the SH4-based models (not the original SH3 fx-9860G or the Slim).
+- Monochrome models: only the SH4-based ones (not the original SH3
+  fx-9860G or the Slim), and of their OS's functions only the ones add-ins
+  have needed so far (unimplemented ones stop the add-in with their number).
+  PrintMini uses a 5x8 font (Casio's is smaller).
 - No sound.
 - Not planned: DSP arithmetic instructions, USB for add-ins, and an FPU
   (the SH7305 has none; add-ins use soft-float).

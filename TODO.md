@@ -180,9 +180,17 @@ Casio's own apps are not emulated: `APP_RUNMAT` (1A03), `APP_Program` (1945),
   formats; the fx-CG50 sends `1RC2`. The ScreenR(XP) mode, which streams
   over plain USB bulk (`07cf:6101`), isn't handled.
 - **Monochrome models** (`.g1a`): gint add-ins on the SH4-based models run
-  (tests/gint-mono, gint-dual, gint-files). Not done yet:
-  - OS-based (fxlib) add-ins: the fx-9860G OS's functions (0x80010070),
-    beyond the 25 gint calls, starting with the display and GetKey ones.
+  (tests/gint-mono, gint-dual, gint-files), and so do fxlib ones that stay
+  within the fx-9860G syscalls implemented in syscalls_fx.c and the
+  syscalls.c fx table (tried: Wolfenstein, Gravity Duck, Jetpack Joyride).
+  Not done yet:
+  - More fx-9860G syscalls as add-ins need them (Simon Lothar's list,
+    https://media.taricorp.net/prizm/simon_chm/fx_legacy_syscalls.htm);
+    Bdisp_WriteGraph_*, Bdisp_DrawShape*, PopUpWin, the cursor ones, 0x1E7
+    and 0x218 (undocumented) are not there.
+  - Casio's PrintMini font (3x5), and its PrintXY font (here Spleen 5x8).
+  - A test add-in for the fxlib side (no SDK here: it would call the
+    syscalls by hand).
   - The SH3-based models (original fx-9860G, Slim): another chip (SH7705 /
     SH7355) with other timers, interrupt controller and keyboard ports.
   - gint's fxlink frames in the mono and grey formats (Show calculator's
