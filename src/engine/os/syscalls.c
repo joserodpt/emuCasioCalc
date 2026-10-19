@@ -339,6 +339,14 @@ static SC(sc_serial_open)
     return 0;
 }
 
+/* Serial_Close(mode): the port closes, whatever is still being sent. */
+static SC(sc_serial_close)
+{
+    (void)a;
+    emu->serial_open = false;
+    return 0;
+}
+
 static SC(sc_serial_is_open)
 {
     (void)a;
@@ -562,6 +570,7 @@ static const Syscall SYSCALLS[] = {
     {0x1A2C, "GetStackPtr", sc_get_stack_ptr},
     {0x1BB4, "OS_InnerWait_ms", sc_wait_ms},
     {0x1BB7, "Serial_Open", sc_serial_open},
+    {0x1BB8, "Serial_Close", sc_serial_close},
     {0x1BBA, "Serial_Read", sc_serial_read},
     {0x1BBE, "Serial_Write", sc_serial_write},
     {0x1BBF, "Serial_PollRX", sc_serial_poll_rx},
@@ -675,6 +684,8 @@ static const Syscall SYSCALLS_FX[] = {
     {0x03ED, "Interrupt_SetOrClrStatusFlags", sc_nothing},
     {0x03F4, "PowerOff", sc_nothing},          /* off and on again at once */
     {0x03FA, "Hmem_SetMMU", sc_fx_set_mmu},
+    {0x0418, "Serial_Open", sc_serial_open},
+    {0x0419, "Serial_Close", sc_serial_close},
     {0x0420, "OS_inner_Sleep", sc_wait_ms},
     {0x042C, "Bfile_OpenFile", sc_bfile_open},
     {0x042D, "Bfile_CloseFile", sc_bfile_close},
