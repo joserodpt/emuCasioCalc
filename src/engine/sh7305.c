@@ -288,8 +288,10 @@ static void schedule(Sh7305 *hw)
         const Tmu *t = &hw->tmu[i];
         if (!(hw->tstr & (1 << i)) || !(t->tcr & TCR_UNIE))
             continue;
+        /* From when tcnt was counted: callers that didn't sync first (RTC
+         * and DMA writes) would otherwise push the underflow later. */
         unsigned sh = tmu_shift(hw, t);
-        uint64_t c = ((now >> sh) + (uint64_t)t->tcnt + 1) << sh;
+        uint64_t c = ((t->synced >> sh) + (uint64_t)t->tcnt + 1) << sh;
         if (c < next)
             next = c;
     }
@@ -297,7 +299,7 @@ static void schedule(Sh7305 *hw)
         const Etmu *t = &hw->etmu[i];
         if (!(t->tstr & 1) || !(t->tcr & ETCR_UNIE))
             continue;
-        uint64_t c = tclk_cycle(hw, tclk(hw, now) + t->tcnt + 1);
+        uint64_t c = tclk_cycle(hw, tclk(hw, t->synced) + t->tcnt + 1);
         if (c < next)
             next = c;
     }

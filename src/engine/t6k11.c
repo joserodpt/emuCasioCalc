@@ -21,8 +21,15 @@ void t6k11_reset(T6k11 *lcd, const uint64_t *now, uint32_t hz)
     lcd->dirty = true; /* a first, blank render */
 }
 
+/* avg moves 1/GREY_WEIGHT of the way to v. */
+static uint32_t toward(uint32_t avg, uint32_t v)
+{
+    return (uint32_t)((int64_t)avg + ((int64_t)v - (int64_t)avg) / GREY_WEIGHT);
+}
+
 /* Pixel p turns dark (on) or light now. Turning dark after a dark-light
- * pair closes a cycle: its length and dark part give the pixel's shade. */
+ * pair closes a cycle: its length and dark part go into the pixel's
+ * averages (the first cycle of a grey sets them). */
 static void set_pixel(T6k11 *lcd, int p, bool on)
 {
     uint64_t now = *lcd->now;
@@ -33,8 +40,11 @@ static void set_pixel(T6k11 *lcd, int p, bool on)
     if (lcd->rise[p] && lcd->fall[p] > lcd->rise[p]) {
         uint64_t period = now - lcd->rise[p];
         if (period <= lcd->grey_max) {
+            uint32_t dark = (uint32_t)(lcd->fall[p] - lcd->rise[p]);
+            bool grey = lcd->period[p] != 0;
+            lcd->avg_period[p] = grey ? toward(lcd->avg_period[p], (uint32_t)period) : (uint32_t)period;
+            lcd->avg_dark[p] = grey ? toward(lcd->avg_dark[p], dark) : dark;
             lcd->period[p] = (uint32_t)period;
-            lcd->dark_len[p] = (uint32_t)(lcd->fall[p] - lcd->rise[p]);
         } else {
             lcd->period[p] = 0; /* a slow blink, not grey */
         }
@@ -147,7 +157,9 @@ bool t6k11_render(T6k11 *lcd, uint16_t *out)
             uint32_t period = lcd->period[p];
             unsigned level = on ? 255 : 0; /* 255 = dark */
             if (period && now - last <= 2 * (uint64_t)period) { /* still switching: grey */
-                level = (unsigned)((uint64_t)lcd->dark_len[p] * 255 / period);
+                level = (unsigned)((uint64_t)lcd->avg_dark[p] * 255 / lcd->avg_period[p]);
+                if (level > 255)
+                    level = 255;
                 grey = true;
             }
             unsigned r = LIGHT_R + (DARK_R - LIGHT_R) * (int)level / 255;

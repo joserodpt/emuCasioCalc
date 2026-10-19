@@ -24,9 +24,11 @@
  * cycle is about 11.6 ms at its default delays), and the LCD's slow pixels
  * average them. Here a pixel that keeps switching (a full dark-light cycle
  * no longer than GREY_MAX_MS, the last switch at most two cycles ago) shows
- * the share of its last cycle it was dark, as a shade: the same at every
- * render, wherever renders fall in the cycle. Any other pixel shows what
- * it is, so black and white change at once.
+ * the share of its recent cycles it was dark, as a shade: the same at every
+ * render, wherever renders fall in the cycle. The average gives each new
+ * cycle 1/GREY_WEIGHT, as the LCD's slow response does: the odd cycle an
+ * add-in's redraw lengthens moves the shade by a level or two, not more.
+ * Any other pixel shows what it is, so black and white change at once.
  */
 #define MONO_WIDTH  128
 #define MONO_HEIGHT 64
@@ -45,11 +47,13 @@ typedef struct {
     /* Grey: each pixel's last switches, and its last full cycle. */
     uint64_t rise[MONO_WIDTH * MONO_HEIGHT];    /* when it last turned dark (0: never) */
     uint64_t fall[MONO_WIDTH * MONO_HEIGHT];    /* ...and light */
-    uint32_t period[MONO_WIDTH * MONO_HEIGHT];  /* dark to dark, cycles (0: none yet) */
-    uint32_t dark_len[MONO_WIDTH * MONO_HEIGHT]; /* the dark part of it */
+    uint32_t period[MONO_WIDTH * MONO_HEIGHT];  /* the last cycle, dark to dark (0: none) */
+    uint32_t avg_period[MONO_WIDTH * MONO_HEIGHT]; /* recent cycles' length... */
+    uint32_t avg_dark[MONO_WIDTH * MONO_HEIGHT];   /* ...and dark part, averaged */
 } T6k11;
 
 #define GREY_MAX_MS 50
+#define GREY_WEIGHT 8
 
 /* hz: the CPU clock (cycles per second of *now). */
 void t6k11_reset(T6k11 *lcd, const uint64_t *now, uint32_t hz);
