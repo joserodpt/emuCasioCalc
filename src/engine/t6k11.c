@@ -28,8 +28,11 @@ static uint32_t toward(uint32_t avg, uint32_t v)
 }
 
 /* Pixel p turns dark (on) or light now. Turning dark after a dark-light
- * pair closes a cycle: its length and dark part go into the pixel's
- * averages (the first cycle of a grey sets them). */
+ * pair closes a cycle. A short one (at most GREY_MAX_MS) of about the
+ * length of the one before (within 1/GREY_SAME) extends the pixel's run of
+ * regular cycles, and its length and dark part go into the averages (the
+ * first cycle of a run sets them). The grey engine's cycles are like that;
+ * a game's animation switches pixels more slowly and less regularly. */
 static void set_pixel(T6k11 *lcd, int p, bool on)
 {
     uint64_t now = *lcd->now;
@@ -40,13 +43,19 @@ static void set_pixel(T6k11 *lcd, int p, bool on)
     if (lcd->rise[p] && lcd->fall[p] > lcd->rise[p]) {
         uint64_t period = now - lcd->rise[p];
         if (period <= lcd->grey_max) {
-            uint32_t dark = (uint32_t)(lcd->fall[p] - lcd->rise[p]);
-            bool grey = lcd->period[p] != 0;
-            lcd->avg_period[p] = grey ? toward(lcd->avg_period[p], (uint32_t)period) : (uint32_t)period;
-            lcd->avg_dark[p] = grey ? toward(lcd->avg_dark[p], dark) : dark;
+            uint32_t dark = (uint32_t)(lcd->fall[p] - lcd->rise[p]), last = lcd->period[p];
+            uint32_t gap = (uint32_t)(period > last ? period - last : last - period);
+            bool regular = last && gap <= last / GREY_SAME;
+            if (!regular)
+                lcd->cycles[p] = 0;
+            if (lcd->cycles[p] < 255)
+                lcd->cycles[p]++;
+            lcd->avg_period[p] = lcd->cycles[p] > 1 ? toward(lcd->avg_period[p], (uint32_t)period) : (uint32_t)period;
+            lcd->avg_dark[p] = lcd->cycles[p] > 1 ? toward(lcd->avg_dark[p], dark) : dark;
             lcd->period[p] = (uint32_t)period;
-        } else {
-            lcd->period[p] = 0; /* a slow blink, not grey */
+        } else { /* a slow blink, not grey */
+            lcd->period[p] = 0;
+            lcd->cycles[p] = 0;
         }
     }
     lcd->rise[p] = now;
@@ -156,7 +165,7 @@ bool t6k11_render(T6k11 *lcd, uint16_t *out)
             uint64_t last = lcd->rise[p] > lcd->fall[p] ? lcd->rise[p] : lcd->fall[p];
             uint32_t period = lcd->period[p];
             unsigned level = on ? 255 : 0; /* 255 = dark */
-            if (period && now - last <= 2 * (uint64_t)period) { /* still switching: grey */
+            if (lcd->cycles[p] >= GREY_CYCLES && now - last <= 2 * (uint64_t)period) { /* still switching: grey */
                 level = (unsigned)((uint64_t)lcd->avg_dark[p] * 255 / lcd->avg_period[p]);
                 if (level > 255)
                     level = 255;

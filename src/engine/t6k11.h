@@ -22,13 +22,16 @@
  *
  * Grey: gint's grey engine flickers between two pictures on a timer (one
  * cycle is about 11.6 ms at its default delays), and the LCD's slow pixels
- * average them. Here a pixel that keeps switching (a full dark-light cycle
- * no longer than GREY_MAX_MS, the last switch at most two cycles ago) shows
- * the share of its recent cycles it was dark, as a shade: the same at every
+ * average them. Here a pixel that keeps switching regularly (GREY_CYCLES
+ * dark-light cycles in a row, each at most GREY_MAX_MS and about as long as
+ * the one before, the last switch at most two cycles ago) shows the share
+ * of its recent cycles it was dark, as a shade: the same at every
  * render, wherever renders fall in the cycle. The average gives each new
  * cycle 1/GREY_WEIGHT, as the LCD's slow response does: the odd cycle an
  * add-in's redraw lengthens moves the shade by a level or two, not more.
- * Any other pixel shows what it is, so black and white change at once.
+ * Any other pixel shows what it is, so black and white change at once, and
+ * pixels a game animates (at its frame rate, 20 ms or more a change) stay
+ * black or white.
  */
 #define MONO_WIDTH  128
 #define MONO_HEIGHT 64
@@ -50,9 +53,12 @@ typedef struct {
     uint32_t period[MONO_WIDTH * MONO_HEIGHT];  /* the last cycle, dark to dark (0: none) */
     uint32_t avg_period[MONO_WIDTH * MONO_HEIGHT]; /* recent cycles' length... */
     uint32_t avg_dark[MONO_WIDTH * MONO_HEIGHT];   /* ...and dark part, averaged */
+    uint8_t cycles[MONO_WIDTH * MONO_HEIGHT];      /* regular cycles in a row */
 } T6k11;
 
-#define GREY_MAX_MS 50
+#define GREY_MAX_MS 20
+#define GREY_SAME   4 /* cycles within 1/4 of each other are regular */
+#define GREY_CYCLES 2
 #define GREY_WEIGHT 8
 
 /* hz: the CPU clock (cycles per second of *now). */
