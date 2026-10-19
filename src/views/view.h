@@ -138,6 +138,8 @@ bool recorder_active(void);
 uint64_t recorder_elapsed_ms(void);
 /* A frame the window shows. */
 void recorder_frame(const uint16_t *fb);
+/* The emulated time: without a window, recordings are timed by it. */
+void recorder_clock(uint64_t emu_ms);
 /* Regularly: keeps the elapsed time on the menu bar current. */
 void recorder_tick(void);
 /* window.c: the screen as last shown (PANEL_WIDTH x PANEL_HEIGHT). */

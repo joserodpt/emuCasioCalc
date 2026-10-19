@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 
 #include "keys.h"
@@ -12,6 +13,7 @@
 #define KEY_START_MS 300  /* let a keyboard-scanning add-in settle first */
 #define KEY_HOLD_MS  100
 #define KEY_GAP_MS   100
+#define KEY_SETTLE_MS 100 /* after a key GetKey took, before the script goes on without it */
 
 /*
  * fx-CG50: 8 MB of RAM at 0x0C000000, VRAM at its start (0xAC000000). The
@@ -67,6 +69,14 @@ const Layout *model_layout(Model model)
     return &LAYOUTS[model];
 }
 
+/* --clock: when the calculator's clock starts (Unix time), 0 = now. */
+static int64_t clock_start;
+
+void emu_set_clock(int64_t unix_time)
+{
+    clock_start = unix_time;
+}
+
 bool emu_init(Emu *emu, Model model)
 {
     Memory *mem = &emu->mem;
@@ -110,7 +120,7 @@ bool emu_init(Emu *emu, Model model)
         return false;
 
     r61524_reset(&emu->lcd);
-    if (!sh7305_init(&emu->hw, &emu->cpu, mem, &emu->lcd, (int64_t)time(NULL), l->frqcr))
+    if (!sh7305_init(&emu->hw, &emu->cpu, mem, &emu->lcd, clock_start ? clock_start : (int64_t)time(NULL), l->frqcr))
         return false;
     sh7305_add_mapping(&emu->hw, URAM_BASE, l->uram_phys, URAM_SIZE);
 
@@ -162,34 +172,212 @@ void emu_start(Emu *emu)
     emu->cpu.r[5] = 0; /* optnum */
 }
 
-bool emu_parse_keys(Emu *emu, const char *list)
+/*---------------------------------------------------------------------------
+ * The key script (--keys, --script)
+ *-------------------------------------------------------------------------*/
+
+static uint64_t cycles_per_ms(const Emu *emu)
 {
-    char buf[1024];
-    snprintf(buf, sizeof buf, "%s", list);
-    for (char *tok = strtok(buf, ","); tok; tok = strtok(NULL, ",")) {
-        int k = key_find(tok);
-        if (k < 0 || emu->script_len >= (int)(sizeof emu->script / sizeof emu->script[0])) {
-            fprintf(stderr, "unknown key '%s'\n", tok);
-            return false;
+    return sh7305_iphi_hz(&emu->hw) / 1000;
+}
+
+/* The script's next word, or "quoted words"; NULL at its end. */
+static const char *next_token(const char **text, char *buf, size_t cap)
+{
+    const char *p = *text;
+    for (;;) {
+        while (*p && strchr(" \t\r\n,", *p))
+            p++;
+        if (*p != '#')
+            break;
+        while (*p && *p != '\n') /* a comment, to the end of the line */
+            p++;
+    }
+    if (!*p) {
+        *text = p;
+        return NULL;
+    }
+    size_t n = 0;
+    if (*p == '"') {
+        for (p++; *p && *p != '"'; p++)
+            if (n + 1 < cap)
+                buf[n++] = *p;
+        if (*p)
+            p++;
+    } else {
+        for (; *p && !strchr(" \t\r\n,", *p); p++)
+            if (n + 1 < cap)
+                buf[n++] = *p;
+    }
+    buf[n] = '\0';
+    *text = p;
+    return buf;
+}
+
+/* "500", "500ms", "2s", "1.5s" in milliseconds; -1 if it isn't a time. */
+static long parse_ms(const char *t)
+{
+    char *end;
+    double v = strtod(t, &end);
+    if (end == t || v < 0)
+        return -1;
+    if (!strcmp(end, "s"))
+        v *= 1000;
+    else if (*end && strcmp(end, "ms"))
+        return -1;
+    return v > 3600000 ? -1 : (long)(v + 0.5);
+}
+
+static bool add_step(Emu *emu, ScriptStep step)
+{
+    if (emu->script_len >= (int)(sizeof emu->script / sizeof emu->script[0])) {
+        fprintf(stderr, "script: more than %d steps\n", (int)(sizeof emu->script / sizeof emu->script[0]));
+        return false;
+    }
+    emu->script[emu->script_len++] = step;
+    return true;
+}
+
+bool emu_parse_script(Emu *emu, const char *text)
+{
+    char tok[1024], arg[1024];
+    if (!emu->shot_scale)
+        emu->shot_scale = 2;
+    while (next_token(&text, tok, sizeof tok)) {
+        if (!strcasecmp(tok, "wait")) {
+            long ms = next_token(&text, arg, sizeof arg) ? parse_ms(arg) : -1;
+            if (ms < 0) {
+                fprintf(stderr, "script: wait needs a time (500, 500ms, 2s)\n");
+                return false;
+            }
+            if (!add_step(emu, (ScriptStep){.kind = STEP_WAIT, .ms = (uint32_t)ms}))
+                return false;
+        } else if (!strcasecmp(tok, "shot")) {
+            if (!next_token(&text, arg, sizeof arg)) {
+                fprintf(stderr, "script: shot needs a file name\n");
+                return false;
+            }
+            size_t n = strlen(arg) + 1;
+            if (emu->script_paths_len + n > sizeof emu->script_paths) {
+                fprintf(stderr, "script: too many screenshot names\n");
+                return false;
+            }
+            memcpy(emu->script_paths + emu->script_paths_len, arg, n);
+            if (!add_step(emu, (ScriptStep){.kind = STEP_SHOT, .path = emu->script_paths_len,
+                                             .scale = emu->shot_scale}))
+                return false;
+            emu->script_paths_len += (int)n;
+        } else if (!strcasecmp(tok, "scale")) {
+            int v = next_token(&text, arg, sizeof arg) ? atoi(arg) : 0;
+            if (v < 1 || v > 8) {
+                fprintf(stderr, "script: scale is 1 to 8\n");
+                return false;
+            }
+            emu->shot_scale = v;
+        } else {
+            int k = key_find(tok);
+            if (k < 0) {
+                fprintf(stderr, "script: unknown key or command '%s'\n", tok);
+                return false;
+            }
+            if (!add_step(emu, (ScriptStep){.kind = STEP_KEY, .key = k}))
+                return false;
         }
-        emu->script[emu->script_len++] = k;
     }
     return true;
+}
+
+static void take_shot(Emu *emu, const ScriptStep *step)
+{
+    const char *path = emu->script_paths + step->path;
+    if (platform_save_image(path, emu->lcd.fb, PANEL_WIDTH, PANEL_HEIGHT, step->scale)) {
+        printf("script: saved %s\n", path);
+    } else {
+        fprintf(stderr, "script: could not save %s\n", path);
+        emu->script_failed = true;
+    }
+}
+
+/* Runs the waits and screenshots whose time has come, up to the next key.
+ * Returns true if that key can be pressed now. */
+static bool script_ready(Emu *emu)
+{
+    uint64_t now = emu->cpu.instructions;
+    while (emu->script_pos < emu->script_len && emu->script_next <= now) {
+        const ScriptStep *step = &emu->script[emu->script_pos];
+        if (step->kind == STEP_KEY)
+            return true;
+        if (step->kind == STEP_WAIT)
+            emu->script_next = now + step->ms * cycles_per_ms(emu);
+        else
+            take_shot(emu, step);
+        emu->script_pos++;
+    }
+    return false;
+}
+
+/* The add-in is blocked in GetKey until cycle `until` (a scripted wait):
+ * time goes on (in real time with a window), OS timers run and the screen
+ * follows. Returns -2 once there, else what emu_next_key returns: a key
+ * pressed meanwhile, -1, or -3. */
+static int wait_blocked(Emu *emu, uint64_t until)
+{
+    uint64_t per_ms = cycles_per_ms(emu);
+    uint32_t serial = emu->inject_serial;
+    emu_present(emu); /* what GetKey shows, from now */
+    while (emu->cpu.instructions < until && emu->cpu.state == CPU_RUNNING) {
+        uint64_t now = emu->cpu.instructions, due = timers_next_due(emu);
+        uint64_t left = (due < until ? due : until) - now;
+        if (due <= now)
+            left = 0;
+        if (!emu->headless) { /* in whole ms, rounded up, at most 1 s at a time */
+            uint64_t ms = (left + per_ms - 1) / per_ms;
+            if (ms > 1000) {
+                ms = 1000;
+                left = 1000 * per_ms;
+            }
+            int key = platform_wait_key_timeout((uint32_t)ms);
+            if (key != -2)
+                return key;
+        }
+        time_advance(emu, left);
+        emu_present(emu);
+        if (emu->inject_serial != serial)
+            return -3;
+    }
+    return emu->cpu.state == CPU_RUNNING ? -2 : -1;
 }
 
 int emu_next_key(Emu *emu)
 {
     /* A timer about to run (within 50 ms) runs first: it may inject a key,
      * as gint does to go back to the main menu. */
-    uint64_t per_ms = sh7305_iphi_hz(&emu->hw) / 1000, due = timers_next_due(emu);
+    uint64_t per_ms = cycles_per_ms(emu), due = timers_next_due(emu);
     uint32_t serial = emu->inject_serial;
     if (due != UINT64_MAX && due <= emu->cpu.instructions + 50 * per_ms) {
         time_advance(emu, due > emu->cpu.instructions ? due - emu->cpu.instructions : 0);
         if (emu->inject_serial != serial)
             return -3;
     }
-    if (emu->script_pos < emu->script_len)
-        return emu->script[emu->script_pos++];
+    /* The script: back in GetKey, the add-in has drawn what the last key
+     * did, so what follows can go on now. */
+    if (emu->script_settling) {
+        emu->script_settling = false;
+        emu->script_next = emu->cpu.instructions;
+    }
+    while (emu->script_pos < emu->script_len) {
+        if (script_ready(emu)) {
+            int key = emu->script[emu->script_pos++].key;
+            emu->script_next = emu->cpu.instructions + KEY_SETTLE_MS * per_ms;
+            emu->script_settling = true;
+            return key;
+        }
+        if (emu->script_pos < emu->script_len) {
+            int key = wait_blocked(emu, emu->script_next);
+            if (key != -2)
+                return key;
+        }
+    }
     if (emu->headless) {
         fprintf(stderr, "headless: GetKey called with no scripted keys left\n");
         return -1;
@@ -219,6 +407,25 @@ int emu_next_key(Emu *emu)
     return platform_wait_key();
 }
 
+int emu_finish_script(Emu *emu)
+{
+    int unused = 0;
+    uint64_t per_ms = cycles_per_ms(emu);
+    if (emu->script_next > emu->cpu.instructions && !emu->script_settling)
+        emu->cpu.instructions = emu->script_next; /* the wait under way */
+    for (; emu->script_pos < emu->script_len; emu->script_pos++) {
+        const ScriptStep *step = &emu->script[emu->script_pos];
+        if (step->kind == STEP_KEY)
+            unused++;
+        else if (step->kind == STEP_WAIT)
+            emu->cpu.instructions += step->ms * per_ms;
+        else
+            take_shot(emu, step);
+    }
+    emu_present(emu); /* the clock, for a recording's last frame */
+    return unused;
+}
+
 void emu_run(Emu *emu, uint64_t cycles)
 {
     Cpu *cpu = &emu->cpu;
@@ -239,26 +446,31 @@ void emu_update_keys(Emu *emu, const bool *host_down)
     bool down[256];
     memcpy(down, host_down, (size_t)KEY_COUNT * sizeof *down);
 
-    /* The script goes on in the matrix only while the add-in reads it: a
-     * gint add-in in the OS world (gint_world_switch) doesn't, and its OS
-     * GetKey calls take the keys instead. */
+    /* Waits and screenshots go on whatever the add-in does. Keys go in the
+     * matrix only while the add-in reads it: a gint add-in in the OS world
+     * (gint_world_switch) doesn't, and its OS GetKey calls take the keys
+     * instead. Each is held, then released for a gap. */
     bool polled = emu->hw.keysc_read || emu->polls_keys;
     emu->hw.keysc_read = false;
     emu->polls_keys = false;
-    if (polled && emu->script_pos < emu->script_len) {
-        if (!emu->script_next) {
-            emu->script_next = now + KEY_START_MS * ms;
-        } else if (now >= emu->script_next) {
-            emu->script_down = !emu->script_down;
-            emu->script_next = now + (emu->script_down ? KEY_HOLD_MS : KEY_GAP_MS) * ms;
-            if (!emu->script_down && ++emu->script_pos == emu->script_len)
-                emu->script_done = now;
+    if (emu->script_down) {
+        if (now >= emu->script_next) {
+            emu->script_down = false;
+            emu->script_pos++;
+            emu->script_next = now + KEY_GAP_MS * ms;
         }
-        if (emu->script_down)
-            down[emu->script[emu->script_pos]] = true;
-    } else if (polled && !emu->script_done) {
-        emu->script_done = now; /* no script at all */
+    } else if (script_ready(emu) && polled) {
+        if (!emu->script_next) {
+            emu->script_next = now + KEY_START_MS * ms; /* let the add-in settle first */
+        } else {
+            emu->script_down = true;
+            emu->script_next = now + KEY_HOLD_MS * ms;
+        }
     }
+    if (emu->script_down)
+        down[emu->script[emu->script_pos].key] = true;
+    else if (polled && !emu->script_done && emu->script_pos >= emu->script_len)
+        emu->script_done = now; /* the script is over, or there is none */
     memcpy(emu->key_down, down, sizeof emu->key_down);
     key_matrix(down, emu->hw.keys);
 }
@@ -271,6 +483,7 @@ bool emu_script_finished(const Emu *emu, uint64_t after_ms)
 
 void emu_present(Emu *emu)
 {
+    platform_clock(emu->cpu.instructions / cycles_per_ms(emu));
     if (!emu->lcd.dirty)
         return;
     platform_present(emu->lcd.fb);

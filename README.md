@@ -37,6 +37,7 @@ ctest --test-dir build --output-on-failure
 ./build/emucasiofxcg --timing fast some-addin.g3a       # no OS/memory/DMA delays (default: realistic)
 ./build/emucasiofxcg --speed 50 some-addin.g3a          # half speed (10-400, or max)
 ./build/emucasiofxcg --record demo.gif some-addin.g3a   # record the screen until the window closes
+./build/emucasiofxcg --headless --script demo.txt --record demo.gif some-addin.g3a  # a scripted demo
 
 ./run.sh                  # rebuilds if the sources changed, opens an empty window (File > Open)
 ./run.sh some-addin.g3a   # same, starting that add-in (quote paths with spaces)
@@ -109,7 +110,39 @@ Emulation > Pause is left out), each screen pixel as 2 x 2, looping.
 Frames less than 20 ms apart are merged, as browsers slow shorter ones
 down. Colours are exact for screens with up to 255 of them, and reduced
 (median cut) beyond. `--record F.gif` records from the first frame until
-the window closes.
+the window closes, or with `--headless` until the run ends.
+
+**Scripted demos and screenshots**: `--script F` runs the steps in file F
+(and `--keys` takes the same steps), so a demo GIF and showcase
+screenshots can be made without anyone at the keyboard:
+
+```sh
+# demo.txt
+wait 1s
+shot ready.png        # screenshot: .png (or .bmp), 2x
+EXE                   # keys by name: EXE, EXIT, F1, UP, 7, SHIFT...
+wait 3s
+shot running.png
+scale 1               # the next screenshots at 1x
+shot "small one.png"  # quotes for names with spaces
+```
+
+```sh
+./build/emucasiofxcg --headless --clock "2026-01-01 12:00" --script demo.txt --record demo.gif addin.g3a
+```
+
+Steps run in order, on the emulated clock: `wait N` (ms, or `2s`, `1.5s`)
+lets time go on, with the add-in running (or its OS timers, while it waits
+in GetKey); `shot F` saves the screen as it is. A key GetKey took counts as
+done once the add-in is back in GetKey (its screen redrawn), or after
+100 ms; put a `wait` before a screenshot to let an animation play. If the
+add-in exits first, the screenshots left are taken of its last screen and
+the waits left make the recording's last frame last; keys left are
+reported. Headless, the run goes as fast as it can while the recording
+keeps the emulated pace, and `--clock` starts the calculator's clock at a
+fixed date and time, so the same script gives the same files each time.
+The run exits with status 1 if a screenshot couldn't be saved.
+`--screenshot F.png` saves the last frame as a PNG too.
 
 **Settings** are remembered between runs, in `settings.ini` in the
 emulator's data folder (with the kept OS dump): zoom, window position,
@@ -158,11 +191,11 @@ read the keyboard themselves and see SHIFT and ALPHA as plain keys; the
 window follows them with the OS's rules, which most add-ins share, so PC
 letters work there too.
 
-`--keys` works for both kinds of add-ins: OS `GetKey` calls pop the keys in
-order; for gint add-ins each key is held down for 100 ms of emulated time
-while the add-in reads the keyboard (not while it is in the OS world, where
-its `GetKey` calls take them).
-Headless gint runs stop 0.5 s (emulated) after the last scripted key.
+`--keys` (and `--script`) works for both kinds of add-ins: OS `GetKey` calls
+pop the keys in order; for gint add-ins each key is held down for 100 ms of
+emulated time while the add-in reads the keyboard (not while it is in the
+OS world, where its `GetKey` calls take them).
+Headless gint runs stop 0.5 s (emulated) after the end of the script.
 
 ### gint test add-ins
 
@@ -216,6 +249,7 @@ CTest runs them all (`ctest`, 20 tests).
 | `app_icon.c`, `font.c` | The emulator's icon (drawn in code), the 8x8 font |
 | **`src/utils/`** | **Helpers** |
 | `g3a.c` | Reads a .g3a: header (name, icons...) and code, mapped at `0x00300000` |
+| `png.c` | PNG writer (palette or RGB, its own deflate) |
 | `gif.c` | Animated GIF writer: changed rectangles, transparency, median cut, LZW |
 | `keys.c` | Calculator keys: names, GetKey codes, key matrix positions |
 | `tests/test_cpu.c` | CPU tests (division, delay slots, carries, shifts, repeat loops, TRAPA/RTE/banks) |

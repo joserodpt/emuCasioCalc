@@ -7,5 +7,4 @@ storage/
 !tests/*.g3a
 .DS_Store
 ._*
-.gif
-recording-*.gif
+*.gif

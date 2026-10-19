@@ -1,5 +1,7 @@
 /* File > Record GIF: the calculator screen as an animated GIF, at the pace
- * it was shown in the window (real time, without the pauses). A frame is
+ * it was shown in the window (real time, without the pauses); without a
+ * window (--headless --record), at the emulated clock's, so a script gives
+ * the same file each time however fast it runs. A frame is
  * written once the next one comes, when its duration is known; frames
  * closer than GIF_MIN_CS are merged, as viewers slow down shorter ones. */
 #include <stdio.h>
@@ -21,6 +23,17 @@ static uint64_t start_ms;     /* when the recording's clock started */
 static uint64_t paused_ms;    /* time spent paused since */
 static uint64_t pause_start;  /* when the current pause began, 0 if not paused */
 static uint64_t shown_second; /* the elapsed second on the menu bar */
+static uint64_t emu_now;      /* the emulated clock (ms), timing headless recordings */
+
+static uint64_t now_ms(void)
+{
+    return view_headless ? emu_now : SDL_GetTicks();
+}
+
+void recorder_clock(uint64_t emu_ms)
+{
+    emu_now = emu_ms;
+}
 
 bool recorder_active(void)
 {
@@ -30,7 +43,7 @@ bool recorder_active(void)
 /* Follows Emulation > Pause: paused time isn't recorded. */
 static void follow_pause(void)
 {
-    uint64_t now = SDL_GetTicks();
+    uint64_t now = now_ms();
     if (view_paused && !pause_start)
         pause_start = now;
     else if (!view_paused && pause_start) {
@@ -44,7 +57,7 @@ uint64_t recorder_elapsed_ms(void)
     if (!gif || !have_pending)
         return 0;
     follow_pause();
-    uint64_t now = pause_start ? pause_start : SDL_GetTicks();
+    uint64_t now = pause_start ? pause_start : now_ms();
     return now - start_ms - paused_ms;
 }
 
@@ -53,7 +66,7 @@ static void begin(const uint16_t *fb)
     memcpy(pending, fb, sizeof pending);
     have_pending = true;
     pending_cs = 0;
-    start_ms = SDL_GetTicks();
+    start_ms = now_ms();
     paused_ms = 0;
     pause_start = view_paused ? start_ms : 0;
 }

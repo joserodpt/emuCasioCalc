@@ -80,6 +80,14 @@ add_test(NAME hello_cg20
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 set_tests_properties(hello_cg20 PROPERTIES PASS_REGULAR_EXPRESSION "running as fx-CG10/20.*add-in exited")
 
+# A script: waits, screenshots (PNG, 2x) and a recording timed by the
+# emulated clock (4 s: the waits, also the one after the add-in exits).
+add_test(NAME script
+  COMMAND emucasiofxcg --headless --clock "2026-01-01 12:00"
+          --keys "wait 2s, shot script.png, EXE, wait 1s, EXIT, wait 1s" --record script.gif hello.g3a
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+set_tests_properties(script PROPERTIES PASS_REGULAR_EXPRESSION "script: saved script.png.*saved script.gif \\(4.0 s\\)")
+
 # gint add-ins (tests/gint-*), built with the fxSDK when it is installed
 # (fxsdk on the PATH, or -DFXSDK=/path/to/bin/fxsdk).
 find_program(FXSDK fxsdk HINTS $ENV{HOME}/.local/bin)

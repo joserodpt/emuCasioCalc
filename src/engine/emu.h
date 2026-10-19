@@ -39,6 +39,16 @@ static inline int battery_bars(int cv)
 }
 
 /* A glyph of the status area (DefineStatusGlyph). */
+/* A step of the key script. */
+typedef enum { STEP_KEY, STEP_WAIT, STEP_SHOT } StepKind;
+typedef struct {
+    StepKind kind;
+    int key;      /* STEP_KEY: index into KEYS */
+    uint32_t ms;  /* STEP_WAIT */
+    int path;     /* STEP_SHOT: offset in script_paths */
+    int scale;    /* STEP_SHOT */
+} ScriptStep;
+
 typedef struct {
     int dx, dy, xalign, xoffset;
     uint32_t bitmap; /* RGB565, dx * dy */
@@ -76,13 +86,20 @@ typedef struct {
     bool realistic;
     bool headless;
 
-    /* --keys: GetKey pops them; for add-ins that scan the keyboard
-     * themselves (gint), each key is held down for a while in emulated time. */
-    int script[256];      /* indices into KEYS */
+    /* --keys / --script: keys, waits and screenshots, in order, in emulated
+     * time. GetKey takes the keys; for add-ins that scan the keyboard
+     * themselves (gint), each key is held down for a while. Waits and
+     * screenshots don't need the add-in: they happen when their time comes. */
+    ScriptStep script[512];
     int script_len, script_pos;
-    bool script_down;
-    uint64_t script_next; /* cycle of the next press/release, 0 = not started */
-    uint64_t script_done; /* cycle when the last scripted key was released */
+    char script_paths[8192]; /* the screenshots' file names */
+    int script_paths_len;
+    int shot_scale;       /* the screenshots' scale (script: scale N) */
+    bool script_down;     /* a scripted key is held in the matrix */
+    uint64_t script_next; /* cycle the next step may start, 0 = not started */
+    uint64_t script_done; /* cycle when the script ended */
+    bool script_failed;   /* a screenshot couldn't be saved */
+    bool script_settling; /* GetKey took the last key: the script waits for it to be back */
     bool polls_keys;      /* the add-in read the key state (PRGM_GetKey...) since the last update */
     bool key_down[256];   /* KEYS currently held (host keyboard + script) */
     /* GetKey's modifiers: SHIFT pressed, ALPHA for one key or locked. */
@@ -155,26 +172,38 @@ typedef struct {
 
 /* Builds the memory map and peripherals of a model. */
 bool emu_init(Emu *emu, Model model);
+/* The calculator's clock starts at unix_time (local time) instead of now,
+ * then follows the emulated time: runs show the same date and time. */
+void emu_set_clock(int64_t unix_time);
 void emu_free(Emu *emu);
 /* Switches between realistic and fast timing (can change while running). */
 void emu_set_realistic(Emu *emu, bool realistic);
 /* Resets the CPU to the add-in's entry point, like the OS launching it. */
 void emu_start(Emu *emu);
 
-bool emu_parse_keys(Emu *emu, const char *list);
+/* Adds the steps of a script: key names (EXE, F1, 7...), "wait N" (ms, or
+ * "2s"), "shot FILE" (.png or .bmp, at the scale set by "scale N", 2 by
+ * default), separated by spaces, commas or lines; "#" starts a comment and
+ * "quotes" keep a file name with spaces together. */
+bool emu_parse_script(Emu *emu, const char *text);
 /* GetKey: next scripted key, else waits for the host keyboard.
  * Returns a KEYS index, -1 when there is nothing left (headless) or the
  * window was closed, or -3 when an OS timer injected a key meanwhile
  * (Keyboard_PutKeycode: read emu->inject). */
 int emu_next_key(Emu *emu);
+/* The add-in has ended: the script's screenshots and waits left happen on
+ * its last screen (waits make a recording's last frame last). Returns the
+ * number of keys left unused. */
+int emu_finish_script(Emu *emu);
 /* Runs the add-in for cycles of time, with the OS timers due meanwhile. */
 void emu_run(Emu *emu, uint64_t cycles);
 /* Feeds the key matrix with host-held keys and the key script. */
 void emu_update_keys(Emu *emu, const bool *host_down);
-/* Headless runs of keyboard-scanning add-ins end this long after the script. */
+/* Headless runs of keyboard-scanning add-ins end this long after the script
+ * (its keys, waits and screenshots). */
 bool emu_script_finished(const Emu *emu, uint64_t after_ms);
 
-/* Shows the panel if it changed. */
+/* Shows the panel if it changed (and tells the window the emulated time). */
 void emu_present(Emu *emu);
 
 #endif

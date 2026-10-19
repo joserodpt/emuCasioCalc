@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "casio_font.h"
@@ -18,8 +19,36 @@
 
 typedef struct {
     bool headless, trace, trace_hw;
-    const char *keys;
+    const char *keys;   /* --keys: a script on the command line */
+    char *script;       /* --script: the file's text */
 } Options;
+
+/* The whole of a text file (malloc'd), or NULL. */
+static char *read_text(const char *path)
+{
+    FILE *f = fopen(path, "rb");
+    if (!f)
+        return NULL;
+    char *text = NULL;
+    size_t n = 0, cap = 0, got;
+    do {
+        if (n + 4096 + 1 > cap) {
+            cap = cap ? cap * 2 : 8192;
+            char *p = realloc(text, cap);
+            if (!p) {
+                free(text);
+                fclose(f);
+                return NULL;
+            }
+            text = p;
+        }
+        got = fread(text + n, 1, 4096, f);
+        n += got;
+    } while (got > 0);
+    fclose(f);
+    text[n] = '\0';
+    return text;
+}
 
 static void usage(const char *argv0)
 {
@@ -31,11 +60,18 @@ static void usage(const char *argv0)
             "  --scale N          window scale, 1-6 (default 4, or the last run's)\n"
             "  --trace            log every syscall\n"
             "  --trace-hw         log exceptions, DMA transfers and unmodelled I/O registers\n"
-            "  --keys K1,K2,...   keys to press first (EXE, EXIT, UP, F1, 0-9...)\n"
-            "  --headless         no window; input only comes from --keys\n"
-            "  --screenshot F     save the last frame to F (.bmp) on exit\n"
+            "  --keys K1,K2,...   keys to press first (EXE, EXIT, UP, F1, 0-9...); takes\n"
+            "                     the --script steps too (\"EXE,wait 1s,shot a.png\")\n"
+            "  --script F         run the steps in file F: keys, \"wait 500\" / \"wait 2s\",\n"
+            "                     \"shot F.png\" (screenshot, 2x), \"scale N\" (of the next\n"
+            "                     shots); # starts a comment\n"
+            "  --headless         no window; input only comes from --keys / --script\n"
+            "  --clock T          the calculator's clock starts at T (\"2026-01-01 12:00\")\n"
+            "                     instead of now: runs show the same time\n"
+            "  --screenshot F     save the last frame to F (.png or .bmp) on exit\n"
             "  --window-shot F    save the whole window (menus, keyboard) to F (.bmp) on exit\n"
-            "  --record F         record the screen to F (an animated .gif) until the window closes\n"
+            "  --record F         record the screen to F (an animated .gif) until the window\n"
+            "                     closes; headless, until the run ends, in emulated time\n"
             "  --export-icon F    save the emulator's icon to F (.png, 1024 x 1024) and quit\n"
             "  --install-desktop [CMD]  add the icon and a launcher running CMD (default:\n"
             "                     this program) to the desktop's applications, and quit\n"
@@ -158,7 +194,9 @@ static bool load(Emu *emu, const Options *opt, const char *path, G3aInfo *info, 
     emu->cpu.trace_exceptions = opt->trace_hw;
     emu->hw.trace = opt->trace_hw;
     if (ok && fresh && opt->keys)
-        ok = emu_parse_keys(emu, opt->keys);
+        ok = emu_parse_script(emu, opt->keys);
+    if (ok && fresh && opt->script)
+        ok = emu_parse_script(emu, opt->script);
     if (ok)
         ok = g3a_map(emu, &file);
     *info = file.info;
@@ -270,6 +308,28 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--trace")) opt.trace = true;
         else if (!strcmp(argv[i], "--trace-hw")) opt.trace_hw = true;
         else if (!strcmp(argv[i], "--keys") && i + 1 < argc) opt.keys = argv[++i];
+        else if (!strcmp(argv[i], "--clock") && i + 1 < argc) {
+            /* "2026-01-01 12:00[:00]" or with a T, local time */
+            struct tm tm = {.tm_isdst = -1};
+            char sep;
+            int n = sscanf(argv[++i], "%d-%d-%d%c%d:%d:%d", &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &sep,
+                           &tm.tm_hour, &tm.tm_min, &tm.tm_sec);
+            tm.tm_year -= 1900;
+            tm.tm_mon -= 1;
+            time_t t = n >= 6 && (sep == ' ' || sep == 'T') ? mktime(&tm) : (time_t)-1;
+            if (t == (time_t)-1) {
+                fprintf(stderr, "--clock: give a date and time, like \"2026-01-01 12:00\"\n");
+                return 2;
+            }
+            emu_set_clock((int64_t)t);
+        }
+        else if (!strcmp(argv[i], "--script") && i + 1 < argc) {
+            const char *f = argv[++i];
+            if (!(opt.script = read_text(f))) {
+                fprintf(stderr, "--script: cannot read %s\n", f);
+                return 2;
+            }
+        }
         else if (!strcmp(argv[i], "--headless")) opt.headless = true;
         else if (!strcmp(argv[i], "--screenshot") && i + 1 < argc) screenshot = argv[++i];
         else if (!strcmp(argv[i], "--window-shot") && i + 1 < argc) window_shot = argv[++i];
@@ -288,7 +348,7 @@ int main(int argc, char **argv)
         else if (argv[i][0] != '-' && !path) path = argv[i];
         else { usage(argv[0]); return 2; }
     }
-    if ((!path || record) && opt.headless) {
+    if (!path && opt.headless) {
         usage(argv[0]);
         return 2;
     }
@@ -410,8 +470,13 @@ int main(int argc, char **argv)
                 status = 0;
             }
             emu_present(&emu);
-            if (opt.headless)
+            if (opt.headless) {
+                int unused = emu_finish_script(&emu);
+                if (unused)
+                    fprintf(stderr, "script: %d key%s left unused (the add-in ended first)\n", unused,
+                            unused == 1 ? "" : "s");
                 break;
+            }
             platform_status(emu.cpu.state == CPU_ERROR ? "Stopped with an error" : "Add-in exited");
         }
         /* Wait for the user: Reset, Open another add-in or Quit. */
@@ -437,6 +502,8 @@ int main(int argc, char **argv)
     if (window_shot && !platform_save_window(window_shot))
         fprintf(stderr, "could not save %s\n", window_shot);
     if (screenshot && !platform_save_screenshot(screenshot))
+        status = 1;
+    if (emu.script_failed)
         status = 1;
     platform_shutdown();
     emu_free(&emu);

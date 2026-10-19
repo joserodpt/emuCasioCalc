@@ -41,14 +41,22 @@ void platform_shutdown(void);
 
 /* fb is the panel: PANEL_WIDTH x PANEL_HEIGHT, host-endian RGB565. */
 void platform_present(const uint16_t *fb);
+/* The screen at 1x, as a PNG (.png) or a BMP. */
 bool platform_save_screenshot(const char *path);
 /* --record: records the screen as an animated GIF from the first frame
- * until the window closes (File > Record GIF). */
+ * until the window closes (File > Record GIF), or headless, until the run
+ * ends, timed by the emulated clock. */
 bool platform_record(const char *path);
 /* The whole window as drawn (menu bar, screen, keyboard), as a .bmp. */
 bool platform_save_window(const char *path);
 /* Saves w x h host-endian RGB565 pixels as a .bmp file. */
 bool platform_save_bmp(const char *path, const uint16_t *pixels, int w, int h);
+/* The same as a PNG if path ends in .png, else a BMP, each pixel as
+ * scale x scale pixels. */
+bool platform_save_image(const char *path, const uint16_t *pixels, int w, int h, int scale);
+/* The emulated time in ms, as the screen is shown: recordings without a
+ * window are timed by it. */
+void platform_clock(uint64_t emu_ms);
 
 /* The add-in being run, and the model it runs on: they go in the title
  * bar, and Add-in info shows the header, icons and model detection

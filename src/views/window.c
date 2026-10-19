@@ -2,11 +2,14 @@
  * input, and the platform interface the emulator uses. */
 #include <limits.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 
 #include "app_icon.h"
 #include "keys.h"
+#include "png.h"
 #include "r61524.h"
 #include "view.h"
 
@@ -604,7 +607,12 @@ bool platform_init(int scale, bool headless)
 
 bool platform_record(const char *path)
 {
-    return !view_headless && recorder_start(path, NULL);
+    return recorder_start(path, NULL);
+}
+
+void platform_clock(uint64_t emu_ms)
+{
+    recorder_clock(emu_ms);
 }
 
 const uint16_t *view_last_frame(void)
@@ -614,13 +622,12 @@ const uint16_t *view_last_frame(void)
 
 void platform_shutdown(void)
 {
-    if (!view_headless) {
-        char path[1024];
-        uint64_t ms;
-        if (recorder_active() && recorder_stop(path, sizeof path, &ms))
-            printf("saved %s (%.1f s)\n", path, (double)ms / 1000);
+    char path[1024];
+    uint64_t ms;
+    if (recorder_active() && recorder_stop(path, sizeof path, &ms))
+        printf("saved %s (%.1f s)\n", path, (double)ms / 1000);
+    if (!view_headless)
         settings_save();
-    }
     info_window_close();
     about_window_close();
     SDL_DestroyTexture(upscaled);
@@ -666,9 +673,31 @@ bool platform_save_window(const char *path)
     return ok;
 }
 
+bool platform_save_image(const char *path, const uint16_t *pixels, int w, int h, int scale)
+{
+    size_t n = strlen(path);
+    if (n >= 4 && !strcasecmp(path + n - 4, ".png")) {
+        bool ok = png_save_rgb565(path, pixels, w, h, scale);
+        if (!ok)
+            fprintf(stderr, "%s: could not write it\n", path);
+        return ok;
+    }
+    if (scale <= 1)
+        return platform_save_bmp(path, pixels, w, h);
+    uint16_t *big = malloc((size_t)w * (size_t)h * (size_t)(scale * scale) * sizeof *big);
+    if (!big)
+        return false;
+    for (int y = 0; y < h * scale; y++)
+        for (int x = 0; x < w * scale; x++)
+            big[y * w * scale + x] = pixels[(y / scale) * w + x / scale];
+    bool ok = platform_save_bmp(path, big, w * scale, h * scale);
+    free(big);
+    return ok;
+}
+
 bool platform_save_screenshot(const char *path)
 {
-    return platform_save_bmp(path, frame, PANEL_WIDTH, PANEL_HEIGHT);
+    return platform_save_image(path, frame, PANEL_WIDTH, PANEL_HEIGHT, 1);
 }
 
 void platform_set_app(const G3aInfo *info, const char *path, Model model)
