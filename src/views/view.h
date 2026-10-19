@@ -127,6 +127,32 @@ bool view_key_held(int k);
  * keeps its size. */
 void view_show_keypad_panel(bool show);
 
+/* recorder.c: File > Record GIF */
+/* Starts recording to path, from the frame fb (NULL: from the next frame
+ * shown). */
+bool recorder_start(const char *path, const uint16_t *fb);
+/* Writes the file; its path and the recording's length. False if it
+ * wasn't recording, or the file couldn't be written. */
+bool recorder_stop(char *path, size_t cap, uint64_t *ms);
+bool recorder_active(void);
+uint64_t recorder_elapsed_ms(void);
+/* A frame the window shows. */
+void recorder_frame(const uint16_t *fb);
+/* Regularly: keeps the elapsed time on the menu bar current. */
+void recorder_tick(void);
+/* window.c: the screen as last shown (PANEL_WIDTH x PANEL_HEIGHT). */
+const uint16_t *view_last_frame(void);
+
+/* settings.c: what the window remembers between runs */
+/* The setting saved for key, or fallback if there is none. */
+int settings_int(const char *key, int fallback);
+/* The folder File > Open starts in: the last add-in's, "" if unknown. */
+const char *settings_folder(void);
+/* Notes the values the run starts with (after the command line). */
+void settings_started(void);
+/* Writes them (when the window closes). */
+void settings_save(void);
+
 /* font.c */
 bool font_init(void);
 

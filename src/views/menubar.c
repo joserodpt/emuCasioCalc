@@ -1,6 +1,8 @@
 /* The menu bar at the top of the main window: drop-down menus, buttons,
  * Ctrl shortcuts and the actions behind them. */
+#include <limits.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -9,7 +11,7 @@
 #include "view.h"
 
 typedef enum {
-    A_NONE, A_SEPARATOR, A_OPEN, A_INFO, A_SCREENSHOT, A_SAVE_ICON, A_QUIT, A_PAUSE, A_RESET,
+    A_NONE, A_SEPARATOR, A_OPEN, A_INFO, A_SCREENSHOT, A_RECORD, A_SAVE_ICON, A_QUIT, A_PAUSE, A_RESET,
     A_SEND, A_AUTO_RELOAD, A_KEYPAD, A_LOAD_OS_DUMP,
     A_FONT_CLASSIC, A_FONT_SPLEEN, A_FONT_UNIFONT, A_FONT_CASIO, /* consecutive, as FONT_STYLE_* */
     A_ZOOM1, A_ZOOM2, A_ZOOM3, A_ZOOM4, A_ZOOM5, A_ZOOM6, /* consecutive */
@@ -30,6 +32,7 @@ static const Item FILE_ITEMS[] = {
     {"Add-in info...", "Ctrl+I", A_INFO},
     {"", "", A_SEPARATOR},
     {"Save screenshot", "Ctrl+S", A_SCREENSHOT},
+    {"Record GIF", "Ctrl+G", A_RECORD},
     {"Save icon", "", A_SAVE_ICON},
     {"", "", A_SEPARATOR},
     {"Copy add-in to calculator...", "", A_SEND},
@@ -199,6 +202,8 @@ static bool checked(Action a)
         return view_auto_reload;
     if (a == A_KEYPAD)
         return view_show_keypad;
+    if (a == A_RECORD)
+        return recorder_active();
     if (a >= A_FONT_CLASSIC && a <= A_FONT_CASIO)
         return view_font == (int)(a - A_FONT_CLASSIC);
     if (a >= A_LANG_EN && a <= A_LANG_ZH)
@@ -390,7 +395,8 @@ static void draw_status(int width, const char *right)
     const char *shown = fit_end(right, (float)room, k, cut, sizeof cut);
     if (!shown[0])
         return;
-    color(view_paused ? 170 : 60, view_paused ? 0 : 60, 0);
+    bool alert = view_paused || recorder_active();
+    color(alert ? 170 : 60, alert ? 0 : 60, 0);
     view_text(view_renderer, (float)right_edge - PAD - view_text_w(shown, k), row + (row_h - 8.0f * k) / 2,
               shown, k);
 }
@@ -532,8 +538,12 @@ void menubar_draw(int width, const char *status)
     if (view_show_speed)
         draw_toolbar(width);
     draw_status_row(width);
-    char right[400];
-    snprintf(right, sizeof right, "%s%s%s", view_paused ? "PAUSED" : "", view_paused && status[0] ? "  " : "",
+    char right[400], rec[32] = "";
+    if (recorder_active()) {
+        uint64_t s = recorder_elapsed_ms() / 1000;
+        snprintf(rec, sizeof rec, "REC %d:%02d  ", (int)(s / 60), (int)(s % 60));
+    }
+    snprintf(right, sizeof right, "%s%s%s%s", rec, view_paused ? "PAUSED" : "", view_paused && status[0] ? "  " : "",
              status);
     if (right[0])
         draw_status(width, right);
@@ -545,15 +555,15 @@ void menubar_draw(int width, const char *status)
  * Actions
  *-------------------------------------------------------------------------*/
 
-/* A file name with the time: <stem>-YYYYMMDD-HHMMSS.bmp */
-static void timestamped(char *out, size_t cap, const char *stem)
+/* A file name with the time: <stem>-YYYYMMDD-HHMMSS.<ext> */
+static void timestamped(char *out, size_t cap, const char *stem, const char *ext)
 {
     time_t t = time(NULL);
     struct tm tm;
     localtime_r(&t, &tm);
     char stamp[32];
     strftime(stamp, sizeof stamp, "%Y%m%d-%H%M%S", &tm);
-    snprintf(out, cap, "%s-%s.bmp", stem, stamp);
+    snprintf(out, cap, "%s-%s.%s", stem, stamp, ext);
 }
 
 static void SDLCALL open_done(void *user, const char *const *files, int filter)
@@ -631,14 +641,48 @@ static void request_reset(void)
     view_paused = false;
 }
 
+/* File > Record GIF: starts, or stops and saves. */
+static void toggle_recording(void)
+{
+    char path[1024], msg[1100];
+    uint64_t ms;
+    if (recorder_active()) {
+        bool ok = recorder_stop(path, sizeof path, &ms);
+        if (ok)
+            snprintf(msg, sizeof msg, "Saved %s (%.1f s)", path, (double)ms / 1000);
+        else
+            snprintf(msg, sizeof msg, "Could not write %s", path);
+        printf("%s\n", msg);
+        view_flash_status(msg);
+        return;
+    }
+    timestamped(path, sizeof path, "recording", "gif");
+    if (!recorder_start(path, view_last_frame())) {
+        snprintf(msg, sizeof msg, "Could not create %s", path);
+        view_flash_status(msg);
+    }
+}
+
+/* The folder File > Open starts in: the running add-in's, else the last
+ * one's. */
+static const char *open_folder(char buf[PATH_MAX])
+{
+    char *slash = view_app_path[0] && realpath(view_app_path, buf) ? strrchr(buf, '/') : NULL;
+    if (slash) {
+        slash[1] = '\0';
+        return buf;
+    }
+    return settings_folder()[0] ? settings_folder() : NULL;
+}
+
 static void run_action(Action a)
 {
     static const SDL_DialogFileFilter FILTERS[] = {{"Casio fx-CG add-ins", "g3a"}, {"All files", "*"}};
     static const SDL_DialogFileFilter DUMPS[] = {{"OS dumps", "bin"}, {"All files", "*"}};
-    char path[256];
+    char path[256], folder[PATH_MAX];
     switch (a) {
     case A_OPEN:
-        SDL_ShowOpenFileDialog(open_done, NULL, view_window, FILTERS, 2, NULL, false);
+        SDL_ShowOpenFileDialog(open_done, NULL, view_window, FILTERS, 2, open_folder(folder), false);
         break;
     case A_INFO:
         info_window_open();
@@ -668,8 +712,11 @@ static void run_action(Action a)
         view_flash_status("Font changed: the add-in's next text uses it");
         break;
     case A_SCREENSHOT:
-        timestamped(path, sizeof path, "screenshot");
+        timestamped(path, sizeof path, "screenshot", "bmp");
         saved(platform_save_screenshot(path), path);
+        break;
+    case A_RECORD:
+        toggle_recording();
         break;
     case A_SAVE_ICON:
         if (!view_have_app || !view_app.has_icon) {
@@ -746,7 +793,7 @@ static bool shortcut(SDL_Keycode k)
         {SDLK_O, A_OPEN}, {SDLK_I, A_INFO}, {SDLK_S, A_SCREENSHOT}, {SDLK_Q, A_QUIT}, {SDLK_P, A_PAUSE},
         {SDLK_R, A_RESET}, {SDLK_EQUALS, A_FASTER}, {SDLK_PLUS, A_FASTER}, {SDLK_MINUS, A_SLOWER},
         {SDLK_0, A_NORMAL_SPEED}, {SDLK_1, A_ZOOM1}, {SDLK_2, A_ZOOM2}, {SDLK_3, A_ZOOM3}, {SDLK_4, A_ZOOM4},
-        {SDLK_5, A_ZOOM5}, {SDLK_6, A_ZOOM6}, {SDLK_K, A_KEYPAD},
+        {SDLK_5, A_ZOOM5}, {SDLK_6, A_ZOOM6}, {SDLK_K, A_KEYPAD}, {SDLK_G, A_RECORD},
     };
     for (size_t i = 0; i < sizeof SHORTCUTS / sizeof SHORTCUTS[0]; i++) {
         if (SHORTCUTS[i].key == k) {

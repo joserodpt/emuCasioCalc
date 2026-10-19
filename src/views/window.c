@@ -1,5 +1,6 @@
 /* The main window: the calculator screen under the menu bar, keyboard
  * input, and the platform interface the emulator uses. */
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -494,6 +495,7 @@ static void housekeeping(void)
 {
     menubar_poll();
     watch_app();
+    recorder_tick();
     if (status_until && SDL_GetTicks() >= status_until)
         view_redraw();
 }
@@ -530,6 +532,22 @@ static void set_window_icon(void)
     }
 }
 
+/* The display a window placed at (x, y) would show on (its top left
+ * corner, with room for the title bar), 0 if none. */
+static SDL_DisplayID display_at(int x, int y)
+{
+    int count;
+    SDL_DisplayID *ids = SDL_GetDisplays(&count), found = 0;
+    for (int i = 0; ids && i < count && !found; i++) {
+        SDL_Rect r;
+        if (SDL_GetDisplayUsableBounds(ids[i], &r) && x + 40 >= r.x && x + 40 < r.x + r.w && y >= r.y &&
+            y < r.y + r.h)
+            found = ids[i];
+    }
+    SDL_free(ids);
+    return found;
+}
+
 bool platform_init(int scale, bool headless)
 {
     view_headless = headless;
@@ -549,12 +567,19 @@ bool platform_init(int scale, bool headless)
     if (headless)
         return true;
     read_ui_scale();
+    if (scale <= 0)
+        scale = settings_int("zoom", 4);
+    /* Where the window was last time, if that is still on a screen */
+    int x = settings_int("x", INT_MIN), y = settings_int("y", INT_MIN);
+    SDL_DisplayID display = x == INT_MIN || y == INT_MIN ? 0 : display_at(x, y);
+    if (!display)
+        x = y = SDL_WINDOWPOS_CENTERED;
     /* The largest zoom up to `scale` that fits the screen, title bar
      * included: a bigger window would be shrunk by the desktop (a laptop's
      * at 4x on macOS), leaving the screen at an uneven zoom. */
     int w, h;
     SDL_Rect usable;
-    bool bounds = SDL_GetDisplayUsableBounds(SDL_GetPrimaryDisplay(), &usable);
+    bool bounds = SDL_GetDisplayUsableBounds(display ? display : SDL_GetPrimaryDisplay(), &usable);
     window_size(scale, &w, &h);
     while (bounds && scale > 1 && (w > usable.w || h + TITLE_BAR_H > usable.h))
         window_size(--scale, &w, &h);
@@ -565,6 +590,7 @@ bool platform_init(int scale, bool headless)
         fprintf(stderr, "SDL window: %s\n", SDL_GetError());
         return false;
     }
+    SDL_SetWindowPosition(view_window, x, y);
     read_ui_scale(); /* again, now the window's density is known */
     set_window_icon();
     screen = SDL_CreateTexture(view_renderer, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING, PANEL_WIDTH,
@@ -572,11 +598,29 @@ bool platform_init(int scale, bool headless)
     SDL_SetTextureScaleMode(screen, SDL_SCALEMODE_NEAREST);
     SDL_SetWindowMinimumSize(view_window, PANEL_WIDTH, (8 + 16) + (8 + 14) + PANEL_HEIGHT); /* 1x screen and bar */
     update_layout();
+    settings_started();
     return screen != NULL;
+}
+
+bool platform_record(const char *path)
+{
+    return !view_headless && recorder_start(path, NULL);
+}
+
+const uint16_t *view_last_frame(void)
+{
+    return frame;
 }
 
 void platform_shutdown(void)
 {
+    if (!view_headless) {
+        char path[1024];
+        uint64_t ms;
+        if (recorder_active() && recorder_stop(path, sizeof path, &ms))
+            printf("saved %s (%.1f s)\n", path, (double)ms / 1000);
+        settings_save();
+    }
     info_window_close();
     about_window_close();
     SDL_DestroyTexture(upscaled);
@@ -590,6 +634,7 @@ void platform_shutdown(void)
 void platform_present(const uint16_t *fb)
 {
     memcpy(frame, fb, sizeof frame);
+    recorder_frame(frame);
     view_redraw();
 }
 

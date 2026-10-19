@@ -28,13 +28,23 @@ typedef enum {
 bool desktop_export_icon(const char *path, int size);
 bool desktop_install(const char *run);
 
-/* headless: no window (for tests). */
+/* What the window remembered from the last run (zoom, position, font,
+ * language, model, timing, speed, battery...): applied before the command
+ * line's options, which then only last for their run. False if there was
+ * nothing saved. */
+bool platform_load_settings(void);
+
+/* headless: no window (for tests). scale: the screen's zoom, 0 for the one
+ * remembered (4 the first time). */
 bool platform_init(int scale, bool headless);
 void platform_shutdown(void);
 
 /* fb is the panel: PANEL_WIDTH x PANEL_HEIGHT, host-endian RGB565. */
 void platform_present(const uint16_t *fb);
 bool platform_save_screenshot(const char *path);
+/* --record: records the screen as an animated GIF from the first frame
+ * until the window closes (File > Record GIF). */
+bool platform_record(const char *path);
 /* The whole window as drawn (menu bar, screen, keyboard), as a .bmp. */
 bool platform_save_window(const char *path);
 /* Saves w x h host-endian RGB565 pixels as a .bmp file. */

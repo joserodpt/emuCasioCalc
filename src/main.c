@@ -26,13 +26,16 @@ static void usage(const char *argv0)
     fprintf(stderr,
             "usage: %s [options] [addin.g3a]\n"
             "  (without an add-in, the window opens empty: use File > Open)\n"
-            "  --scale N          window scale, 1-6 (default 4)\n"
+            "  (the window remembers its zoom, font, model, speed... between runs;\n"
+            "  these options only change them for one run)\n"
+            "  --scale N          window scale, 1-6 (default 4, or the last run's)\n"
             "  --trace            log every syscall\n"
             "  --trace-hw         log exceptions, DMA transfers and unmodelled I/O registers\n"
             "  --keys K1,K2,...   keys to press first (EXE, EXIT, UP, F1, 0-9...)\n"
             "  --headless         no window; input only comes from --keys\n"
             "  --screenshot F     save the last frame to F (.bmp) on exit\n"
             "  --window-shot F    save the whole window (menus, keyboard) to F (.bmp) on exit\n"
+            "  --record F         record the screen to F (an animated .gif) until the window closes\n"
             "  --export-icon F    save the emulator's icon to F (.png, 1024 x 1024) and quit\n"
             "  --install-desktop [CMD]  add the icon and a launcher running CMD (default:\n"
             "                     this program) to the desktop's applications, and quit\n"
@@ -236,12 +239,12 @@ static bool run(Emu *emu, bool headless)
 
 int main(int argc, char **argv)
 {
-    int scale = 4;
+    int scale = 0; /* the zoom remembered (4 the first time) */
     Options opt = {0};
     const char *path = NULL, *screenshot = NULL, *window_shot = NULL, *icon = NULL;
     bool show_info = false;
-    const char *model = "auto", *timing = "realistic", *speed = NULL, *battery = NULL, *language = NULL, *font = NULL;
-    const char *os_dump = NULL;
+    const char *model = NULL, *timing = NULL, *speed = NULL, *battery = NULL, *language = NULL, *font = NULL;
+    const char *os_dump = NULL, *record = NULL;
     bool keyboard = false;
     static Emu emu;
     static G3aInfo info;
@@ -270,6 +273,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--headless")) opt.headless = true;
         else if (!strcmp(argv[i], "--screenshot") && i + 1 < argc) screenshot = argv[++i];
         else if (!strcmp(argv[i], "--window-shot") && i + 1 < argc) window_shot = argv[++i];
+        else if (!strcmp(argv[i], "--record") && i + 1 < argc) record = argv[++i];
         else if (!strcmp(argv[i], "--icon") && i + 1 < argc) icon = argv[++i];
         else if (!strcmp(argv[i], "--info")) show_info = true;
         else if (!strcmp(argv[i], "--model") && i + 1 < argc) model = argv[++i];
@@ -284,25 +288,33 @@ int main(int argc, char **argv)
         else if (argv[i][0] != '-' && !path) path = argv[i];
         else { usage(argv[0]); return 2; }
     }
-    if (!path && opt.headless) {
+    if ((!path || record) && opt.headless) {
         usage(argv[0]);
         return 2;
     }
-    if (!strcmp(model, "cg20") || !strcmp(model, "cg10")) {
-        platform_set_model_choice(CHOICE_CG20);
-    } else if (!strcmp(model, "cg50")) {
-        platform_set_model_choice(CHOICE_CG50);
-    } else if (strcmp(model, "auto")) {
-        usage(argv[0]);
-        return 2;
+    /* What the window remembered; the options below override it for this
+     * run. Headless runs (tests) start from the defaults. */
+    bool remembered = !opt.headless && platform_load_settings();
+    if (model) {
+        if (!strcmp(model, "auto")) {
+            platform_set_model_choice(CHOICE_AUTO);
+        } else if (!strcmp(model, "cg20") || !strcmp(model, "cg10")) {
+            platform_set_model_choice(CHOICE_CG20);
+        } else if (!strcmp(model, "cg50")) {
+            platform_set_model_choice(CHOICE_CG50);
+        } else {
+            usage(argv[0]);
+            return 2;
+        }
     }
     if (speed)
         platform_set_speed(!strcmp(speed, "max") ? 0 : atof(speed) / 100);
-    if (!strcmp(timing, "fast")) {
-        platform_set_realistic(false);
-    } else if (strcmp(timing, "realistic")) {
-        usage(argv[0]);
-        return 2;
+    if (timing) {
+        if (strcmp(timing, "fast") && strcmp(timing, "realistic")) {
+            usage(argv[0]);
+            return 2;
+        }
+        platform_set_realistic(!strcmp(timing, "realistic"));
     }
     if (font) {
         static const char *const FONTS[FONT_STYLE_COUNT] = {"classic", "spleen", "unifont", "casio"};
@@ -326,7 +338,9 @@ int main(int argc, char **argv)
         char err[256];
         if (casio_fonts_load_file(os_dump, err, sizeof err)) {
             printf("Casio fonts from OS %s (%s)\n", casio_fonts_os_version(), os_dump);
-            if (!font)
+            /* switch to them: always for --os-dump, else the first time
+             * (later, the font remembered stays) */
+            if (!font && (os_dump != kept || !remembered))
                 platform_set_font(FONT_STYLE_CASIO);
         } else {
             fprintf(stderr, "OS dump %s: %s\n", os_dump, err);
@@ -334,6 +348,8 @@ int main(int argc, char **argv)
                 return 1;
         }
     }
+    if (platform_font() == FONT_STYLE_CASIO && !casio_fonts_loaded())
+        platform_set_font(FONT_STYLE_CLASSIC); /* remembered, but the dump is gone */
     if (keyboard)
         platform_set_keyboard(true);
     if (language) {
@@ -359,8 +375,12 @@ int main(int argc, char **argv)
         }
         platform_set_battery(cv);
     }
-    if (!platform_init(scale > 0 ? scale : 4, opt.headless))
+    if (!platform_init(scale > 0 ? scale : opt.headless ? 4 : 0, opt.headless))
         return 1;
+    if (record && !platform_record(record)) {
+        fprintf(stderr, "could not create %s\n", record);
+        return 1;
+    }
     static char current[1024]; /* the add-in Reset reloads, "" if none yet */
     bool loaded = false, first = true;
     if (path) {

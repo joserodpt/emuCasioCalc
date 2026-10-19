@@ -36,20 +36,21 @@ ctest --test-dir build --output-on-failure
 ./build/emucasiofxcg --model cg20 some-addin.g3a        # force the fx-CG10/20 (default: detect)
 ./build/emucasiofxcg --timing fast some-addin.g3a       # no OS/memory/DMA delays (default: realistic)
 ./build/emucasiofxcg --speed 50 some-addin.g3a          # half speed (10-400, or max)
+./build/emucasiofxcg --record demo.gif some-addin.g3a   # record the screen until the window closes
 
 ./run.sh                  # rebuilds if the sources changed, opens an empty window (File > Open)
 ./run.sh some-addin.g3a   # same, starting that add-in (quote paths with spaces)
 ```
 
 The window has a menu bar: **File** (open another add-in, add-in info, save a
-screenshot or the add-in's icon), **Emulation** (pause, reset, model, timing), **View**
-(zoom 1x-6x, 4x at start) and **Help**, plus an **Info** button that opens a window with the
+screenshot, record a GIF, save the add-in's icon), **Emulation** (pause, reset, model, timing), **View**
+(zoom 1x-6x, 4x the first time) and **Help**, plus an **Info** button that opens a window with the
 add-in's name, header fields and icon (hover the icon to see its selected
 version; the name on it is the one for the chosen language, as in the main
 menu), its name in each language (the header's labels; one row when they
 are all the same, Chinese characters shown as `?`), and its controls: the calculator keys it uses with the PC key for
 each, when they can be found in its code (add-ins using the OS's GetKey), or
-the whole key table otherwise. Shortcuts: Ctrl+O, Ctrl+I, Ctrl+S, Ctrl+P, Ctrl+R, Ctrl+1..6, Ctrl+Q.
+the whole key table otherwise. Shortcuts: Ctrl+O, Ctrl+I, Ctrl+S, Ctrl+G, Ctrl+P, Ctrl+R, Ctrl+1..6, Ctrl+Q.
 When the add-in exits, the window stays open so you can reset or open another.
 If it stops with an error, the error is printed on the terminal and shown on
 the screen in a red-bordered box.
@@ -99,6 +100,23 @@ adds the emulator to the applications menu with its icon (in
 `~/.local/share/applications` and the user's icon theme), so the dock,
 the app grid and Alt-Tab show it. `--export-icon F.png` saves the icon at
 1024 x 1024 (that's `assets/icon.png`).
+
+**Screen recording** (File > Record GIF, Ctrl+G; again to stop): the
+calculator screen as an animated GIF, `recording-<date>-<time>.gif` in the
+directory you run the emulator from, with the menu bar showing `REC` and
+the time. It plays at the pace the window showed it (time paused with
+Emulation > Pause is left out), each screen pixel as 2 x 2, looping.
+Frames less than 20 ms apart are merged, as browsers slow shorter ones
+down. Colours are exact for screens with up to 255 of them, and reduced
+(median cut) beyond. `--record F.gif` records from the first frame until
+the window closes.
+
+**Settings** are remembered between runs, in `settings.ini` in the
+emulator's data folder (with the kept OS dump): zoom, window position,
+keyboard, font, language, model, timing, speed, battery, reload, and the
+folder File > Open starts in (the last add-in's). Command-line options
+override them for one run only: unless you change it again in the
+window, the saved value stays. Headless runs ignore the file.
 
 **Display scaling**: the menus, status row and Add-in info window follow
 the desktop's scaling (200% on a 4K screen gives twice the size), as SDL
@@ -191,11 +209,14 @@ CTest runs them all (`ctest`, 20 tests).
 | `send_addin.c` | File > Copy add-in to calculator |
 | `keypad.c` | The on-screen keyboard (View > Keyboard) |
 | `desktop.c` | `--install-desktop` (launcher and icon theme), `--export-icon` |
+| `recorder.c` | File > Record GIF: frames as shown, their timing, the REC time |
+| `settings.c` | Settings remembered between runs (`settings.ini`) |
 | `about_window.c` | Help > About: version, what it emulates, credits, repository link |
 | `ui_font.c` | The UI's text: Inter through stb_truetype, glyph atlases per size |
 | `app_icon.c`, `font.c` | The emulator's icon (drawn in code), the 8x8 font |
 | **`src/utils/`** | **Helpers** |
 | `g3a.c` | Reads a .g3a: header (name, icons...) and code, mapped at `0x00300000` |
+| `gif.c` | Animated GIF writer: changed rectangles, transparency, median cut, LZW |
 | `keys.c` | Calculator keys: names, GetKey codes, key matrix positions |
 | `tests/test_cpu.c` | CPU tests (division, delay slots, carries, shifts, repeat loops, TRAPA/RTE/banks) |
 | `tests/gint-*` | gint add-ins used as integration tests |
