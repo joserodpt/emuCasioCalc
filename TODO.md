@@ -174,6 +174,11 @@ Casio's own apps are not emulated: `APP_RUNMAT` (1A03), `APP_Program` (1945),
 - **Main menu**: there is no OS main menu to show. In OS add-ins GetKey
   drops MENU (unless the add-in turned the return to the menu off); gint
   add-ins' `gint_osmenu()` returns at once.
+- **Show calculator's screen**: Linux only (usbfs). macOS claims USB
+  drives for itself, so it needs another way to send the vendor SCSI
+  commands. Projector mode is untested. So are the `1RC3` / `1RM2` frame
+  formats; the fx-CG50 sends `1RC2`. The ScreenR(XP) mode, which streams
+  over plain USB bulk (`07cf:6101`), isn't handled.
 
 ## From the OS dump (next)
 

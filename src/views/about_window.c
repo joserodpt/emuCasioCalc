@@ -8,7 +8,7 @@
 #include "view.h"
 
 #define ABOUT_W   600
-#define ABOUT_H   440
+#define ABOUT_H   462
 #define MARGIN    28
 #define GITHUB    "github.com/joserodpt/emuCasioFxCG"
 #define GITHUB_URL "https://" GITHUB
@@ -37,6 +37,7 @@ static const struct { const char *what, *who, *licence; } CREDITS[] = {
     {"SDL 3", "the window, input and drawing", "zlib"},
     {"gint and the fxSDK", "Lephenixnoir: gint add-ins, test icons", "MIT"},
     {"WikiPrizm and libfxcg", "the OS syscalls' documentation", ""},
+    {"Cahute", "Thomas Touhey: Casio's USB protocols, documented", ""},
     {"Spleen 2.1.0", "Frederic Cambus: calculator text", "BSD 2-clause"},
     {"GNU Unifont 15.1.05", "Unifoundry: symbols, calculator text", "SIL OFL 1.1"},
     {"Inter 4.1", "Rasmus Andersson: this window, the menus", "SIL OFL 1.1"},

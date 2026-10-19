@@ -90,6 +90,31 @@ echo 'ACTION=="add|change", SUBSYSTEM=="block", ENV{DEVTYPE}=="disk", ATTRS{idVe
 sudo udevadm control --reload
 ```
 
+**Show calculator's screen (USB)** (File menu, Linux): shows a real
+calculator's screen live in the window, as Casio's Screen Receiver program
+does. Plug the calculator in by USB and choose "Screen Receiver" (or
+"Projector") on it, then pick the menu item; the item is checked while it
+runs, and picking it again stops it. Meanwhile the add-in is paused and
+the menu bar shows CALCULATOR; Save screenshot and Record GIF save the
+calculator's screen. It keeps waiting for the calculator until stopped, so
+it can be unplugged, or switch modes, meanwhile. gint add-ins can be shown
+too, if they open their USB link and send frames
+(`usb_open` with `usb_ff_bulk`, then
+`dupdate_set_hook(GINT_CALL(usb_fxlink_videocapture, 0))`, or a hook that
+doesn't wait as casioPrizmApps' `usb_screen.c` does): starting one ends
+Screen Receiver mode, and the calculator comes back as gint's fxlink device,
+whose "video" messages are shown. In Screen Receiver mode the calculator is a USB drive
+(`07cf:6102`) that also answers three Casio SCSI commands, and sends
+[Protocol 7.00 screenstreaming](https://cahute.org/topics/protocols/seven-ohp.html)
+frames (384x216, 16-bit colour) each time its screen changes. That protocol,
+the vendor SCSI commands and the frame formats come from the documentation
+of [Cahute](https://cahute.org/) by Thomas Touhey; thanks to it this needed
+no reverse engineering. The emulator
+takes the device from the kernel's usb-storage driver through usbfs and
+gives it back after, so it needs access to `/dev/bus/usb/...`: if it says
+it has no permission, it shows the udev rule to add. Every step is logged on
+the terminal (`screen receiver: ...`).
+
 **On-screen keyboard** (View > Keyboard, Ctrl+K, or `--keyboard`; hidden
 at first): the fx-CG50's keys right of the screen, with each key's SHIFT function (yellow) and ALPHA letter
 (red) above it. Click a key to press it (held while the mouse button is);
@@ -332,6 +357,8 @@ For OS-based add-ins the loop is: run an add-in, hit `unimplemented syscall
 0x....`, look it up, implement it, repeat. References:
 - WikiPrizm syscall list: https://prizm.cemetech.net/Syscalls/
 - libfxcg headers and stubs: https://github.com/Jonimoose/libfxcg
+- Cahute's documentation of Casio's link protocols (screenstreaming,
+  Protocol 7.00, USB transports): https://cahute.org/
 
 For gint add-ins, run with `--trace-hw`: it reports CPU exceptions, DMA
 transfers and the first access to every peripheral page we don't model. The
@@ -348,8 +375,9 @@ Next steps:
 
 - MENU in a gint add-in returns to the add-in at once (there is no OS menu).
 - No sound.
-- Not planned: DSP arithmetic instructions, USB, and an FPU (the SH7305 has
-  none; add-ins use soft-float).
+- Not planned: DSP arithmetic instructions, USB for add-ins, and an FPU
+  (the SH7305 has none; add-ins use soft-float).
+- Showing a calculator's screen works on Linux only for now.
 - Built-in apps (Run-Matrix, Graph...) are part of the OS and can't run here.
 
 ## Legal

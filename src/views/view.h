@@ -145,6 +145,19 @@ void recorder_tick(void);
 /* window.c: the screen as last shown (PANEL_WIDTH x PANEL_HEIGHT). */
 const uint16_t *view_last_frame(void);
 
+/* screen_receiver.c: File > Show calculator's screen (a real calculator in
+ * Screen Receiver or Projector mode, by USB; Linux). While it runs the
+ * add-in is paused and the window shows the calculator's frames. */
+void receiver_start(void);
+void receiver_stop(void);
+bool receiver_active(void);
+/* Shows the frames that came in; notices the end. */
+void receiver_poll(void);
+/* window.c: shows a frame that isn't the emulator's (recorded too), and
+ * the emulator's last one, which comes back after. */
+void view_show_frame(const uint16_t *fb);
+const uint16_t *view_emulated_frame(void);
+
 /* settings.c: what the window remembers between runs */
 /* The setting saved for key, or fallback if there is none. */
 int settings_int(const char *key, int fallback);

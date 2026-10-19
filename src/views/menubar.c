@@ -12,7 +12,7 @@
 
 typedef enum {
     A_NONE, A_SEPARATOR, A_OPEN, A_INFO, A_SCREENSHOT, A_RECORD, A_SAVE_ICON, A_QUIT, A_PAUSE, A_RESET,
-    A_SEND, A_AUTO_RELOAD, A_KEYPAD, A_LOAD_OS_DUMP,
+    A_SEND, A_RECEIVE, A_AUTO_RELOAD, A_KEYPAD, A_LOAD_OS_DUMP,
     A_FONT_CLASSIC, A_FONT_SPLEEN, A_FONT_UNIFONT, A_FONT_CASIO, /* consecutive, as FONT_STYLE_* */
     A_ZOOM1, A_ZOOM2, A_ZOOM3, A_ZOOM4, A_ZOOM5, A_ZOOM6, /* consecutive */
     A_KEYS, A_ABOUT,
@@ -36,6 +36,7 @@ static const Item FILE_ITEMS[] = {
     {"Save icon", "", A_SAVE_ICON},
     {"", "", A_SEPARATOR},
     {"Copy add-in to calculator...", "", A_SEND},
+    {"Show calculator's screen (USB)", "", A_RECEIVE},
     {"Reload when the file changes", "", A_AUTO_RELOAD},
     {"", "", A_SEPARATOR},
     {"Load OS dump (Casio's fonts)...", "", A_LOAD_OS_DUMP},
@@ -204,6 +205,8 @@ static bool checked(Action a)
         return view_show_keypad;
     if (a == A_RECORD)
         return recorder_active();
+    if (a == A_RECEIVE)
+        return receiver_active();
     if (a >= A_FONT_CLASSIC && a <= A_FONT_CASIO)
         return view_font == (int)(a - A_FONT_CLASSIC);
     if (a >= A_LANG_EN && a <= A_LANG_ZH)
@@ -395,7 +398,7 @@ static void draw_status(int width, const char *right)
     const char *shown = fit_end(right, (float)room, k, cut, sizeof cut);
     if (!shown[0])
         return;
-    bool alert = view_paused || recorder_active();
+    bool alert = view_paused || recorder_active() || receiver_active();
     color(alert ? 170 : 60, alert ? 0 : 60, 0);
     view_text(view_renderer, (float)right_edge - PAD - view_text_w(shown, k), row + (row_h - 8.0f * k) / 2,
               shown, k);
@@ -543,8 +546,8 @@ void menubar_draw(int width, const char *status)
         uint64_t s = recorder_elapsed_ms() / 1000;
         snprintf(rec, sizeof rec, "REC %d:%02d  ", (int)(s / 60), (int)(s % 60));
     }
-    snprintf(right, sizeof right, "%s%s%s%s", rec, view_paused ? "PAUSED" : "", view_paused && status[0] ? "  " : "",
-             status);
+    const char *mode = receiver_active() ? "CALCULATOR" : view_paused ? "PAUSED" : "";
+    snprintf(right, sizeof right, "%s%s%s%s", rec, mode, mode[0] && status[0] ? "  " : "", status);
     if (right[0])
         draw_status(width, right);
     if (open_menu >= 0)
@@ -689,6 +692,12 @@ static void run_action(Action a)
         break;
     case A_SEND:
         send_addin_start();
+        break;
+    case A_RECEIVE:
+        if (receiver_active())
+            receiver_stop();
+        else
+            receiver_start();
         break;
     case A_AUTO_RELOAD:
         view_auto_reload = !view_auto_reload;

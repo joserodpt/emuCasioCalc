@@ -50,6 +50,7 @@ static int upscale;            /* its scale, 0 = not created */
 static float density = 1;      /* window pixels per window unit: 2 on a Retina Mac */
 static int window_w;
 static uint16_t frame[PANEL_WIDTH * PANEL_HEIGHT]; /* last presented frame, host RGB565 */
+static uint16_t emu_frame[PANEL_WIDTH * PANEL_HEIGHT]; /* the emulator's, while another is shown */
 static char status[320];
 static uint64_t status_until; /* 0 = stays */
 /* Which KEYS entry each held scancode pressed (index + 1), so that a key
@@ -497,6 +498,7 @@ static void watch_app(void)
 static void housekeeping(void)
 {
     menubar_poll();
+    receiver_poll();
     watch_app();
     recorder_tick();
     if (status_until && SDL_GetTicks() >= status_until)
@@ -628,6 +630,7 @@ void platform_shutdown(void)
         printf("saved %s (%.1f s)\n", path, (double)ms / 1000);
     if (!view_headless)
         settings_save();
+    receiver_stop();
     info_window_close();
     about_window_close();
     SDL_DestroyTexture(upscaled);
@@ -640,9 +643,21 @@ void platform_shutdown(void)
 
 void platform_present(const uint16_t *fb)
 {
+    memcpy(emu_frame, fb, sizeof emu_frame);
+    if (!receiver_active())
+        view_show_frame(fb);
+}
+
+void view_show_frame(const uint16_t *fb)
+{
     memcpy(frame, fb, sizeof frame);
     recorder_frame(frame);
     view_redraw();
+}
+
+const uint16_t *view_emulated_frame(void)
+{
+    return emu_frame;
 }
 
 bool platform_save_bmp(const char *path, const uint16_t *pixels, int w, int h)
