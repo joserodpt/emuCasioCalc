@@ -191,6 +191,14 @@ bool emu_init(Emu *emu, Model model);
 /* The calculator's clock starts at unix_time (local time) instead of now,
  * then follows the emulated time: runs show the same date and time. */
 void emu_set_clock(int64_t unix_time);
+/* The calculator's product ID, 8 bytes in its OS's ROM: at 0x8000FFD0 on
+ * the fx-9860G, 0x8001FFD0 on the fx-CG. Random (once a run) unless set;
+ * emu_init writes it. */
+#define DEVICE_ID_SIZE 8
+#define PRODUCT_ID_FX  0x0000FFD0u /* offsets in ROM */
+#define PRODUCT_ID_CG  0x0001FFD0u
+void emu_set_device_id(const uint8_t id[DEVICE_ID_SIZE]);
+const uint8_t *emu_device_id(void);
 void emu_free(Emu *emu);
 /* Switches between realistic and fast timing (can change while running). */
 void emu_set_realistic(Emu *emu, bool realistic);

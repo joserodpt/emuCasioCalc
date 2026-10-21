@@ -110,6 +110,35 @@ void emu_set_clock(int64_t unix_time)
     clock_start = unix_time;
 }
 
+/* The calculator's product ID: random until set, then the same for every
+ * emu_init (a reload, another model) of this run. */
+static uint8_t device_id[DEVICE_ID_SIZE];
+static bool device_id_set;
+
+void emu_set_device_id(const uint8_t id[DEVICE_ID_SIZE])
+{
+    memcpy(device_id, id, DEVICE_ID_SIZE);
+    device_id_set = true;
+}
+
+const uint8_t *emu_device_id(void)
+{
+    if (!device_id_set) {
+        uint8_t id[DEVICE_ID_SIZE];
+        FILE *f = fopen("/dev/urandom", "rb");
+        size_t n = f ? fread(id, 1, sizeof id, f) : 0;
+        if (f)
+            fclose(f);
+        uint64_t x = (uint64_t)time(NULL) ^ (uint64_t)clock() << 32;
+        for (size_t i = n; i < sizeof id; i++) { /* no /dev/urandom */
+            x = x * 6364136223846793005u + 1442695040888963407u;
+            id[i] = (uint8_t)(x >> 56);
+        }
+        emu_set_device_id(id);
+    }
+    return device_id;
+}
+
 bool emu_init(Emu *emu, Model model)
 {
     Memory *mem = &emu->mem;
@@ -126,9 +155,11 @@ bool emu_init(Emu *emu, Model model)
     if (!emu->rom || !emu->ram)
         return false;
     /* Past the OS, flash is erased (0xFF) until files and the add-in are
-     * written into it. The OS area stays zero: gint takes an all-0xFF
-     * product ID (0x8001FFD0) for Casio's PC emulator. */
+     * written into it. The OS area is zero but for the product ID, which
+     * add-ins read to tell calculators apart (gint takes an all-0xFF one
+     * for Casio's PC emulator; a random one is never that). */
     memset(emu->rom + OS_ROM_SIZE, 0xFF, ROM_SIZE - OS_ROM_SIZE);
+    memcpy(emu->rom + (model_mono(model) ? PRODUCT_ID_FX : PRODUCT_ID_CG), emu_device_id(), DEVICE_ID_SIZE);
     emu->flash_next = FLASH_FILES;
     emu->battery_cv = BATTERY_CENTIVOLTS;
     emu->status_flags = 0x0303; /* battery, SHIFT/ALPHA, text, glyph */

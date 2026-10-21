@@ -86,8 +86,8 @@ ctest --test-dir build --output-on-failure
 Also: `--keyboard` (show the on-screen keyboard), `--window-shot F` (save the
 whole window, keyboard included, as a .bmp), `--font`, `--language
 en|es|de|fr|pt|zh`, `--battery low` or `--battery 4.6`, `--os-dump F`,
-`--clock "2026-01-01 12:00"`, `--ui-scale 2`, `--install-desktop`,
-`--export-icon F.png`.
+`--clock "2026-01-01 12:00"`, `--device-id 0123456789ABCDEF`, `--ui-scale 2`,
+`--install-desktop`, `--export-icon F.png`.
 
 </details>
 
@@ -337,6 +337,13 @@ or empty (`--battery low` or `--battery 4.6` at start); add-ins see it in
 `GetMainBatteryVoltage` and on the OS status bar, which `DisplayStatusArea`
 and `GetKey` draw at the top of the screen.
 
+Each calculator has a **product ID**, 8 bytes in its OS's ROM that add-ins
+can read (0x8000FFD0 on the fx-9860G models, 0x8001FFD0 on the fx-CG). The
+window's calculator gets a random one on its first run and keeps it (in
+`settings.ini`); headless runs get a new one each time. `--device-id` sets it
+for one run, as 16 hex digits. The emulator prints it when it loads an
+add-in.
+
 </details>
 
 <details>
@@ -353,8 +360,9 @@ put it in `storage/fls0/doom.wad`).
 
 **Settings** are remembered between runs, in `settings.ini` in the
 emulator's data folder (with the kept OS dump): zoom, window position,
-keyboard, font, language, model, timing, speed, battery, reload, and the
-folder File > Open starts in (the last add-in's). Command-line options
+keyboard, font, language, model, timing, speed, battery, reload, the
+folder File > Open starts in (the last add-in's), and the calculator's
+product ID. Command-line options
 override them for one run only: unless you change it again in the window,
 the saved value stays. Headless runs ignore the file.
 

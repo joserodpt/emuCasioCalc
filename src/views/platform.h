@@ -33,6 +33,10 @@ bool desktop_install(const char *run);
  * line's options, which then only last for their run. False if there was
  * nothing saved. */
 bool platform_load_settings(void);
+/* The calculator's product ID the window keeps, 16 hex digits ("" before
+ * its first run), and the one to keep. */
+const char *platform_device_id(void);
+void platform_set_device_id(const char *hex);
 
 /* headless: no window (for tests). scale: the screen's zoom, 0 for the one
  * remembered (4 the first time). */

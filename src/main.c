@@ -23,6 +23,25 @@ typedef struct {
     char *script;       /* --script: the file's text */
 } Options;
 
+/* A product ID: exactly 16 hex digits. */
+static bool parse_device_id(const char *hex, uint8_t id[DEVICE_ID_SIZE])
+{
+    if (strlen(hex) != 2 * DEVICE_ID_SIZE || strspn(hex, "0123456789abcdefABCDEF") != 2 * DEVICE_ID_SIZE)
+        return false;
+    for (int i = 0; i < DEVICE_ID_SIZE; i++) {
+        unsigned b;
+        sscanf(hex + 2 * i, "%2x", &b);
+        id[i] = (uint8_t)b;
+    }
+    return true;
+}
+
+static void format_device_id(const uint8_t id[DEVICE_ID_SIZE], char hex[2 * DEVICE_ID_SIZE + 1])
+{
+    for (int i = 0; i < DEVICE_ID_SIZE; i++)
+        snprintf(hex + 2 * i, 3, "%02X", id[i]);
+}
+
 /* The whole of a text file (malloc'd), or NULL. */
 static char *read_text(const char *path)
 {
@@ -68,6 +87,9 @@ static void usage(const char *argv0)
             "  --headless         no window; input only comes from --keys / --script\n"
             "  --clock T          the calculator's clock starts at T (\"2026-01-01 12:00\")\n"
             "                     instead of now: runs show the same time\n"
+            "  --device-id H      the calculator's product ID: 16 hex digits (8 bytes,\n"
+            "                     at 0x8000FFD0 / 0x8001FFD0) instead of the window's\n"
+            "                     own random one, or a new random one each headless run\n"
             "  --screenshot F     save the last frame to F (.png or .bmp) on exit\n"
             "  --window-shot F    save the whole window (menus, keyboard) to F (.bmp) on exit\n"
             "  --audio-out F      write the sound of the link port's TX pin (the jack) to\n"
@@ -213,9 +235,11 @@ static bool load(Emu *emu, const Options *opt, const char *path, G3aInfo *info, 
     if (!ok)
         return false;
     bool chosen = model != info->model;
-    printf("loaded %s: %u bytes of code, running as %s (%s%s)\n", path, file.size - g3a_header_size(info),
-           model_name(model), chosen ? "chosen; detected: " : "",
-           chosen ? model_name(info->model) : info->model_reason);
+    char id[2 * DEVICE_ID_SIZE + 1];
+    format_device_id(emu_device_id(), id);
+    printf("loaded %s: %u bytes of code, running as %s (%s%s), product ID %s\n", path,
+           file.size - g3a_header_size(info), model_name(model), chosen ? "chosen; detected: " : "",
+           chosen ? model_name(info->model) : info->model_reason, id);
     platform_set_app(info, path, model);
     emu->battery_cv = platform_battery();
     emu->language = platform_language();
@@ -304,7 +328,7 @@ int main(int argc, char **argv)
     const char *path = NULL, *screenshot = NULL, *window_shot = NULL, *icon = NULL;
     bool show_info = false;
     const char *model = NULL, *timing = NULL, *speed = NULL, *battery = NULL, *language = NULL, *font = NULL;
-    const char *os_dump = NULL, *record = NULL, *audio_out = NULL;
+    const char *os_dump = NULL, *record = NULL, *audio_out = NULL, *device_id = NULL;
     bool keyboard = false;
     static Emu emu;
     static G3aInfo info;
@@ -345,6 +369,7 @@ int main(int argc, char **argv)
             }
             emu_set_clock((int64_t)t);
         }
+        else if (!strcmp(argv[i], "--device-id") && i + 1 < argc) device_id = argv[++i];
         else if (!strcmp(argv[i], "--script") && i + 1 < argc) {
             const char *f = argv[++i];
             if (!(opt.script = read_text(f))) {
@@ -378,6 +403,21 @@ int main(int argc, char **argv)
     /* What the window remembered; the options below override it for this
      * run. Headless runs (tests) start from the defaults. */
     bool remembered = !opt.headless && platform_load_settings();
+    /* The product ID: the window's calculator keeps the random one it got
+     * on its first run; headless runs get a new one. */
+    uint8_t id[DEVICE_ID_SIZE];
+    char hex[2 * DEVICE_ID_SIZE + 1];
+    if (parse_device_id(platform_device_id(), id))
+        emu_set_device_id(id);
+    format_device_id(emu_device_id(), hex);
+    platform_set_device_id(hex);
+    if (device_id) {
+        if (!parse_device_id(device_id, id)) {
+            fprintf(stderr, "--device-id: give 16 hex digits, like 0123456789ABCDEF\n");
+            return 2;
+        }
+        emu_set_device_id(id);
+    }
     if (model) {
         if (!strcmp(model, "auto")) {
             platform_set_model_choice(CHOICE_AUTO);

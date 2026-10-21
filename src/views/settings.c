@@ -1,7 +1,7 @@
 /* What the window remembers between runs, in settings.ini in the
  * emulator's data folder (beside the kept OS dump): zoom, position,
- * keyboard, font, language, model, timing, speed, battery, reload, and the
- * folder of the last add-in. Read before the command line's options and
+ * keyboard, font, language, model, timing, speed, battery, reload, the
+ * folder of the last add-in, and the calculator's product ID. Read before the command line's options and
  * written when the window closes. An option only lasts for its run: a
  * value it changed, and the user didn't change again, is saved as it was. */
 #include <limits.h>
@@ -85,6 +85,7 @@ static int loaded[SETTING_COUNT];
 static bool has[SETTING_COUNT];
 static int start[SETTING_COUNT];
 static char folder[1024];
+static char device_id[2 * 8 + 1]; /* hex, "" if none */
 
 /* The emulator's per-user folder (SDL's "pref" folder): settings and the
  * kept OS dump. It was named after emuCasioFxCG, the emulator's old name:
@@ -146,6 +147,10 @@ bool platform_load_settings(void)
             snprintf(folder, sizeof folder, "%s", value);
             continue;
         }
+        if (!strcmp(line, "device_id")) {
+            snprintf(device_id, sizeof device_id, "%s", value);
+            continue;
+        }
         for (int i = 0; i < SETTING_COUNT; i++) {
             if (strcmp(line, SETTINGS[i].key))
                 continue;
@@ -174,6 +179,16 @@ int settings_int(const char *key, int fallback)
 const char *settings_folder(void)
 {
     return folder;
+}
+
+const char *platform_device_id(void)
+{
+    return device_id;
+}
+
+void platform_set_device_id(const char *hex)
+{
+    snprintf(device_id, sizeof device_id, "%s", hex);
 }
 
 void settings_started(void)
@@ -209,6 +224,8 @@ void settings_save(void)
     }
     if (folder[0])
         fprintf(f, "folder=%s\n", folder);
+    if (device_id[0])
+        fprintf(f, "device_id=%s\n", device_id);
     bool ok = !ferror(f);
     if (fclose(f) != 0)
         ok = false;
