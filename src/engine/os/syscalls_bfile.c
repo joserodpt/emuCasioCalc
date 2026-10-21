@@ -324,6 +324,15 @@ SC(sc_bfile_name_to_str)
     return 0;
 }
 
+/* Bfile_GetFilenameLength(const unsigned short *name): its characters. */
+SC(sc_bfile_name_length)
+{
+    uint32_t n = 0;
+    while (mem_read16(&emu->mem, a[0] + 2 * n) && !emu->mem.fault)
+        n++;
+    return n;
+}
+
 /* Reads a 16-bit OS string (8-bit characters kept, others become '?'). */
 static void read_name(Emu *emu, uint32_t addr, char *out, size_t cap)
 {

@@ -277,6 +277,43 @@ SC(sc_fx_area_reverse_vram)
     return 0;
 }
 
+/* A popup: a cleared box with a frame and a drop shadow around `lines`
+ * rows of locate's grid from row `top`, columns 2 to 20. Its exact shape
+ * is our reading. */
+static void popup(Emu *emu, int top, int lines)
+{
+    if (lines < 1) lines = 1;
+    if (lines > 7) lines = 7;
+    if (top > 8 - lines) top = 8 - lines;
+    if (top < 1) top = 1;
+    int y0 = (top - 1) * 8 - 2, y1 = y0 + lines * 8 + 3;
+    int x0 = 4, x1 = 121;
+    area(emu->vram, x0, y0, x1, y1, PX_CLEAR);
+    line(emu->vram, x0, y0, x1, y0, PX_SET);
+    line(emu->vram, x0, y1, x1, y1, PX_SET);
+    line(emu->vram, x0, y0, x0, y1, PX_SET);
+    line(emu->vram, x1, y0, x1, y1, PX_SET);
+    line(emu->vram, x0 + 1, y1 + 1, x1 + 1, y1 + 1, PX_SET);
+    line(emu->vram, x1 + 1, y0 + 1, x1 + 1, y1 + 1, PX_SET);
+}
+
+/* PopupWin(lines), the SDK's: centred over rows 1..7 (ROBOBALL writes a
+ * 2-line one on rows 3 and 4). */
+SC(sc_fx_popup_win)
+{
+    int lines = (int32_t)a[0];
+    popup(emu, (7 - lines) / 2 + 1, lines);
+    return 0;
+}
+
+/* 0x156(top, lines): the same box from row `top` (our reading of how
+ * ROBOBALL uses it). */
+SC(sc_fx_popup_at)
+{
+    popup(emu, (int32_t)a[0], (int32_t)a[1]);
+    return 0;
+}
+
 /* SaveDisp / RestoreDisp(page 1..3): the VRAM in one of three slots. */
 static uint8_t saved[SAVED_DISPS][MONO_VRAM_SIZE];
 
@@ -365,6 +402,55 @@ static uint32_t print_at_cursor(Emu *emu, uint32_t addr, bool invert, bool one)
     return 0;
 }
 
+/* PrintLine / PrintRLine(string, max): at the cursor up to column max
+ * (1..21), the cells past the string blank (dark when reversed). */
+static uint32_t print_line(Emu *emu, uint32_t addr, int max, bool invert)
+{
+    char text[256];
+    sc_string(emu, addr, text, sizeof text);
+    const char *p = text;
+    for (; emu->cursor_x <= max && emu->cursor_x <= MONO_WIDTH / 6; emu->cursor_x++) {
+        uint32_t cp = ' ';
+        if (*p) {
+            int len;
+            cp = text_decode(p, &len);
+            p += len > 0 ? len : 1;
+        }
+        draw_char(emu->vram, (emu->cursor_x - 1) * 6, (emu->cursor_y - 1) * 8, cp, 6, invert, true);
+    }
+    return 0;
+}
+
+/* PrintCR(string, x, y): Print at cell (x, y) from 0 (locate's x + 1, y +
+ * 1); the cursor moves past. */
+SC(sc_fx_print_cr)
+{
+    emu->cursor_x = (int32_t)a[1] + 1;
+    emu->cursor_y = (int32_t)a[2] + 1;
+    return print_at_cursor(emu, a[0], false, false);
+}
+
+/* Cursor_GetSettings(unsigned int settings[4]): the cursor's cell from 0
+ * (as PrintCR takes it), then its flash style and mode: none, as we don't
+ * draw it. */
+SC(sc_fx_cursor_settings)
+{
+    uint32_t v[4] = {(uint32_t)emu->cursor_x - 1, (uint32_t)emu->cursor_y - 1, 0, 0};
+    for (int i = 0; i < 4; i++)
+        mem_write32(&emu->mem, a[0] + 4 * (uint32_t)i, v[i]);
+    return 0;
+}
+
+SC(sc_fx_print_line)
+{
+    return print_line(emu, a[0], (int32_t)a[1], false);
+}
+
+SC(sc_fx_print_rline)
+{
+    return print_line(emu, a[0], (int32_t)a[1], true);
+}
+
 SC(sc_fx_print)
 {
     return print_at_cursor(emu, a[0], false, false);
@@ -436,6 +522,73 @@ SC(sc_fx_keycode_table)
             be_write(t + 4 * ((row - 1) * 7 + (col - 1)), (uint32_t)KEYS[k].getkey, 4);
     }
     return P1(ROM_PHYS + KEYCODE_TABLE);
+}
+
+/* 0x486(table): the OS's message (0) and F-key bitmap (1) tables, as fxlib
+ * reads them: a 16-bit count at +12, then count + 1 16-bit offsets of the
+ * entries (1..count) from the end of the offsets. We don't have the OS's,
+ * so these are stand-ins: the messages add-ins show in their own dialogs,
+ * empty strings for the rest, and blank 21 x 8 F-key tabs. */
+#define MESSAGE_TABLE 0x00381000u
+#define BITMAP_TABLE  0x00382000u
+#define MESSAGES      512
+#define BITMAPS       64
+#define FKEY_BYTES    (3 * 8)
+
+static const char *const MESSAGE_TEXT[] = {
+    [1] = "    Press:[EXIT]",
+    [2] = "      Yes:[F1]",
+    [3] = "      No :[F6]",
+};
+
+static uint32_t data_table(Emu *emu, uint32_t at, int count, const uint8_t *(*entry)(int i, uint32_t *size))
+{
+    uint8_t *t = emu->rom + at;
+    memset(t, 0, 12);
+    be_write(t + 12, (uint32_t)count, 2);
+    uint8_t *data = t + 14 + 2 * (count + 1);
+    uint32_t used = 0;
+    for (int i = 0; i <= count; i++) {
+        uint32_t size;
+        const uint8_t *e = entry(i, &size);
+        be_write(t + 14 + 2 * i, used, 2);
+        memcpy(data + used, e, size);
+        used += size;
+    }
+    return P1(ROM_PHYS + at);
+}
+
+static const uint8_t *message(int i, uint32_t *size)
+{
+    const char *text = "";
+    if (i < (int)(sizeof MESSAGE_TEXT / sizeof MESSAGE_TEXT[0]) && MESSAGE_TEXT[i])
+        text = MESSAGE_TEXT[i];
+    *size = (uint32_t)strlen(text) + 1;
+    return (const uint8_t *)text;
+}
+
+static const uint8_t *fkey_bitmap(int i, uint32_t *size)
+{
+    static const uint8_t blank[FKEY_BYTES];
+    (void)i;
+    *size = FKEY_BYTES;
+    return blank;
+}
+
+SC(sc_fx_data_table)
+{
+    switch (a[0]) {
+    case 0: return data_table(emu, MESSAGE_TABLE, MESSAGES, message);
+    case 1: return data_table(emu, BITMAP_TABLE, BITMAPS, fkey_bitmap);
+    default: return 0;
+    }
+}
+
+/* GetInsOverwriteState(): 1, insert mode (the OS's default). */
+SC(sc_fx_ins_state)
+{
+    (void)emu; (void)a;
+    return 1;
 }
 
 /* PutKey(keycode, mode): the next GetKey returns keycode. */

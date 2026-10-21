@@ -230,6 +230,78 @@ static SC(sc_memcmp)
     return 0;
 }
 
+/* The rest of the C string functions, as the fx-9860G OS has them. */
+static uint32_t str_copy(Emu *emu, uint32_t dst, uint32_t src, uint32_t n)
+{
+    uint32_t i = 0;
+    for (; i < n; i++) {
+        uint8_t c = mem_read8(&emu->mem, src + i);
+        mem_write8(&emu->mem, dst + i, c);
+        if (!c || emu->mem.fault)
+            break;
+    }
+    return i;
+}
+
+static uint32_t str_compare(Emu *emu, uint32_t s1, uint32_t s2, uint32_t n)
+{
+    for (uint32_t i = 0; i < n && !emu->mem.fault; i++) {
+        uint8_t c1 = mem_read8(&emu->mem, s1 + i), c2 = mem_read8(&emu->mem, s2 + i);
+        if (c1 != c2)
+            return (uint32_t)(c1 - c2);
+        if (!c1)
+            break;
+    }
+    return 0;
+}
+
+static SC(sc_strcat)
+{
+    str_copy(emu, a[0] + sc_strlen(emu, a), a[1], UINT32_MAX);
+    return a[0];
+}
+
+/* strncat(dst, src, n): at most n characters, then always a NUL. */
+static SC(sc_strncat)
+{
+    uint32_t end = a[0] + sc_strlen(emu, a);
+    uint32_t n = str_copy(emu, end, a[1], a[2]);
+    if (n == a[2])
+        mem_write8(&emu->mem, end + n, 0);
+    return a[0];
+}
+
+static SC(sc_strcmp)
+{
+    return str_compare(emu, a[0], a[1], UINT32_MAX);
+}
+
+static SC(sc_strncmp)
+{
+    return str_compare(emu, a[0], a[1], a[2]);
+}
+
+/* strncpy(dst, src, n): pads with NULs up to n. */
+static SC(sc_strncpy)
+{
+    for (uint32_t i = str_copy(emu, a[0], a[1], a[2]); i < a[2]; i++)
+        mem_write8(&emu->mem, a[0] + i, 0);
+    return a[0];
+}
+
+static SC(sc_strrchr)
+{
+    uint32_t found = 0;
+    for (uint32_t p = a[0]; !emu->mem.fault; p++) {
+        uint8_t c = mem_read8(&emu->mem, p);
+        if (c == (uint8_t)a[1])
+            found = p;
+        if (!c)
+            break;
+    }
+    return found;
+}
+
 /* Hex conversions. The *ToHex calls write uppercase digits without a NUL;
  * HexTo* accept either case and return 0, or 1 on a non-hex character
  * (then *result is left alone). */
@@ -391,6 +463,31 @@ static SC(sc_serial_write)
     for (int i = 0; i < size; i++)
         sh7305_serial_send(&emu->hw, mem_read8(&emu->mem, a[0] + (uint32_t)i));
     return 0;
+}
+
+/* Serial_ReadOneByte(unsigned char *out) and Serial_SpyNthByte(n, out): 1,
+ * nothing to read (3: not open). */
+static SC(sc_serial_read_one)
+{
+    (void)a;
+    return emu->serial_open ? 1 : 3;
+}
+
+/* Serial_BufferedTransmitOneByte / DirectTransmitOneByte(byte): as
+ * Serial_Write. */
+static SC(sc_serial_write_one)
+{
+    if (!emu->serial_open)
+        return 3;
+    return sh7305_serial_send(&emu->hw, (uint8_t)a[0]) ? 0 : 2;
+}
+
+/* Serial_ClearReceiveBuffer / ClearTransmitBuffer: nothing ever waits to
+ * be read; what is being sent is left to go out. */
+static SC(sc_serial_clear)
+{
+    (void)a;
+    return emu->serial_open ? 0 : 3;
 }
 
 /*
@@ -669,6 +766,9 @@ static const Syscall SYSCALLS_FX[] = {
     {0x011A, "Timer_Start", sc_timer_start},
     {0x011B, "Timer_Stop", sc_timer_stop},
     {0x0135, "GetVRAMAddress", sc_get_vram_address}, /* the OS's 1 kB monochrome VRAM */
+    {0x0139, "Cursor_SetFlashStyle", sc_nothing}, /* we don't draw the text cursor */
+    {0x013A, "Cursor_SetFlashMode", sc_nothing},
+    {0x013B, "Cursor_GetSettings", sc_fx_cursor_settings},
     {0x0142, "Bdisp_AllClr_DD", sc_fx_allclr_dd},
     {0x0143, "Bdisp_AllClr_VRAM", sc_fx_allclr_vram},
     {0x0144, "Bdisp_AllClr_DDVRAM", sc_fx_allclr_ddvram},
@@ -682,6 +782,8 @@ static const Syscall SYSCALLS_FX[] = {
     {0x014C, "Bdisp_AreaClr_DDVRAM", sc_fx_areaclr_ddvram},
     {0x014D, "Bdisp_AreaReverseVRAM", sc_fx_area_reverse_vram},
     {0x0150, "PrintXY", sc_fx_print_xy},
+    {0x0156, "PopUpWin", sc_fx_popup_at},
+    {0x015D, "PrintCR", sc_fx_print_cr},
     {0x0236, "Reset", sc_restart},
     {0x023E, "RTC_SetDateTime", sc_rtc_set_date_time},
     {0x0241, "Keyboard_ClrBuffer", sc_nothing},
@@ -695,12 +797,24 @@ static const Syscall SYSCALLS_FX[] = {
     {0x024B, "Keyboard_IsSpecialKeyDown", sc_fx_key_down_at},
     {0x024C, "Keyboard_IsSpecialKeyDown", sc_fx_key_down_at},
     {0x024D, "Keyboard_KeyDown", sc_fx_key_down},
+    {0x02AA, "memcpy", sc_memcpy},
     {0x03ED, "Interrupt_SetOrClrStatusFlags", sc_nothing},
     {0x03F4, "PowerOff", sc_nothing},          /* off and on again at once */
     {0x03FA, "Hmem_SetMMU", sc_fx_set_mmu},
+    {0x040C, "Serial_ReadOneByte", sc_serial_read_one},
+    {0x040D, "Serial_ReadNBytes", sc_serial_read},
+    {0x040E, "Serial_BufferedTransmitOneByte", sc_serial_write_one},
+    {0x040F, "Serial_BufferedTransmitNBytes", sc_serial_write},
+    {0x0410, "Serial_DirectTransmitOneByte", sc_serial_write_one},
+    {0x0411, "Serial_GetReceivedBytesAvailable", sc_serial_poll_rx},
+    {0x0412, "Serial_GetFreeTransmitSpace", sc_serial_poll_tx},
+    {0x0413, "Serial_ClearReceiveBuffer", sc_serial_clear},
+    {0x0414, "Serial_ClearTransmitBuffer", sc_serial_clear},
     {0x0418, "Serial_Open", sc_serial_open},
     {0x0419, "Serial_Close", sc_serial_close},
     {0x0420, "OS_inner_Sleep", sc_wait_ms},
+    {0x0422, "Serial_SpyNthByte", sc_serial_read_one},
+    {0x0425, "Serial_IsOpen", sc_serial_is_open},
     {0x042C, "Bfile_OpenFile", sc_bfile_open},
     {0x042D, "Bfile_CloseFile", sc_bfile_close},
     {0x042E, "Bfile_GetMediaFree", sc_bfile_media_free},
@@ -713,13 +827,20 @@ static const Syscall SYSCALLS_FX[] = {
     {0x043B, "Bfile_FindFirst", sc_bfile_find_first},
     {0x043C, "Bfile_FindNext", sc_bfile_find_next},
     {0x043D, "Bfile_FindClose", sc_bfile_find_close},
+    {0x0450, "Bfile_GetFilenameLength", sc_bfile_name_length},
+    {0x0456, "Bfile_NameToStr_ncpy", sc_bfile_name_to_str},
     {0x0462, "GetAppName", sc_get_app_name},
+    {0x0486, "GetDataTablePtr", sc_fx_data_table},
     {0x0494, "SetQuitHandler", sc_nothing},    /* no OS menu to quit through */
+    {0x06C4, "Keyboard_PRGM_GetKey", sc_prgm_get_key_os}, /* same codes as on the fx-CG */
     {0x0807, "locate", sc_locate},
     {0x0808, "Print", sc_fx_print},
     {0x0809, "PrintRev", sc_fx_print_rev},
     {0x080A, "PrintC", sc_fx_print_c},
     {0x080B, "PrintRevC", sc_fx_print_rev_c},
+    {0x080C, "PrintLine", sc_fx_print_line},
+    {0x080D, "PrintRLine", sc_fx_print_rline},
+    {0x0811, "Cursor_SetFlashOn", sc_nothing},
     {0x0813, "SaveDisp", sc_fx_save_disp},
     {0x0814, "RestoreDisp", sc_fx_restore_disp},
     {0x0829, "MCS_CreateDirectory", sc_mcs_create_dir},
@@ -729,11 +850,23 @@ static const Syscall SYSCALLS_FX[] = {
     {0x0840, "MCSGetDlen2", sc_mcs_get_dlen2},
     {0x0841, "MCSGetData1", sc_mcs_get_data1},
     {0x0844, "MCSGetCapa", sc_mcs_get_capa},
+    {0x08FE, "PopupWin", sc_fx_popup_win},
+    {0x090C, "GetInsOverwriteState", sc_fx_ins_state},
     {0x090F, "GetKey", sc_get_key},
     {0x0910, "PutKey", sc_fx_put_key},
     {0x09AD, "PrintXY", sc_fx_print_xy},
     {0x0ACC, "free", sc_free},
     {0x0ACD, "malloc", sc_malloc},
+    {0x0ACE, "memcmp", sc_memcmp},
+    {0x0ACF, "memcpy", sc_memcpy},
+    {0x0AD0, "memset", sc_memset},
+    {0x0AD4, "strcat", sc_strcat},
+    {0x0AD5, "strcmp", sc_strcmp},
+    {0x0AD6, "strlen", sc_strlen},
+    {0x0AD7, "strncat", sc_strncat},
+    {0x0AD8, "strncmp", sc_strncmp},
+    {0x0AD9, "strncpy", sc_strncpy},
+    {0x0ADA, "strrchr", sc_strrchr},
     {0x0C4F, "PrintMini", sc_fx_print_mini},
     {0x0E6D, "realloc", sc_realloc},
     {0x1032, "Keyboard_KeycodeTable", sc_fx_keycode_table},
