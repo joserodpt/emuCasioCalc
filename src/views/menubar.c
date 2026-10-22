@@ -893,14 +893,17 @@ bool menubar_event(const SDL_Event *e)
         view_redraw();
         return true;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        /* below the bars, with no menu open, clicks go on to the keypad */
+        if (open_menu < 0 && e->button.y >= BAR_H)
+            return false;
         if (e->button.button == SDL_BUTTON_LEFT)
             click(e->button.x, e->button.y);
         return true;
     case SDL_EVENT_MOUSE_BUTTON_UP:
-        if (dragging) {
-            dragging = false;
-            view_redraw();
-        }
+        if (!dragging)
+            return false;
+        dragging = false;
+        view_redraw();
         return true;
     case SDL_EVENT_KEY_DOWN:
         if (e->key.repeat)
