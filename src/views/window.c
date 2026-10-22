@@ -14,7 +14,6 @@
 #include "view.h"
 
 #define STATUS_MS    4000  /* how long a flashed status message stays */
-#define WIDE_TEXT_W  600   /* windows at least this wide get 2x menu text */
 #define TITLE_BAR_H  40    /* room left for the window's title bar, at most */
 #define MONO_MIN_W   256   /* the smallest window: the 128x64 screen at 2x */
 #define MONO_MIN_H   128
@@ -81,12 +80,11 @@ static const struct { const char *name; SDL_Keycode sdl; } KEYMAP[] = {
 
 
 
-/* UI text: 1.5x the desktop's scaling in windows at least WIDE_TEXT_W
- * logical pixels wide, 1x in narrower ones (100%: 2 or 1; 200%: 3 or 2). */
-static int text_scale_for(int width)
+/* UI text: the desktop's scaling (100%: 1; 200%: 2), whatever the
+ * window's size, so the bars keep their size as the window is resized. */
+static int text_scale_for(void)
 {
-    float k = view_ui_scale * (width >= WIDE_TEXT_W * view_ui_scale ? 1.5f : 1.0f);
-    int ts = (int)(k + 0.5f);
+    int ts = (int)(view_ui_scale + 0.5f);
     return ts < 1 ? 1 : ts;
 }
 
@@ -116,7 +114,7 @@ static void update_layout(void)
     int w, h;
     SDL_GetWindowSize(view_window, &w, &h);
     window_w = w;
-    view_text_scale = text_scale_for(w);
+    view_text_scale = text_scale_for();
     float area_h = (float)(h - BAR_H);
     /* the keypad on the right, the screen centred in the rest */
     float kw = view_show_keypad ? area_h * KEYPAD_RATIO : 0;
@@ -223,10 +221,8 @@ void view_redraw(void)
 static void window_size(int scale, int *w, int *h)
 {
     *w = view_panel_w * scale + keypad_width(view_panel_h * scale);
-    int before = view_text_scale;
-    view_text_scale = text_scale_for(*w);
-    *h = BAR_H + view_panel_h * scale; /* the bar at that width */
-    view_text_scale = before;
+    view_text_scale = text_scale_for();
+    *h = BAR_H + view_panel_h * scale;
 }
 
 void view_set_scale(int scale)
@@ -400,7 +396,7 @@ static void track_modifiers(int k)
  * else -1. */
 static int handle_event(const SDL_Event *e)
 {
-    if (info_window_event(e) || about_window_event(e) || menubar_event(e))
+    if (info_window_event(e) || about_window_event(e) || id_window_event(e) || menubar_event(e))
         return -1;
     int pk = keypad_event(e);
     if (pk >= 0) {
@@ -592,7 +588,6 @@ bool platform_init(int scale, bool headless)
     window_size(scale, &w, &h);
     while (bounds && scale > 1 && (w > usable.w || h + TITLE_BAR_H > usable.h))
         window_size(--scale, &w, &h);
-    view_text_scale = text_scale_for(w);
     if (!SDL_CreateWindowAndRenderer("emuCasioCalc", w, h,
                                      SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY, &view_window,
                                      &view_renderer)) {
@@ -640,6 +635,7 @@ void platform_shutdown(void)
     receiver_stop();
     info_window_close();
     about_window_close();
+    id_window_close();
     SDL_DestroyTexture(upscaled);
     SDL_DestroyTexture(screen);
     view_text_forget(view_renderer);

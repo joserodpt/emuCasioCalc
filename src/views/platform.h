@@ -37,6 +37,11 @@ bool platform_load_settings(void);
  * its first run), and the one to keep. */
 const char *platform_device_id(void);
 void platform_set_device_id(const char *hex);
+/* id_window.c: the product ID the calculator has (for Emulation > Product
+ * ID to show), and the one chosen there since the last call, NULL if none:
+ * the next load uses it. */
+void platform_show_device_id(const char *hex);
+const char *platform_take_device_id(void);
 
 /* headless: no window (for tests). scale: the screen's zoom, 0 for the one
  * remembered (4 the first time). */

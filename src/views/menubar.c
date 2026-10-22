@@ -17,7 +17,7 @@ typedef enum {
     A_ZOOM1, A_ZOOM2, A_ZOOM3, A_ZOOM4, A_ZOOM5, A_ZOOM6, /* consecutive */
     A_KEYS, A_ABOUT,
     A_MODEL_AUTO, A_MODEL_CG20, A_MODEL_CG50, A_MODEL_FX9860G2, A_MODEL_FX9750G3, /* consecutive, as ModelChoice */
-    A_TIMING_REAL, A_TIMING_FAST, A_SOUND,
+    A_TIMING_REAL, A_TIMING_FAST, A_SOUND, A_PRODUCT_ID,
     A_FASTER, A_SLOWER, A_NORMAL_SPEED, A_CUSTOM_SPEED,
     A_BATTERY_FULL, A_BATTERY_HALF, A_BATTERY_LOW, A_BATTERY_EMPTY, /* consecutive, as BATTERY_LEVEL_CV */
     A_LANG_EN, A_LANG_ES, A_LANG_DE, A_LANG_FR, A_LANG_PT, A_LANG_ZH, /* consecutive, as LANG_* */
@@ -58,6 +58,8 @@ static const Item EMU_ITEMS[] = {
     {"Timing: fast", "", A_TIMING_FAST},
     {"", "", A_SEPARATOR},
     {"Sound (from the link port)", "", A_SOUND},
+    {"", "", A_SEPARATOR},
+    {"Product ID...", "", A_PRODUCT_ID},
     {"", "", A_SEPARATOR},
     {"Speed: normal (100%)", "Ctrl+0", A_NORMAL_SPEED},
     {"Speed: custom...", "", A_CUSTOM_SPEED},
@@ -160,6 +162,13 @@ static int title_w(int m)
     return (int)tw(MENUS[m].title) + 2 * PAD;
 }
 
+/* The File menu's items are toggles, shown with a check after the label;
+ * the other menus' are choices, with a check column before them. */
+static bool check_after(int m)
+{
+    return MENUS[m].items == FILE_ITEMS;
+}
+
 static int dropdown_w(int m)
 {
     int w = 0;
@@ -168,7 +177,7 @@ static int dropdown_w(int m)
         if (iw > w)
             w = iw;
     }
-    return w + 5 * PAD + 2 * CHAR_W; /* check mark column + gap */
+    return w + 5 * PAD + 2 * CHAR_W; /* check mark (column or after the label) + gap */
 }
 
 static int title_at(float x, float y)
@@ -435,14 +444,17 @@ static void draw_dropdown(void)
             color(0, 0, 0);
         }
         float ty = y + (ITEM_H - GLYPH_H) / 2.0f;
+        bool after = check_after(open_menu);
+        float lx = (float)(x0 + PAD + (after ? 0 : 2 * CHAR_W));
         if (checked(it->action)) { /* a check mark */
-            float cx = (float)x0 + PAD, cy = y + ITEM_H / 2.0f, u = 2.0f * TEXT_SCALE;
+            float cx = after ? lx + tw(it->label) + CHAR_W : (float)x0 + PAD, cy = y + ITEM_H / 2.0f,
+                  u = 2.0f * TEXT_SCALE;
             for (int t = 0; t < TEXT_SCALE + 1; t++) {
                 SDL_RenderLine(view_renderer, cx + t * 0.5f, cy + t, cx + 2 * u, cy + 2 * u + t);
                 SDL_RenderLine(view_renderer, cx + 2 * u, cy + 2 * u + t, cx + 5 * u, cy - 2.5f * u + t);
             }
         }
-        text((float)(x0 + PAD + 2 * CHAR_W), ty, it->label);
+        text(lx, ty, it->label);
         if (i != hover_item)
             color(110, 110, 110);
         text((float)(x0 + dw - PAD) - tw(it->shortcut), ty, it->shortcut);
@@ -767,6 +779,9 @@ static void run_action(Action a)
         break;
     case A_ABOUT:
         about_window_open();
+        break;
+    case A_PRODUCT_ID:
+        id_window_open();
         break;
     case A_MODEL_AUTO: case A_MODEL_CG20: case A_MODEL_CG50: case A_MODEL_FX9860G2: case A_MODEL_FX9750G3: {
         ModelChoice c = (ModelChoice)(a - A_MODEL_AUTO);

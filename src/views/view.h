@@ -59,7 +59,7 @@ void view_flash_status(const char *msg);
 
 /* UI sizes, in window pixels. TEXT_SCALE k: text 8k pixels high (8 px
  * units, from the 8x8 font the UI once used), chosen from the desktop's
- * scaling and the window's width (window.c); UI(n): n pixels at 100%. */
+ * scaling (window.c); UI(n): n pixels at 100%. */
 #define TEXT_SCALE view_text_scale
 #define UI(n)      ((int)((n) * view_ui_scale + 0.5f))
 #define CHAR_W     (8 * TEXT_SCALE)
@@ -69,7 +69,7 @@ void view_flash_status(const char *msg);
 #define STATUS_Y   (MENU_H + (view_show_speed ? TOOL_H : 0)) /* the status row, last */
 #define STATUS_H   (GLYPH_H + UI(14))
 #define BAR_H      (STATUS_Y + STATUS_H) /* everything above the screen */
-#define ITEM_H     (GLYPH_H + UI(18))
+#define ITEM_H     (GLYPH_H + UI(8))
 #define PAD        (UI(6) + 4 * TEXT_SCALE)
 
 /* The PC key for KEYS[key] ("Enter", "Esc"...), and a short label for the
@@ -105,6 +105,12 @@ void about_window_open(void);
 void about_window_close(void);
 /* Returns true if the event belonged to the About window. */
 bool about_window_event(const SDL_Event *e);
+
+/* id_window.c: Emulation > Product ID */
+void id_window_open(void);
+void id_window_close(void);
+/* Returns true if the event belonged to the Product ID window. */
+bool id_window_event(const SDL_Event *e);
 
 /* info_window.c */
 void info_window_open(void);

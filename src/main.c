@@ -216,6 +216,10 @@ static bool load(Emu *emu, const Options *opt, const char *path, G3aInfo *info, 
     if (!fresh)
         emu_free(emu);
     memset(emu, 0, sizeof *emu);
+    uint8_t chosen_id[DEVICE_ID_SIZE];
+    const char *hex = platform_take_device_id(); /* Emulation > Product ID */
+    if (hex && parse_device_id(hex, chosen_id))
+        emu_set_device_id(chosen_id);
     bool ok = emu_init(emu, model);
     if (!ok)
         fprintf(stderr, "out of memory\n");
@@ -237,6 +241,7 @@ static bool load(Emu *emu, const Options *opt, const char *path, G3aInfo *info, 
     bool chosen = model != info->model;
     char id[2 * DEVICE_ID_SIZE + 1];
     format_device_id(emu_device_id(), id);
+    platform_show_device_id(id);
     printf("loaded %s: %u bytes of code, running as %s (%s%s), product ID %s\n", path,
            file.size - g3a_header_size(info), model_name(model), chosen ? "chosen; detected: " : "",
            chosen ? model_name(info->model) : info->model_reason, id);
@@ -418,6 +423,8 @@ int main(int argc, char **argv)
         }
         emu_set_device_id(id);
     }
+    format_device_id(emu_device_id(), hex);
+    platform_show_device_id(hex);
     if (model) {
         if (!strcmp(model, "auto")) {
             platform_set_model_choice(CHOICE_AUTO);
