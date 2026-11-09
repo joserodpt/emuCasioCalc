@@ -18,6 +18,13 @@ live view of a real calculator's screen over USB.
 ![Built with](https://img.shields.io/badge/built%20with-SDL3-8a2be2)
 ![Syscalls](https://img.shields.io/badge/syscalls-193%20of%20273%20(71%25)-2ea44f)
 
+<img src="assets/screenshots/accircuit.png" width="80%" alt="The emulator window running the AC Circuit add-in on an fx-CG50">
+
+<img src="assets/screenshots/basen-fx9860gii.png" width="42%" alt="The emulator window running the Base-N add-in on a monochrome fx-9860GII">
+<img src="assets/screenshots/electronics-keyboard.png" width="54%" alt="The emulator window running the Electronics add-in on an fx-CG50, with the on-screen keyboard">
+
+<sub>A monochrome <code>.g1a</code> add-in on the fx-9860GII, and the fx-CG50 with the on-screen keyboard.</sub>
+
 <img src="https://raw.githubusercontent.com/joserodpt/casioCalcApps/main/apps/circuit/screenshots/demo.gif" width="32%" alt="Circuit running in the emulator">
 <img src="https://raw.githubusercontent.com/joserodpt/casioCalcApps/main/apps/electronics/screenshots/demo.gif" width="32%" alt="Electronics running in the emulator">
 <img src="https://raw.githubusercontent.com/joserodpt/casioCalcApps/main/apps/base-n/screenshots/demo.gif" width="32%" alt="Base-N running in the emulator">
