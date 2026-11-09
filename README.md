@@ -17,6 +17,7 @@ live view of a real calculator's screen over USB.
 ![Language](https://img.shields.io/badge/language-C11-555555)
 ![Built with](https://img.shields.io/badge/built%20with-SDL3-8a2be2)
 ![Syscalls](https://img.shields.io/badge/syscalls-193%20of%20273%20(71%25)-2ea44f)
+![License](https://img.shields.io/badge/license-MIT-555555)
 
 <img src="assets/screenshots/accircuit.png" width="80%" alt="The emulator window running the AC Circuit add-in on an fx-CG50">
 
@@ -621,6 +622,13 @@ Next steps:
 - Built-in apps (Run-Matrix, Graph...) are part of the OS and can't run here.
 
 ## Legal and credits
+
+emuCasioCalc is released under the [MIT License](LICENSE).
+
+This is an independent project, not affiliated with, endorsed by or
+sponsored by CASIO Computer Co., Ltd. CASIO, Prizm and the calculator model
+names are trademarks of CASIO Computer Co., Ltd., used here only to say
+which calculators the emulator runs add-ins for.
 
 Don't commit or share OS dumps or other people's add-ins. This project only
 contains code written for it, and two open fonts for the OS text calls
